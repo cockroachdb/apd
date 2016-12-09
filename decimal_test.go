@@ -1,7 +1,6 @@
 package apd
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"testing"
@@ -57,10 +56,6 @@ func newDecimal(t *testing.T, s string) *Decimal {
 	return d
 }
 
-func (d *Decimal) GoString() string {
-	return fmt.Sprintf(`{Coeff: %s, Exponent: %d}`, d.Coeff.String(), d.Exponent)
-}
-
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal
@@ -93,18 +88,6 @@ func TestUpscale(t *testing.T) {
 	}
 }
 
-func TestNumDigits(t *testing.T) {
-	var buf bytes.Buffer
-	for i := int64(1); i < 1000; i++ {
-		buf.WriteByte('1')
-		d := newDecimal(t, buf.String())
-		n := d.numDigits()
-		if n != i {
-			t.Fatalf("expected %d, got %d", i, n)
-		}
-	}
-}
-
 func TestAdd(t *testing.T) {
 	tests := []struct {
 		x, y string
@@ -126,6 +109,35 @@ func TestAdd(t *testing.T) {
 			s := d.String()
 			if s != tc.r {
 				t.Fatalf("expected: %s, got: %s", tc.r, s)
+			}
+		})
+	}
+}
+
+func TestCmp(t *testing.T) {
+	tests := []struct {
+		x, y string
+		c    int
+	}{
+		{x: "1", y: "10", c: -1},
+		{x: "1", y: "1e1", c: -1},
+		{x: "1e1", y: "1", c: 1},
+		{x: ".1e1", y: "100e-1", c: -1},
+
+		{x: ".1e1", y: "100e-2", c: 0},
+		{x: "1", y: ".1e1", c: 0},
+		{x: "1", y: "1", c: 0},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {
+			x := newDecimal(t, tc.x)
+			y := newDecimal(t, tc.y)
+			c, err := x.Cmp(y)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c != tc.c {
+				t.Fatalf("expected: %d, got: %d", tc.c, c)
 			}
 		})
 	}

@@ -1,6 +1,7 @@
 package apd
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -20,8 +21,10 @@ type Decimal struct {
 	Coeff    big.Int
 	Exponent int32
 
-	Precision uint32
-	Rounding  Rounder
+	MaxExponent int32
+	MinExponent int32
+	Precision   uint32
+	Rounding    Rounder
 }
 
 func New(i int64, scale int32) *Decimal {
@@ -86,6 +89,10 @@ func (d *Decimal) String() string {
 	return s
 }
 
+func (d *Decimal) GoString() string {
+	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, MaxExponent: %d, MinExponent: %d, Precision: %d}`, d.Coeff.String(), d.Exponent, d.MaxExponent, d.MinExponent, d.Precision)
+}
+
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
@@ -105,14 +112,28 @@ func (d *Decimal) addExponent(x int64) error {
 	if r > math.MaxInt32 || r < math.MinInt32 {
 		return ErrExponentOutOfRange
 	}
+	if d.MaxExponent != 0 || d.MinExponent != 0 {
+		// For max/min exponent calculation, add in the number of digits for each power of 10.
+		nr := r + d.numDigits() - 1
+		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
+		if nr > math.MaxInt32 || nr < math.MinInt32 {
+			return ErrExponentOutOfRange
+		}
+		v := int32(nr)
+		if d.MaxExponent != 0 && v > d.MaxExponent ||
+			d.MinExponent != 0 && v < d.MinExponent {
+			return ErrExponentOutOfRange
+		}
+	}
 	d.Exponent = int32(r)
 	return nil
 }
 
 var (
-	bigOne = big.NewInt(1)
-	bigTwo = big.NewInt(2)
-	bigTen = big.NewInt(10)
+	bigZero = big.NewInt(0)
+	bigOne  = big.NewInt(1)
+	bigTwo  = big.NewInt(2)
+	bigTen  = big.NewInt(10)
 )
 
 // upscale converts a and b to big.Ints with the same scaling, and their
@@ -128,7 +149,9 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 		b, a = a, b
 	}
 	s := int64(a.Exponent) - int64(b.Exponent)
-	if s > math.MaxInt32 {
+	// TODO(mjibson): figure out a better way to upscale numbers with highly
+	// differing exponents.
+	if s > 1000 {
 		return nil, nil, 0, ErrExponentOutOfRange
 	}
 	y := big.NewInt(s)
@@ -141,21 +164,21 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	return y, x, b.Exponent, nil
 }
 
-// numDigits returns the number of digits of d's coefficient.
-func (d *Decimal) numDigits() int64 {
-	const digitsToBitsRatio = math.Ln10 / math.Ln2
-
-	numDigits := float64(d.Coeff.BitLen()) / digitsToBitsRatio
-	return int64(numDigits) + 1
-}
-
 // Add sets d to the sum x+y and returns d.
 func (d *Decimal) Add(x, y *Decimal) (*Decimal, error) {
 	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "add")
+		return nil, errors.Wrap(err, "Add")
 	}
 	d.Coeff.Add(a, b)
 	d.Exponent = s
-	return d, nil
+	return d.Round(d)
+}
+
+func (d *Decimal) Cmp(x *Decimal) (int, error) {
+	a, b, _, err := upscale(d, x)
+	if err != nil {
+		return 0, errors.Wrap(err, "Cmp")
+	}
+	return a.Cmp(b), nil
 }

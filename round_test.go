@@ -5,12 +5,13 @@ import (
 	"testing"
 )
 
+var rounders = map[string]Rounder{
+	"down":      RoundDown,
+	"half_up":   RoundHalfUp,
+	"half_even": RoundHalfEven,
+}
+
 func TestRound(t *testing.T) {
-	rounders := map[string]Rounder{
-		"down":      RoundDown,
-		"half-up":   RoundHalfUp,
-		"half-even": RoundHalfEven,
-	}
 
 	tests := map[string][]struct {
 		x string
@@ -24,7 +25,7 @@ func TestRound(t *testing.T) {
 			{x: "12", p: 3, r: "12"},
 			{x: "1234.5678e10", p: 5, r: "12345000000000"},
 		},
-		"half-up": {
+		"half_up": {
 			{x: "14", p: 1, r: "10"},
 			{x: "15", p: 1, r: "20"},
 			{x: "16", p: 1, r: "20"},
@@ -38,18 +39,21 @@ func TestRound(t *testing.T) {
 			{x: "155", p: 2, r: "160"},
 			{x: "156", p: 2, r: "160"},
 		},
-		"half-even": {
+		"half_even": {
 			{x: "14", p: 1, r: "10"},
-			{x: "15", p: 1, r: "10"},
+			{x: "15", p: 1, r: "20"},
 			{x: "16", p: 1, r: "20"},
+			{x: "24", p: 1, r: "20"},
+			{x: "25", p: 1, r: "20"},
+			{x: "26", p: 1, r: "30"},
 			{x: "149", p: 1, r: "100"},
-			{x: "150", p: 1, r: "100"},
+			{x: "150", p: 1, r: "200"},
 			{x: "151", p: 1, r: "200"},
 			{x: "149", p: 2, r: "150"},
 			{x: "150", p: 2, r: "150"},
 			{x: "151", p: 2, r: "150"},
 			{x: "154", p: 2, r: "150"},
-			{x: "155", p: 2, r: "150"},
+			{x: "155", p: 2, r: "160"},
 			{x: "156", p: 2, r: "160"},
 		},
 	}
