@@ -14,11 +14,14 @@ import (
 //     coeff * 10 ^ exponent
 //
 // All arithmetic operations on a Decimal are subject to the result's
-// Precision and Rounding settings.
+// Precision and Rounding settings. RoundDown is the default Rounding.
+
 type Decimal struct {
-	Coeff     big.Int
-	Exponent  int32
-	Precision int32
+	Coeff    big.Int
+	Exponent int32
+
+	Precision uint32
+	Rounding  Rounder
 }
 
 func New(i int64, scale int32) *Decimal {
@@ -38,14 +41,14 @@ func NewFromString(s string) (*Decimal, error) {
 			return nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
 		if exp > math.MaxInt32 || exp < math.MinInt32 {
-			return nil, errors.Errorf("exponent out of range: %d", exp)
+			return nil, ErrExponentOutOfRange
 		}
 		s = s[:i]
 	}
 	if i := strings.IndexByte(s, '.'); i >= 0 {
 		exp -= len(s) - i - 1
 		if exp > math.MaxInt32 || exp < math.MinInt32 {
-			return nil, errors.Errorf("exponent out of range: %d", exp)
+			return nil, ErrExponentOutOfRange
 		}
 		s = s[:i] + s[i+1:]
 	}
@@ -83,7 +86,32 @@ func (d *Decimal) String() string {
 	return s
 }
 
+func (d *Decimal) Set(x *Decimal) *Decimal {
+	d.Coeff.Set(&x.Coeff)
+	d.Exponent = x.Exponent
+	return d
+}
+
+var ErrExponentOutOfRange = errors.New("exponent out of range")
+
+// addExponent adds x to d's Exponent and checks that it is in range.
+func (d *Decimal) addExponent(x int64) error {
+	if x > math.MaxInt32 || x < math.MinInt32 {
+		return ErrExponentOutOfRange
+	}
+	// Now both d.Exponent and x are guaranteed to fit in an int32, so we can
+	// add them without overflow.
+	r := int64(d.Exponent) + int64(x)
+	if r > math.MaxInt32 || r < math.MinInt32 {
+		return ErrExponentOutOfRange
+	}
+	d.Exponent = int32(r)
+	return nil
+}
+
 var (
+	bigOne = big.NewInt(1)
+	bigTwo = big.NewInt(2)
 	bigTen = big.NewInt(10)
 )
 
@@ -101,7 +129,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	}
 	s := int64(a.Exponent) - int64(b.Exponent)
 	if s > math.MaxInt32 {
-		return nil, nil, 0, errors.Errorf("scale difference too large: %d", s)
+		return nil, nil, 0, ErrExponentOutOfRange
 	}
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)
@@ -111,6 +139,14 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 		x, y = y, x
 	}
 	return y, x, b.Exponent, nil
+}
+
+// numDigits returns the number of digits of d's coefficient.
+func (d *Decimal) numDigits() int64 {
+	const digitsToBitsRatio = math.Ln10 / math.Ln2
+
+	numDigits := float64(d.Coeff.BitLen()) / digitsToBitsRatio
+	return int64(numDigits) + 1
 }
 
 // Add sets d to the sum x+y and returns d.

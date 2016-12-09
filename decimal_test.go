@@ -1,6 +1,7 @@
 package apd
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"testing"
@@ -89,6 +90,18 @@ func TestUpscale(t *testing.T) {
 				t.Errorf("s: expected %d, got %d", tc.s, s)
 			}
 		})
+	}
+}
+
+func TestNumDigits(t *testing.T) {
+	var buf bytes.Buffer
+	for i := int64(1); i < 1000; i++ {
+		buf.WriteByte('1')
+		d := newDecimal(t, buf.String())
+		n := d.numDigits()
+		if n != i {
+			t.Fatalf("expected %d, got %d", i, n)
+		}
 	}
 }
 
