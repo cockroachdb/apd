@@ -1,0 +1,673 @@
+------------------------------------------------------------------------
+-- subtract0.decTest -- decimal subtraction (simplified)              --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+version: 2.62
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+-- [first group are 'quick confidence check']
+sub001 subtract  0   0  -> '0'
+sub002 subtract  1   1  -> '0'
+sub003 subtract  1   2  -> '-1'
+sub004 subtract  2   1  -> '1'
+sub005 subtract  2   2  -> '0'
+sub006 subtract  3   2  -> '1'
+sub007 subtract  2   3  -> '-1'
+
+sub011 subtract -0   0  -> '0'
+sub012 subtract -1   1  -> '-2'
+sub013 subtract -1   2  -> '-3'
+sub014 subtract -2   1  -> '-3'
+sub015 subtract -2   2  -> '-4'
+sub016 subtract -3   2  -> '-5'
+sub017 subtract -2   3  -> '-5'
+
+sub021 subtract  0  -0  -> '0'
+sub022 subtract  1  -1  -> '2'
+sub023 subtract  1  -2  -> '3'
+sub024 subtract  2  -1  -> '3'
+sub025 subtract  2  -2  -> '4'
+sub026 subtract  3  -2  -> '5'
+sub027 subtract  2  -3  -> '5'
+
+sub030 subtract  11  1  -> 10
+sub031 subtract  10  1  ->  9
+sub032 subtract  9   1  ->  8
+sub033 subtract  1   1  ->  0
+sub034 subtract  0   1  -> -1
+sub035 subtract -1   1  -> -2
+sub036 subtract -9   1  -> -10
+sub037 subtract -10  1  -> -11
+sub038 subtract -11  1  -> -12
+
+sub040 subtract '5.75' '3.3'  -> '2.45'
+sub041 subtract '5'    '-3'   -> '8'
+sub042 subtract '-5'   '-3'   -> '-2'
+sub043 subtract '-7'   '2.5'  -> '-9.5'
+sub044 subtract '0.7'  '0.3'  -> '0.4'
+sub045 subtract '1.3'  '0.3'  -> '1.0'
+sub046 subtract '1.25' '1.25' -> '0'
+
+sub050 subtract '1.23456789'    '1.00000000' -> '0.23456789'
+sub051 subtract '1.23456789'    '1.00000089' -> '0.23456700'
+sub052 subtract '0.5555555559'    '0.0000000001' -> '0.555555556' Inexact Lost_digits Rounded
+sub053 subtract '0.5555555559'    '0.0000000005' -> '0.555555556' Inexact Lost_digits Rounded
+sub054 subtract '0.4444444444'    '0.1111111111' -> '0.333333333' Inexact Lost_digits Rounded
+sub055 subtract '1.0000000000'    '0.00000001' -> '0.99999999' Rounded
+sub056 subtract '0.4444444444999'    '0' -> '0.444444444' Inexact Lost_digits Rounded
+sub057 subtract '0.4444444445000'    '0' -> '0.444444445' Inexact Lost_digits Rounded
+
+sub060 subtract '70'    '10000e+9' -> '-1.00000000E+13' Inexact Rounded
+sub061 subtract '700'    '10000e+9' -> '-1.00000000E+13' Inexact Rounded
+sub062 subtract '7000'    '10000e+9' -> '-1.00000000E+13' Inexact Rounded
+sub063 subtract '70000'    '10000e+9' -> '-9.9999999E+12' Inexact Rounded
+sub064 subtract '700000'    '10000e+9' -> '-9.9999993E+12' Rounded
+  -- symmetry:
+sub065 subtract '10000e+9'    '70' -> '1.00000000E+13' Inexact Rounded
+sub066 subtract '10000e+9'    '700' -> '1.00000000E+13' Inexact Rounded
+sub067 subtract '10000e+9'    '7000' -> '1.00000000E+13' Inexact Rounded
+sub068 subtract '10000e+9'    '70000' -> '9.9999999E+12' Inexact Rounded
+sub069 subtract '10000e+9'    '700000' -> '9.9999993E+12' Rounded
+
+  -- change precision
+sub080 subtract '10000e+9'    '70000' -> '9.9999999E+12' Inexact Rounded
+precision: 6
+sub081 subtract '10000e+9'    '70000' -> '1.00000E+13' Inexact Rounded
+precision: 9
+
+  -- some of the next group are really constructor tests
+sub090 subtract '00.0'    '0.0'  -> '0'
+sub091 subtract '00.0'    '0.00' -> '0'
+sub092 subtract '0.00'    '00.0' -> '0'
+sub093 subtract '00.0'    '0.00' -> '0'
+sub094 subtract '0.00'    '00.0' -> '0'
+sub095 subtract '3'    '.3'   -> '2.7'
+sub096 subtract '3.'   '.3'   -> '2.7'
+sub097 subtract '3.0'  '.3'   -> '2.7'
+sub098 subtract '3.00' '.3'   -> '2.70'
+sub099 subtract '3'    '3'    -> '0'
+sub100 subtract '3'    '+3'   -> '0'
+sub101 subtract '3'    '-3'   -> '6'
+sub102 subtract '3'    '0.3'  -> '2.7'
+sub103 subtract '3.'   '0.3'  -> '2.7'
+sub104 subtract '3.0'  '0.3'  -> '2.7'
+sub105 subtract '3.00' '0.3'  -> '2.70'
+sub106 subtract '3'    '3.0'  -> '0'
+sub107 subtract '3'    '+3.0' -> '0'
+sub108 subtract '3'    '-3.0' -> '6.0'
+
+-- the above all from add; massaged and extended.  Now some new ones...
+-- [particularly important for comparisons]
+-- NB: -1E-7 below were non-exponents pre-ANSI X3-274
+sub120 subtract  '10.23456784'    '10.23456789'  -> '-1E-7' Inexact Lost_digits Rounded
+sub121 subtract  '10.23456785'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub122 subtract  '10.23456786'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub123 subtract  '10.23456787'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub124 subtract  '10.23456788'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub125 subtract  '10.23456789'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub126 subtract  '10.23456790'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub127 subtract  '10.23456791'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub128 subtract  '10.23456792'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub129 subtract  '10.23456793'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub130 subtract  '10.23456794'    '10.23456789'  -> 0 Inexact Lost_digits Rounded
+sub131 subtract  '10.23456781'    '10.23456786'  -> '-1E-7' Inexact Lost_digits Rounded
+sub132 subtract  '10.23456782'    '10.23456786'  -> '-1E-7' Inexact Lost_digits Rounded
+sub133 subtract  '10.23456783'    '10.23456786'  -> '-1E-7' Inexact Lost_digits Rounded
+sub134 subtract  '10.23456784'    '10.23456786'  -> '-1E-7' Inexact Lost_digits Rounded
+sub135 subtract  '10.23456785'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub136 subtract  '10.23456786'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub137 subtract  '10.23456787'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub138 subtract  '10.23456788'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub139 subtract  '10.23456789'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub140 subtract  '10.23456790'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub141 subtract  '10.23456791'    '10.23456786'  -> 0 Inexact Lost_digits Rounded
+sub142 subtract  '1'              '0.999999999'  -> 0 Inexact Rounded
+sub143 subtract  '0.999999999'    '1'            -> 0 Inexact Rounded
+
+
+precision: 3
+sub150 subtract '12345678900000' '9999999999999'  -> 2.3E+12 Inexact Lost_digits Rounded
+sub151 subtract '9999999999999'  '12345678900000' -> -2.3E+12 Inexact Lost_digits Rounded
+precision: 6
+sub152 subtract '12345678900000' '9999999999999'  -> 2.3457E+12 Inexact Lost_digits Rounded
+sub153 subtract '9999999999999'  '12345678900000' -> -2.3457E+12 Inexact Lost_digits Rounded
+precision: 9
+sub154 subtract '12345678900000' '9999999999999'  -> 2.3456789E+12 Inexact Lost_digits Rounded
+sub155 subtract '9999999999999'  '12345678900000' -> -2.3456789E+12 Inexact Lost_digits Rounded
+precision: 12
+sub156 subtract '12345678900000' '9999999999999'  -> 2.3456789000E+12 Inexact Lost_digits Rounded
+sub157 subtract '9999999999999'  '12345678900000' -> -2.3456789000E+12 Inexact Lost_digits Rounded
+precision: 15
+sub158 subtract '12345678900000' '9999999999999'  -> 2345678900001
+sub159 subtract '9999999999999'  '12345678900000' -> -2345678900001
+precision: 9
+
+-- additional scaled arithmetic tests [0.97 problem]
+sub160 subtract '0'     '.1'      -> '-0.1'
+sub161 subtract '00'    '.97983'  -> '-0.97983'
+sub162 subtract '0'     '.9'      -> '-0.9'
+sub163 subtract '0'     '0.102'   -> '-0.102'
+sub164 subtract '0'     '.4'      -> '-0.4'
+sub165 subtract '0'     '.307'    -> '-0.307'
+sub166 subtract '0'     '.43822'  -> '-0.43822'
+sub167 subtract '0'     '.911'    -> '-0.911'
+sub168 subtract '.0'    '.02'     -> '-0.02'
+sub169 subtract '00'    '.392'    -> '-0.392'
+sub170 subtract '0'     '.26'     -> '-0.26'
+sub171 subtract '0'     '0.51'    -> '-0.51'
+sub172 subtract '0'     '.2234'   -> '-0.2234'
+sub173 subtract '0'     '.2'      -> '-0.2'
+sub174 subtract '.0'    '.0008'   -> '-0.0008'
+-- 0. on left
+sub180 subtract '0.0'     '-.1'      -> '0.1'
+sub181 subtract '0.00'    '-.97983'  -> '0.97983'
+sub182 subtract '0.0'     '-.9'      -> '0.9'
+sub183 subtract '0.0'     '-0.102'   -> '0.102'
+sub184 subtract '0.0'     '-.4'      -> '0.4'
+sub185 subtract '0.0'     '-.307'    -> '0.307'
+sub186 subtract '0.0'     '-.43822'  -> '0.43822'
+sub187 subtract '0.0'     '-.911'    -> '0.911'
+sub188 subtract '0.0'     '-.02'     -> '0.02'
+sub189 subtract '0.00'    '-.392'    -> '0.392'
+sub190 subtract '0.0'     '-.26'     -> '0.26'
+sub191 subtract '0.0'     '-0.51'    -> '0.51'
+sub192 subtract '0.0'     '-.2234'   -> '0.2234'
+sub193 subtract '0.0'     '-.2'      -> '0.2'
+sub194 subtract '0.0'     '-.0008'   -> '0.0008'
+-- negatives of same
+sub200 subtract '0'     '-.1'      -> '0.1'
+sub201 subtract '00'    '-.97983'  -> '0.97983'
+sub202 subtract '0'     '-.9'      -> '0.9'
+sub203 subtract '0'     '-0.102'   -> '0.102'
+sub204 subtract '0'     '-.4'      -> '0.4'
+sub205 subtract '0'     '-.307'    -> '0.307'
+sub206 subtract '0'     '-.43822'  -> '0.43822'
+sub207 subtract '0'     '-.911'    -> '0.911'
+sub208 subtract '.0'    '-.02'     -> '0.02'
+sub209 subtract '00'    '-.392'    -> '0.392'
+sub210 subtract '0'     '-.26'     -> '0.26'
+sub211 subtract '0'     '-0.51'    -> '0.51'
+sub212 subtract '0'     '-.2234'   -> '0.2234'
+sub213 subtract '0'     '-.2'      -> '0.2'
+sub214 subtract '.0'    '-.0008'   -> '0.0008'
+
+-- more fixed, LHS swaps [really the same as testcases under add]
+sub220 subtract '-56267E-12' 0  -> '-5.6267E-8'
+sub221 subtract '-56267E-11' 0  -> '-5.6267E-7'
+sub222 subtract '-56267E-10' 0  -> '-0.0000056267'
+sub223 subtract '-56267E-9'  0  -> '-0.000056267'
+sub224 subtract '-56267E-8'  0  -> '-0.00056267'
+sub225 subtract '-56267E-7'  0  -> '-0.0056267'
+sub226 subtract '-56267E-6'  0  -> '-0.056267'
+sub227 subtract '-56267E-5'  0  -> '-0.56267'
+sub228 subtract '-56267E-2'  0  -> '-562.67'
+sub229 subtract '-56267E-1'  0  -> '-5626.7'
+sub230 subtract '-56267E-0'  0  -> '-56267'
+-- symmetry ...
+sub240 subtract 0 '-56267E-12'  -> '5.6267E-8'
+sub241 subtract 0 '-56267E-11'  -> '5.6267E-7'
+sub242 subtract 0 '-56267E-10'  -> '0.0000056267'
+sub243 subtract 0 '-56267E-9'   -> '0.000056267'
+sub244 subtract 0 '-56267E-8'   -> '0.00056267'
+sub245 subtract 0 '-56267E-7'   -> '0.0056267'
+sub246 subtract 0 '-56267E-6'   -> '0.056267'
+sub247 subtract 0 '-56267E-5'   -> '0.56267'
+sub248 subtract 0 '-56267E-2'   -> '562.67'
+sub249 subtract 0 '-56267E-1'   -> '5626.7'
+sub250 subtract 0 '-56267E-0'   -> '56267'
+
+-- now some more from the 'new' add
+precision: 9
+sub301 subtract '1.23456789'  '1.00000000' -> '0.23456789'
+sub302 subtract '1.23456789'  '1.00000011' -> '0.23456778'
+
+sub311 subtract '0.4444444444'  '0.5555555555' -> '-0.111111112' Inexact Lost_digits Rounded
+sub312 subtract '0.4444444440'  '0.5555555555' -> '-0.111111112' Inexact Lost_digits Rounded
+sub313 subtract '0.4444444444'  '0.5555555550' -> '-0.111111111' Inexact Lost_digits Rounded
+sub314 subtract '0.44444444449'    '0' -> '0.444444444' Inexact Lost_digits Rounded
+sub315 subtract '0.444444444499'   '0' -> '0.444444444' Inexact Lost_digits Rounded
+sub316 subtract '0.4444444444999'  '0' -> '0.444444444' Inexact Lost_digits Rounded
+sub317 subtract '0.4444444445000'  '0' -> '0.444444445' Inexact Lost_digits Rounded
+sub318 subtract '0.4444444445001'  '0' -> '0.444444445' Inexact Lost_digits Rounded
+sub319 subtract '0.444444444501'   '0' -> '0.444444445' Inexact Lost_digits Rounded
+sub320 subtract '0.44444444451'    '0' -> '0.444444445' Inexact Lost_digits Rounded
+
+-- some carrying effects
+sub321 subtract '0.9998'  '0.0000' -> '0.9998'
+sub322 subtract '0.9998'  '0.0001' -> '0.9997'
+sub323 subtract '0.9998'  '0.0002' -> '0.9996'
+sub324 subtract '0.9998'  '0.0003' -> '0.9995'
+sub325 subtract '0.9998'  '-0.0000' -> '0.9998'
+sub326 subtract '0.9998'  '-0.0001' -> '0.9999'
+sub327 subtract '0.9998'  '-0.0002' -> '1.0000'
+sub328 subtract '0.9998'  '-0.0003' -> '1.0001'
+
+sub330 subtract '70'  '10000e+9' -> '-1.00000000E+13' Inexact Rounded
+sub331 subtract '700'  '10000e+9' -> '-1.00000000E+13' Inexact Rounded
+sub332 subtract '7000'  '10000e+9' -> '-1.00000000E+13' Inexact Rounded
+sub333 subtract '70000'  '10000e+9' -> '-9.9999999E+12' Inexact Rounded
+sub334 subtract '700000'  '10000e+9' -> '-9.9999993E+12' Rounded
+sub335 subtract '7000000'  '10000e+9' -> '-9.9999930E+12' Rounded
+-- symmetry:
+sub340 subtract '10000e+9'  '70' -> '1.00000000E+13' Inexact Rounded
+sub341 subtract '10000e+9'  '700' -> '1.00000000E+13' Inexact Rounded
+sub342 subtract '10000e+9'  '7000' -> '1.00000000E+13' Inexact Rounded
+sub343 subtract '10000e+9'  '70000' -> '9.9999999E+12' Inexact Rounded
+sub344 subtract '10000e+9'  '700000' -> '9.9999993E+12' Rounded
+sub345 subtract '10000e+9'  '7000000' -> '9.9999930E+12' Rounded
+
+-- same, higher precision
+precision: 15
+sub346 subtract '10000e+9'  '7' -> '9999999999993'
+sub347 subtract '10000e+9'  '70' -> '9999999999930'
+sub348 subtract '10000e+9'  '700' -> '9999999999300'
+sub349 subtract '10000e+9'  '7000' -> '9999999993000'
+sub350 subtract '10000e+9'  '70000' -> '9999999930000'
+sub351 subtract '10000e+9'  '700000' -> '9999999300000'
+sub352 subtract '7' '10000e+9'   -> '-9999999999993'
+sub353 subtract '70' '10000e+9'   -> '-9999999999930'
+sub354 subtract '700' '10000e+9'   -> '-9999999999300'
+sub355 subtract '7000' '10000e+9'   -> '-9999999993000'
+sub356 subtract '70000' '10000e+9'   -> '-9999999930000'
+sub357 subtract '700000' '10000e+9'   -> '-9999999300000'
+
+-- zero preservation
+precision: 6
+sub360 subtract '10000e+9'  '70000' -> '1.00000E+13' Inexact Rounded
+sub361 subtract 1 '0.0001' -> '0.9999'
+sub362 subtract 1 '0.00001' -> '0.99999'
+sub363 subtract 1 '0.000001' -> '1.00000' Inexact Rounded
+sub364 subtract 1 '0.0000001' -> '1.00000' Inexact Rounded
+sub365 subtract 1 '0.00000001' -> '1.00000' Inexact Rounded
+
+-- some funny zeros [in case of bad signum]
+sub370 subtract 1  0  -> 1
+sub371 subtract 1 0.  -> 1
+sub372 subtract 1  .0 -> 1
+sub373 subtract 1 0.0 -> 1
+sub374 subtract  0  1 -> -1
+sub375 subtract 0.  1 -> -1
+sub376 subtract  .0 1 -> -1
+sub377 subtract 0.0 1 -> -1
+
+precision: 9
+
+-- leading 0 digit before round
+sub910 subtract -103519362 -51897955.3 -> -51621407 Inexact Rounded
+sub911 subtract 159579.444 89827.5229 -> 69751.921 Inexact Rounded
+
+sub920 subtract 333.123456 33.1234566 -> 299.999999 Inexact Rounded
+sub921 subtract 333.123456 33.1234565 -> 300.000000 Inexact Rounded
+sub922 subtract 133.123456 33.1234565 -> 100.000000 Inexact Rounded
+sub923 subtract 133.123456 33.1234564 -> 100.000000 Inexact Rounded
+sub924 subtract 133.123456 33.1234540 -> 100.000002 Rounded
+sub925 subtract 133.123456 43.1234560 ->  90.000000 Rounded
+sub926 subtract 133.123456 43.1234561 ->  90.000000 Inexact Rounded
+sub927 subtract 133.123456 43.1234566 ->  89.999999 Inexact Rounded
+sub928 subtract 101.123456 91.1234566 ->   9.999999 Inexact Rounded
+sub929 subtract 101.123456 99.1234566 ->   1.999999 Inexact Rounded
+
+-- more of the same; probe for cluster boundary problems
+precision: 1
+sub930 subtract  11 2           -> 1E+1 Inexact Lost_digits Rounded
+precision: 2
+sub932 subtract 101 2           -> 1.0E+2 Inexact Lost_digits Rounded
+precision: 3
+sub934 subtract 101 2.1         -> 99 Inexact Rounded
+sub935 subtract 101 92.01       ->  9 Inexact Lost_digits Rounded
+precision: 4
+sub936 subtract 101 2.01        -> 99.0 Inexact Rounded
+sub937 subtract 101 92.01       ->  9.0 Inexact Rounded
+precision: 5
+sub938 subtract 101 2.001       -> 99.00 Inexact Rounded
+sub939 subtract 101 92.001      ->  9.00 Inexact Rounded
+precision: 6
+sub940 subtract 101 2.0001      -> 99.000 Inexact Rounded
+sub941 subtract 101 92.0001     ->  9.000 Inexact Rounded
+precision: 7
+sub942 subtract 101 2.00001     -> 99.0000 Inexact Rounded
+sub943 subtract 101 92.00001    ->  9.0000 Inexact Rounded
+precision: 8
+sub944 subtract 101 2.000001    -> 99.00000 Inexact Rounded
+sub945 subtract 101 92.000001   ->  9.00000 Inexact Rounded
+precision: 9
+sub946 subtract 101 2.0000001   -> 99.000000 Inexact Rounded
+sub947 subtract 101 92.0000001  ->  9.000000 Inexact Rounded
+
+precision: 9
+
+-- more LHS swaps [were fixed]
+sub390 subtract '-56267E-10'   0 ->  '-0.0000056267'
+sub391 subtract '-56267E-6'    0 ->  '-0.056267'
+sub392 subtract '-56267E-5'    0 ->  '-0.56267'
+sub393 subtract '-56267E-4'    0 ->  '-5.6267'
+sub394 subtract '-56267E-3'    0 ->  '-56.267'
+sub395 subtract '-56267E-2'    0 ->  '-562.67'
+sub396 subtract '-56267E-1'    0 ->  '-5626.7'
+sub397 subtract '-56267E-0'    0 ->  '-56267'
+sub398 subtract '-5E-10'       0 ->  '-5E-10'
+sub399 subtract '-5E-7'        0 ->  '-5E-7'
+sub400 subtract '-5E-6'        0 ->  '-0.000005'
+sub401 subtract '-5E-5'        0 ->  '-0.00005'
+sub402 subtract '-5E-4'        0 ->  '-0.0005'
+sub403 subtract '-5E-1'        0 ->  '-0.5'
+sub404 subtract '-5E0'         0 ->  '-5'
+sub405 subtract '-5E1'         0 ->  '-50'
+sub406 subtract '-5E5'         0 ->  '-500000'
+sub407 subtract '-5E8'         0 ->  '-500000000'
+sub408 subtract '-5E9'         0 ->  '-5E+9'
+sub409 subtract '-5E10'        0 ->  '-5E+10'
+sub410 subtract '-5E11'        0 ->  '-5E+11'
+sub411 subtract '-5E100'       0 ->  '-5E+100'
+
+-- more RHS swaps [were fixed]
+sub420 subtract 0  '-56267E-10' ->  '0.0000056267'
+sub421 subtract 0  '-56267E-6'  ->  '0.056267'
+sub422 subtract 0  '-56267E-5'  ->  '0.56267'
+sub423 subtract 0  '-56267E-4'  ->  '5.6267'
+sub424 subtract 0  '-56267E-3'  ->  '56.267'
+sub425 subtract 0  '-56267E-2'  ->  '562.67'
+sub426 subtract 0  '-56267E-1'  ->  '5626.7'
+sub427 subtract 0  '-56267E-0'  ->  '56267'
+sub428 subtract 0  '-5E-10'     ->  '5E-10'
+sub429 subtract 0  '-5E-7'      ->  '5E-7'
+sub430 subtract 0  '-5E-6'      ->  '0.000005'
+sub431 subtract 0  '-5E-5'      ->  '0.00005'
+sub432 subtract 0  '-5E-4'      ->  '0.0005'
+sub433 subtract 0  '-5E-1'      ->  '0.5'
+sub434 subtract 0  '-5E0'       ->  '5'
+sub435 subtract 0  '-5E1'       ->  '50'
+sub436 subtract 0  '-5E5'       ->  '500000'
+sub437 subtract 0  '-5E8'       ->  '500000000'
+sub438 subtract 0  '-5E9'       ->  '5E+9'
+sub439 subtract 0  '-5E10'      ->  '5E+10'
+sub440 subtract 0  '-5E11'      ->  '5E+11'
+sub441 subtract 0  '-5E100'     ->  '5E+100'
+
+
+-- try borderline precision, with carries, etc.
+precision: 15
+sub461 subtract '1E+12' '1'       -> '999999999999'
+sub462 subtract '1E+12' '-1.11'   -> '1000000000001.11'
+sub463 subtract '1.11'  '-1E+12'  -> '1000000000001.11'
+sub464 subtract '-1'    '-1E+12'  -> '999999999999'
+sub465 subtract '7E+12' '1'       -> '6999999999999'
+sub466 subtract '7E+12' '-1.11'   -> '7000000000001.11'
+sub467 subtract '1.11'  '-7E+12'  -> '7000000000001.11'
+sub468 subtract '-1'    '-7E+12'  -> '6999999999999'
+
+--                 123456789012345       123456789012345      1 23456789012345
+sub470 subtract '0.444444444444444'  '-0.555555555555563' -> '1.00000000000001' Inexact Rounded
+sub471 subtract '0.444444444444444'  '-0.555555555555562' -> '1.00000000000001' Inexact Rounded
+sub472 subtract '0.444444444444444'  '-0.555555555555561' -> '1.00000000000001' Inexact Rounded
+sub473 subtract '0.444444444444444'  '-0.555555555555560' -> '1.00000000000000' Inexact Rounded
+sub474 subtract '0.444444444444444'  '-0.555555555555559' -> '1.00000000000000' Inexact Rounded
+sub475 subtract '0.444444444444444'  '-0.555555555555558' -> '1.00000000000000' Inexact Rounded
+sub476 subtract '0.444444444444444'  '-0.555555555555557' -> '1.00000000000000' Inexact Rounded
+sub477 subtract '0.444444444444444'  '-0.555555555555556' -> '1.00000000000000' Rounded
+sub478 subtract '0.444444444444444'  '-0.555555555555555' -> '0.999999999999999'
+sub479 subtract '0.444444444444444'  '-0.555555555555554' -> '0.999999999999998'
+sub480 subtract '0.444444444444444'  '-0.555555555555553' -> '0.999999999999997'
+sub481 subtract '0.444444444444444'  '-0.555555555555552' -> '0.999999999999996'
+sub482 subtract '0.444444444444444'  '-0.555555555555551' -> '0.999999999999995'
+sub483 subtract '0.444444444444444'  '-0.555555555555550' -> '0.999999999999994'
+
+-- and some more, including residue effects and different roundings
+precision: 9
+rounding: half_up
+sub500 subtract '123456789' 0             -> '123456789'
+sub501 subtract '123456789' 0.000000001   -> '123456789' Inexact Rounded
+sub502 subtract '123456789' 0.000001      -> '123456789' Inexact Rounded
+sub503 subtract '123456789' 0.1           -> '123456789' Inexact Rounded
+sub504 subtract '123456789' 0.4           -> '123456789' Inexact Rounded
+sub505 subtract '123456789' 0.49          -> '123456789' Inexact Rounded
+sub506 subtract '123456789' 0.499999      -> '123456789' Inexact Rounded
+sub507 subtract '123456789' 0.499999999   -> '123456789' Inexact Rounded
+sub508 subtract '123456789' 0.5           -> '123456789' Inexact Rounded
+sub509 subtract '123456789' 0.500000001   -> '123456788' Inexact Rounded
+sub510 subtract '123456789' 0.500001      -> '123456788' Inexact Rounded
+sub511 subtract '123456789' 0.51          -> '123456788' Inexact Rounded
+sub512 subtract '123456789' 0.6           -> '123456788' Inexact Rounded
+sub513 subtract '123456789' 0.9           -> '123456788' Inexact Rounded
+sub514 subtract '123456789' 0.99999       -> '123456788' Inexact Rounded
+sub515 subtract '123456789' 0.999999999   -> '123456788' Inexact Rounded
+sub516 subtract '123456789' 1             -> '123456788'
+sub517 subtract '123456789' 1.000000001   -> '123456788' Inexact Lost_digits Rounded
+sub518 subtract '123456789' 1.00001       -> '123456788' Inexact Rounded
+sub519 subtract '123456789' 1.1           -> '123456788' Inexact Rounded
+
+rounding: half_even
+sub520 subtract '123456789' 0             -> '123456789'
+sub521 subtract '123456789' 0.000000001   -> '123456789' Inexact Rounded
+sub522 subtract '123456789' 0.000001      -> '123456789' Inexact Rounded
+sub523 subtract '123456789' 0.1           -> '123456789' Inexact Rounded
+sub524 subtract '123456789' 0.4           -> '123456789' Inexact Rounded
+sub525 subtract '123456789' 0.49          -> '123456789' Inexact Rounded
+sub526 subtract '123456789' 0.499999      -> '123456789' Inexact Rounded
+sub527 subtract '123456789' 0.499999999   -> '123456789' Inexact Rounded
+sub528 subtract '123456789' 0.5           -> '123456788' Inexact Rounded
+sub529 subtract '123456789' 0.500000001   -> '123456788' Inexact Rounded
+sub530 subtract '123456789' 0.500001      -> '123456788' Inexact Rounded
+sub531 subtract '123456789' 0.51          -> '123456788' Inexact Rounded
+sub532 subtract '123456789' 0.6           -> '123456788' Inexact Rounded
+sub533 subtract '123456789' 0.9           -> '123456788' Inexact Rounded
+sub534 subtract '123456789' 0.99999       -> '123456788' Inexact Rounded
+sub535 subtract '123456789' 0.999999999   -> '123456788' Inexact Rounded
+sub536 subtract '123456789' 1             -> '123456788'
+sub537 subtract '123456789' 1.00000001    -> '123456788' Inexact Rounded
+sub538 subtract '123456789' 1.00001       -> '123456788' Inexact Rounded
+sub539 subtract '123456789' 1.1           -> '123456788' Inexact Rounded
+-- critical few with even bottom digit...
+sub540 subtract '123456788' 0.499999999   -> '123456788' Inexact Rounded
+sub541 subtract '123456788' 0.5           -> '123456788' Inexact Rounded
+sub542 subtract '123456788' 0.500000001   -> '123456787' Inexact Rounded
+
+rounding: down
+sub550 subtract '123456789' 0             -> '123456789'
+sub551 subtract '123456789' 0.000000001   -> '123456788' Inexact Rounded
+sub552 subtract '123456789' 0.000001      -> '123456788' Inexact Rounded
+sub553 subtract '123456789' 0.1           -> '123456788' Inexact Rounded
+sub554 subtract '123456789' 0.4           -> '123456788' Inexact Rounded
+sub555 subtract '123456789' 0.49          -> '123456788' Inexact Rounded
+sub556 subtract '123456789' 0.499999      -> '123456788' Inexact Rounded
+sub557 subtract '123456789' 0.499999999   -> '123456788' Inexact Rounded
+sub558 subtract '123456789' 0.5           -> '123456788' Inexact Rounded
+sub559 subtract '123456789' 0.500000001   -> '123456788' Inexact Rounded
+sub560 subtract '123456789' 0.500001      -> '123456788' Inexact Rounded
+sub561 subtract '123456789' 0.51          -> '123456788' Inexact Rounded
+sub562 subtract '123456789' 0.6           -> '123456788' Inexact Rounded
+sub563 subtract '123456789' 0.9           -> '123456788' Inexact Rounded
+sub564 subtract '123456789' 0.99999       -> '123456788' Inexact Rounded
+sub565 subtract '123456789' 0.999999999   -> '123456788' Inexact Rounded
+sub566 subtract '123456789' 1             -> '123456788'
+sub567 subtract '123456789' 1.00000001    -> '123456787' Inexact Rounded
+sub568 subtract '123456789' 1.00001       -> '123456787' Inexact Rounded
+sub569 subtract '123456789' 1.1           -> '123456787' Inexact Rounded
+
+-- symmetry...
+rounding: half_up
+sub600 subtract 0             '123456789' -> '-123456789'
+sub601 subtract 0.000000001   '123456789' -> '-123456789' Inexact Rounded
+sub602 subtract 0.000001      '123456789' -> '-123456789' Inexact Rounded
+sub603 subtract 0.1           '123456789' -> '-123456789' Inexact Rounded
+sub604 subtract 0.4           '123456789' -> '-123456789' Inexact Rounded
+sub605 subtract 0.49          '123456789' -> '-123456789' Inexact Rounded
+sub606 subtract 0.499999      '123456789' -> '-123456789' Inexact Rounded
+sub607 subtract 0.499999999   '123456789' -> '-123456789' Inexact Rounded
+sub608 subtract 0.5           '123456789' -> '-123456789' Inexact Rounded
+sub609 subtract 0.500000001   '123456789' -> '-123456788' Inexact Rounded
+sub610 subtract 0.500001      '123456789' -> '-123456788' Inexact Rounded
+sub611 subtract 0.51          '123456789' -> '-123456788' Inexact Rounded
+sub612 subtract 0.6           '123456789' -> '-123456788' Inexact Rounded
+sub613 subtract 0.9           '123456789' -> '-123456788' Inexact Rounded
+sub614 subtract 0.99999       '123456789' -> '-123456788' Inexact Rounded
+sub615 subtract 0.999999999   '123456789' -> '-123456788' Inexact Rounded
+sub616 subtract 1             '123456789' -> '-123456788'
+sub617 subtract 1.000000001   '123456789' -> '-123456788' Inexact Lost_digits Rounded
+sub618 subtract 1.00001       '123456789' -> '-123456788' Inexact Rounded
+sub619 subtract 1.1           '123456789' -> '-123456788' Inexact Rounded
+
+rounding: half_even
+sub620 subtract 0             '123456789' -> '-123456789'
+sub621 subtract 0.000000001   '123456789' -> '-123456789' Inexact Rounded
+sub622 subtract 0.000001      '123456789' -> '-123456789' Inexact Rounded
+sub623 subtract 0.1           '123456789' -> '-123456789' Inexact Rounded
+sub624 subtract 0.4           '123456789' -> '-123456789' Inexact Rounded
+sub625 subtract 0.49          '123456789' -> '-123456789' Inexact Rounded
+sub626 subtract 0.499999      '123456789' -> '-123456789' Inexact Rounded
+sub627 subtract 0.499999999   '123456789' -> '-123456789' Inexact Rounded
+sub628 subtract 0.5           '123456789' -> '-123456788' Inexact Rounded
+sub629 subtract 0.500000001   '123456789' -> '-123456788' Inexact Rounded
+sub630 subtract 0.500001      '123456789' -> '-123456788' Inexact Rounded
+sub631 subtract 0.51          '123456789' -> '-123456788' Inexact Rounded
+sub632 subtract 0.6           '123456789' -> '-123456788' Inexact Rounded
+sub633 subtract 0.9           '123456789' -> '-123456788' Inexact Rounded
+sub634 subtract 0.99999       '123456789' -> '-123456788' Inexact Rounded
+sub635 subtract 0.999999999   '123456789' -> '-123456788' Inexact Rounded
+sub636 subtract 1             '123456789' -> '-123456788'
+sub637 subtract 1.00000001    '123456789' -> '-123456788' Inexact Rounded
+sub638 subtract 1.00001       '123456789' -> '-123456788' Inexact Rounded
+sub639 subtract 1.1           '123456789' -> '-123456788' Inexact Rounded
+-- critical few with even bottom digit...
+sub640 subtract 0.499999999   '123456788' -> '-123456788' Inexact Rounded
+sub641 subtract 0.5           '123456788' -> '-123456788' Inexact Rounded
+sub642 subtract 0.500000001   '123456788' -> '-123456787' Inexact Rounded
+
+rounding: down
+sub650 subtract 0             '123456789' -> '-123456789'
+sub651 subtract 0.000000001   '123456789' -> '-123456788' Inexact Rounded
+sub652 subtract 0.000001      '123456789' -> '-123456788' Inexact Rounded
+sub653 subtract 0.1           '123456789' -> '-123456788' Inexact Rounded
+sub654 subtract 0.4           '123456789' -> '-123456788' Inexact Rounded
+sub655 subtract 0.49          '123456789' -> '-123456788' Inexact Rounded
+sub656 subtract 0.499999      '123456789' -> '-123456788' Inexact Rounded
+sub657 subtract 0.499999999   '123456789' -> '-123456788' Inexact Rounded
+sub658 subtract 0.5           '123456789' -> '-123456788' Inexact Rounded
+sub659 subtract 0.500000001   '123456789' -> '-123456788' Inexact Rounded
+sub660 subtract 0.500001      '123456789' -> '-123456788' Inexact Rounded
+sub661 subtract 0.51          '123456789' -> '-123456788' Inexact Rounded
+sub662 subtract 0.6           '123456789' -> '-123456788' Inexact Rounded
+sub663 subtract 0.9           '123456789' -> '-123456788' Inexact Rounded
+sub664 subtract 0.99999       '123456789' -> '-123456788' Inexact Rounded
+sub665 subtract 0.999999999   '123456789' -> '-123456788' Inexact Rounded
+sub666 subtract 1             '123456789' -> '-123456788'
+sub667 subtract 1.00000001    '123456789' -> '-123456787' Inexact Rounded
+sub668 subtract 1.00001       '123456789' -> '-123456787' Inexact Rounded
+sub669 subtract 1.1           '123456789' -> '-123456787' Inexact Rounded
+
+-- lots of leading zeros in intermediate result, and showing effects of
+-- input rounding
+precision: 9
+rounding: half_up
+sub670 subtract '123456789' '123456788.1' -> 1 Inexact Lost_digits Rounded
+sub671 subtract '123456789' '123456788.9' -> 0 Inexact Lost_digits Rounded
+sub672 subtract '123456789' '123456789.1' -> 0 Inexact Lost_digits Rounded
+sub673 subtract '123456789' '123456789.5' -> -1 Inexact Lost_digits Rounded
+sub674 subtract '123456789' '123456789.9' -> -1 Inexact Lost_digits Rounded
+
+rounding: half_even
+sub680 subtract '123456789' '123456788.1' -> 1 Inexact Lost_digits Rounded
+sub681 subtract '123456789' '123456788.9' -> 0 Inexact Lost_digits Rounded
+sub682 subtract '123456789' '123456789.1' -> 0 Inexact Lost_digits Rounded
+sub683 subtract '123456789' '123456789.5' -> -1 Inexact Lost_digits Rounded
+sub684 subtract '123456789' '123456789.9' -> -1 Inexact Lost_digits Rounded
+
+sub685 subtract '123456788' '123456787.1' -> 1 Inexact Lost_digits Rounded
+sub686 subtract '123456788' '123456787.9' -> 0 Inexact Lost_digits Rounded
+sub687 subtract '123456788' '123456788.1' -> 0 Inexact Lost_digits Rounded
+sub688 subtract '123456788' '123456788.5' -> 0 Inexact Lost_digits Rounded
+sub689 subtract '123456788' '123456788.9' -> -1 Inexact Lost_digits Rounded
+
+rounding: down
+sub690 subtract '123456789' '123456788.1' -> 1 Inexact Lost_digits Rounded
+sub691 subtract '123456789' '123456788.9' -> 1 Inexact Lost_digits Rounded
+sub692 subtract '123456789' '123456789.1' -> 0 Inexact Lost_digits Rounded
+sub693 subtract '123456789' '123456789.5' -> 0 Inexact Lost_digits Rounded
+sub694 subtract '123456789' '123456789.9' -> 0 Inexact Lost_digits Rounded
+
+
+-- input preparation tests
+rounding: half_up
+precision: 3
+
+sub700 subtract '12345678900000'  -9999999999999 ->  '2.23E+13' Inexact Lost_digits Rounded
+sub701 subtract  '9999999999999' -12345678900000 ->  '2.23E+13' Inexact Lost_digits Rounded
+sub702 subtract '12E+3'  '-3456' ->  '1.55E+4' Inexact Lost_digits Rounded
+-- next was 1.54E+4 under old [truncate to digits+1] rules
+sub703 subtract '12E+3'  '-3446' ->  '1.55E+4' Inexact Lost_digits Rounded
+sub704 subtract '12E+3'  '-3454' ->  '1.55E+4' Inexact Lost_digits Rounded
+sub705 subtract '12E+3'  '-3444' ->  '1.54E+4' Inexact Lost_digits Rounded
+
+sub706 subtract '3456'  '-12E+3' ->  '1.55E+4' Inexact Lost_digits Rounded
+-- next was 1.54E+4 under old [truncate to digits+1] rules
+sub707 subtract '3446'  '-12E+3' ->  '1.55E+4' Inexact Lost_digits Rounded
+sub708 subtract '3454'  '-12E+3' ->  '1.55E+4' Inexact Lost_digits Rounded
+sub709 subtract '3444'  '-12E+3' ->  '1.54E+4' Inexact Lost_digits Rounded
+
+-- overflow and underflow tests
+maxexponent: 999999999
+minexponent: -999999999
+sub730 subtract 1E+999999999    -9E+999999999   -> ? Overflow Inexact Rounded
+sub731 subtract 9E+999999999    -1E+999999999   -> ? Overflow Inexact Rounded
+sub732 subtract -1.1E-999999999 -1E-999999999   -> ? Underflow Subnormal Inexact Rounded
+sub733 subtract 1E-999999999     1.1e-999999999 -> ? Underflow Subnormal Inexact Rounded
+sub734 subtract -1E+999999999    9E+999999999   -> ? Overflow Inexact Rounded
+sub735 subtract -9E+999999999    1E+999999999   -> ? Overflow Inexact Rounded
+sub736 subtract +1.1E-999999999  1E-999999999   -> ? Underflow Subnormal Inexact Rounded
+sub737 subtract -1E-999999999   -1.1e-999999999 -> ? Underflow Subnormal Inexact Rounded
+
+-- lostDigits checks
+maxexponent: 999
+minexponent: -999
+precision: 9
+sub801 subtract 12345678000 0 ->  1.23456780E+10 Rounded
+sub802 subtract 0 12345678000 -> -1.23456780E+10 Rounded
+sub803 subtract 1234567800  0 ->  1.23456780E+9 Rounded
+sub804 subtract 0 1234567800  -> -1.23456780E+9 Rounded
+sub805 subtract 1234567890  0 ->  1.23456789E+9 Rounded
+sub806 subtract 0 1234567890  -> -1.23456789E+9 Rounded
+sub807 subtract 1234567891  0 ->  1.23456789E+9 Inexact Lost_digits Rounded
+sub808 subtract 0 1234567891  -> -1.23456789E+9 Inexact Lost_digits Rounded
+sub809 subtract 12345678901 0 ->  1.23456789E+10 Inexact Lost_digits Rounded
+sub810 subtract 0 12345678901 -> -1.23456789E+10 Inexact Lost_digits Rounded
+sub811 subtract 1234567896  0 ->  1.23456790E+9 Inexact Lost_digits Rounded
+sub812 subtract 0 1234567896  -> -1.23456790E+9 Inexact Lost_digits Rounded
+
+precision: 15
+-- still checking for [no] lostDigits
+sub841 subtract 12345678000 0 ->  12345678000
+sub842 subtract 0 12345678000 -> -12345678000
+sub843 subtract 1234567800  0 ->  1234567800
+sub844 subtract 0 1234567800  -> -1234567800
+sub845 subtract 1234567890  0 ->  1234567890
+sub846 subtract 0 1234567890  -> -1234567890
+sub847 subtract 1234567891  0 ->  1234567891
+sub848 subtract 0 1234567891  -> -1234567891
+sub849 subtract 12345678901 0 ->  12345678901
+sub850 subtract 0 12345678901 -> -12345678901
+sub851 subtract 1234567896  0 ->  1234567896
+sub852 subtract 0 1234567896  -> -1234567896
+
+-- Null tests
+sub900 subtract 10  # -> ? Invalid_operation
+sub901 subtract  # 10 -> ? Invalid_operation
+

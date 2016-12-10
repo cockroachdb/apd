@@ -33,7 +33,7 @@ func RoundDown(d, x *Decimal) error {
 	if diff := nd - int64(d.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
-		y.Div(&d.Coeff, e)
+		y.Quo(&d.Coeff, e)
 		d.Coeff.Set(y)
 		err := d.addExponent(diff)
 		if err != nil {
@@ -43,10 +43,14 @@ func RoundDown(d, x *Decimal) error {
 	return nil
 }
 
-// roundAddOne adds 1 to b
+// roundAddOne adds 1 to abs(b).
 func roundAddOne(b *big.Int, diff *int64) {
 	nd := numDigits(b)
-	b.Add(b, bigOne)
+	if b.Sign() >= 0 {
+		b.Add(b, bigOne)
+	} else {
+		b.Sub(b, bigOne)
+	}
 	nd2 := numDigits(b)
 	if nd2 > nd {
 		b.Div(b, bigTen)
@@ -62,7 +66,8 @@ func RoundHalfUp(d, x *Decimal) error {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
-		y.DivMod(&d.Coeff, e, m)
+		y.QuoRem(&d.Coeff, e, m)
+		m.Abs(m)
 		m.Mul(m, bigTwo)
 		if m.Cmp(e) >= 0 {
 			roundAddOne(y, &diff)
@@ -83,7 +88,8 @@ func RoundHalfEven(d, x *Decimal) error {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
-		y.DivMod(&d.Coeff, e, m)
+		y.QuoRem(&d.Coeff, e, m)
+		m.Abs(m)
 		m.Mul(m, bigTwo)
 		if c := m.Cmp(e); c > 0 {
 			roundAddOne(y, &diff)

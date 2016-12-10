@@ -164,6 +164,14 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	return y, x, b.Exponent, nil
 }
 
+func (d *Decimal) Cmp(x *Decimal) (int, error) {
+	a, b, _, err := upscale(d, x)
+	if err != nil {
+		return 0, errors.Wrap(err, "Cmp")
+	}
+	return a.Cmp(b), nil
+}
+
 // Add sets d to the sum x+y and returns d.
 func (d *Decimal) Add(x, y *Decimal) (*Decimal, error) {
 	a, b, s, err := upscale(x, y)
@@ -175,10 +183,13 @@ func (d *Decimal) Add(x, y *Decimal) (*Decimal, error) {
 	return d.Round(d)
 }
 
-func (d *Decimal) Cmp(x *Decimal) (int, error) {
-	a, b, _, err := upscale(d, x)
+// Sub sets d to the difference x-y and returns d.
+func (d *Decimal) Sub(x, y *Decimal) (*Decimal, error) {
+	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return 0, errors.Wrap(err, "Cmp")
+		return nil, errors.Wrap(err, "Sub")
 	}
-	return a.Cmp(b), nil
+	d.Coeff.Sub(a, b)
+	d.Exponent = s
+	return d.Round(d)
 }
