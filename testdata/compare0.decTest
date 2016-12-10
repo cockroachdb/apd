@@ -1,0 +1,491 @@
+------------------------------------------------------------------------
+-- compare0.decTest -- decimal comparison (simplified)                --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+version: 2.62
+
+-- Note that we cannot assume add/subtract tests cover paths adequately,
+-- here, because the code might be quite different (comparison cannot
+-- overflow or underflow, so actual subtractions are not necessary).
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+com001 compare  -2  -2  -> 0
+com002 compare  -2  -1  -> -1
+com003 compare  -2   0  -> -1
+com004 compare  -2   1  -> -1
+com005 compare  -2   2  -> -1
+com006 compare  -1  -2  -> 1
+com007 compare  -1  -1  -> 0
+com008 compare  -1   0  -> -1
+com009 compare  -1   1  -> -1
+com010 compare  -1   2  -> -1
+com011 compare   0  -2  -> 1
+com012 compare   0  -1  -> 1
+com013 compare   0   0  -> 0
+com014 compare   0   1  -> -1
+com015 compare   0   2  -> -1
+com016 compare   1  -2  -> 1
+com017 compare   1  -1  -> 1
+com018 compare   1   0  -> 1
+com019 compare   1   1  -> 0
+com020 compare   1   2  -> -1
+com021 compare   2  -2  -> 1
+com022 compare   2  -1  -> 1
+com023 compare   2   0  -> 1
+com025 compare   2   1  -> 1
+com026 compare   2   2  -> 0
+
+com031 compare  -20  -20  -> 0
+com032 compare  -20  -10  -> -1
+com033 compare  -20   00  -> -1
+com034 compare  -20   10  -> -1
+com035 compare  -20   20  -> -1
+com036 compare  -10  -20  -> 1
+com037 compare  -10  -10  -> 0
+com038 compare  -10   00  -> -1
+com039 compare  -10   10  -> -1
+com040 compare  -10   20  -> -1
+com041 compare   00  -20  -> 1
+com042 compare   00  -10  -> 1
+com043 compare   00   00  -> 0
+com044 compare   00   10  -> -1
+com045 compare   00   20  -> -1
+com046 compare   10  -20  -> 1
+com047 compare   10  -10  -> 1
+com048 compare   10   00  -> 1
+com049 compare   10   10  -> 0
+com050 compare   10   20  -> -1
+com051 compare   20  -20  -> 1
+com052 compare   20  -10  -> 1
+com053 compare   20   00  -> 1
+com055 compare   20   10  -> 1
+com056 compare   20   20  -> 0
+
+com061 compare  -2.0  -2.0  -> 0
+com062 compare  -2.0  -1.0  -> -1
+com063 compare  -2.0   0.0  -> -1
+com064 compare  -2.0   1.0  -> -1
+com065 compare  -2.0   2.0  -> -1
+com066 compare  -1.0  -2.0  -> 1
+com067 compare  -1.0  -1.0  -> 0
+com068 compare  -1.0   0.0  -> -1
+com069 compare  -1.0   1.0  -> -1
+com070 compare  -1.0   2.0  -> -1
+com071 compare   0.0  -2.0  -> 1
+com072 compare   0.0  -1.0  -> 1
+com073 compare   0.0   0.0  -> 0
+com074 compare   0.0   1.0  -> -1
+com075 compare   0.0   2.0  -> -1
+com076 compare   1.0  -2.0  -> 1
+com077 compare   1.0  -1.0  -> 1
+com078 compare   1.0   0.0  -> 1
+com079 compare   1.0   1.0  -> 0
+com080 compare   1.0   2.0  -> -1
+com081 compare   2.0  -2.0  -> 1
+com082 compare   2.0  -1.0  -> 1
+com083 compare   2.0   0.0  -> 1
+com085 compare   2.0   1.0  -> 1
+com086 compare   2.0   2.0  -> 0
+
+-- some differing length/exponent cases
+precision: 9
+com100 compare   7.0    7.0    -> 0
+com101 compare   7.0    7      -> 0
+com102 compare   7      7.0    -> 0
+com103 compare   7E+0   7.0    -> 0
+com104 compare   70E-1  7.0    -> 0
+com105 compare   0.7E+1 7      -> 0
+com106 compare   70E-1  7      -> 0
+com107 compare   7.0    7E+0   -> 0
+com108 compare   7.0    70E-1  -> 0
+com109 compare   7      0.7E+1 -> 0
+com110 compare   7      70E-1  -> 0
+
+com120 compare   8.0    7.0    -> 1
+com121 compare   8.0    7      -> 1
+com122 compare   8      7.0    -> 1
+com123 compare   8E+0   7.0    -> 1
+com124 compare   80E-1  7.0    -> 1
+com125 compare   0.8E+1 7      -> 1
+com126 compare   80E-1  7      -> 1
+com127 compare   8.0    7E+0   -> 1
+com128 compare   8.0    70E-1  -> 1
+com129 compare   8      0.7E+1  -> 1
+com130 compare   8      70E-1  -> 1
+
+com140 compare   8.0    9.0    -> -1
+com141 compare   8.0    9      -> -1
+com142 compare   8      9.0    -> -1
+com143 compare   8E+0   9.0    -> -1
+com144 compare   80E-1  9.0    -> -1
+com145 compare   0.8E+1 9      -> -1
+com146 compare   80E-1  9      -> -1
+com147 compare   8.0    9E+0   -> -1
+com148 compare   8.0    90E-1  -> -1
+com149 compare   8      0.9E+1 -> -1
+com150 compare   8      90E-1  -> -1
+
+-- and again, with sign changes -+ ..
+com200 compare  -7.0    7.0    -> -1
+com201 compare  -7.0    7      -> -1
+com202 compare  -7      7.0    -> -1
+com203 compare  -7E+0   7.0    -> -1
+com204 compare  -70E-1  7.0    -> -1
+com205 compare  -0.7E+1 7      -> -1
+com206 compare  -70E-1  7      -> -1
+com207 compare  -7.0    7E+0   -> -1
+com208 compare  -7.0    70E-1  -> -1
+com209 compare  -7      0.7E+1 -> -1
+com210 compare  -7      70E-1  -> -1
+
+com220 compare  -8.0    7.0    -> -1
+com221 compare  -8.0    7      -> -1
+com222 compare  -8      7.0    -> -1
+com223 compare  -8E+0   7.0    -> -1
+com224 compare  -80E-1  7.0    -> -1
+com225 compare  -0.8E+1 7      -> -1
+com226 compare  -80E-1  7      -> -1
+com227 compare  -8.0    7E+0   -> -1
+com228 compare  -8.0    70E-1  -> -1
+com229 compare  -8      0.7E+1 -> -1
+com230 compare  -8      70E-1  -> -1
+
+com240 compare  -8.0    9.0    -> -1
+com241 compare  -8.0    9      -> -1
+com242 compare  -8      9.0    -> -1
+com243 compare  -8E+0   9.0    -> -1
+com244 compare  -80E-1  9.0    -> -1
+com245 compare  -0.8E+1 9      -> -1
+com246 compare  -80E-1  9      -> -1
+com247 compare  -8.0    9E+0   -> -1
+com248 compare  -8.0    90E-1  -> -1
+com249 compare  -8      0.9E+1 -> -1
+com250 compare  -8      90E-1  -> -1
+
+-- and again, with sign changes +- ..
+com300 compare   7.0    -7.0    -> 1
+com301 compare   7.0    -7      -> 1
+com302 compare   7      -7.0    -> 1
+com303 compare   7E+0   -7.0    -> 1
+com304 compare   70E-1  -7.0    -> 1
+com305 compare   .7E+1  -7      -> 1
+com306 compare   70E-1  -7      -> 1
+com307 compare   7.0    -7E+0   -> 1
+com308 compare   7.0    -70E-1  -> 1
+com309 compare   7      -.7E+1  -> 1
+com310 compare   7      -70E-1  -> 1
+
+com320 compare   8.0    -7.0    -> 1
+com321 compare   8.0    -7      -> 1
+com322 compare   8      -7.0    -> 1
+com323 compare   8E+0   -7.0    -> 1
+com324 compare   80E-1  -7.0    -> 1
+com325 compare   .8E+1  -7      -> 1
+com326 compare   80E-1  -7      -> 1
+com327 compare   8.0    -7E+0   -> 1
+com328 compare   8.0    -70E-1  -> 1
+com329 compare   8      -.7E+1  -> 1
+com330 compare   8      -70E-1  -> 1
+
+com340 compare   8.0    -9.0    -> 1
+com341 compare   8.0    -9      -> 1
+com342 compare   8      -9.0    -> 1
+com343 compare   8E+0   -9.0    -> 1
+com344 compare   80E-1  -9.0    -> 1
+com345 compare   .8E+1  -9      -> 1
+com346 compare   80E-1  -9      -> 1
+com347 compare   8.0    -9E+0   -> 1
+com348 compare   8.0    -90E-1  -> 1
+com349 compare   8      -.9E+1  -> 1
+com350 compare   8      -90E-1  -> 1
+
+-- and again, with sign changes -- ..
+com400 compare   -7.0    -7.0    -> 0
+com401 compare   -7.0    -7      -> 0
+com402 compare   -7      -7.0    -> 0
+com403 compare   -7E+0   -7.0    -> 0
+com404 compare   -70E-1  -7.0    -> 0
+com405 compare   -.7E+1  -7      -> 0
+com406 compare   -70E-1  -7      -> 0
+com407 compare   -7.0    -7E+0   -> 0
+com408 compare   -7.0    -70E-1  -> 0
+com409 compare   -7      -.7E+1  -> 0
+com410 compare   -7      -70E-1  -> 0
+
+com420 compare   -8.0    -7.0    -> -1
+com421 compare   -8.0    -7      -> -1
+com422 compare   -8      -7.0    -> -1
+com423 compare   -8E+0   -7.0    -> -1
+com424 compare   -80E-1  -7.0    -> -1
+com425 compare   -.8E+1  -7      -> -1
+com426 compare   -80E-1  -7      -> -1
+com427 compare   -8.0    -7E+0   -> -1
+com428 compare   -8.0    -70E-1  -> -1
+com429 compare   -8      -.7E+1  -> -1
+com430 compare   -8      -70E-1  -> -1
+
+com440 compare   -8.0    -9.0    -> 1
+com441 compare   -8.0    -9      -> 1
+com442 compare   -8      -9.0    -> 1
+com443 compare   -8E+0   -9.0    -> 1
+com444 compare   -80E-1  -9.0    -> 1
+com445 compare   -.8E+1  -9      -> 1
+com446 compare   -80E-1  -9      -> 1
+com447 compare   -8.0    -9E+0   -> 1
+com448 compare   -8.0    -90E-1  -> 1
+com449 compare   -8      -.9E+1  -> 1
+com450 compare   -8      -90E-1  -> 1
+
+-- now some cases which might overflow if subtract were used
+maxexponent: 999999999
+minexponent: -999999999
+com460 compare  9.99999999E+999999999 9.99999999E+999999999  -> 0
+com461 compare -9.99999999E+999999999 9.99999999E+999999999  -> -1
+com462 compare  9.99999999E+999999999 -9.99999999E+999999999 -> 1
+com463 compare -9.99999999E+999999999 -9.99999999E+999999999 -> 0
+
+-- testcases that subtract to lots of zeros at boundaries [pgr]
+precision: 40
+com470 compare 123.4560000000000000E789 123.456E789 -> 0
+com471 compare 123.456000000000000E-89 123.456E-89 -> 0
+com472 compare 123.45600000000000E789 123.456E789 -> 0
+com473 compare 123.4560000000000E-89 123.456E-89 -> 0
+com474 compare 123.456000000000E789 123.456E789 -> 0
+com475 compare 123.45600000000E-89 123.456E-89 -> 0
+com476 compare 123.4560000000E789 123.456E789 -> 0
+com477 compare 123.456000000E-89 123.456E-89 -> 0
+com478 compare 123.45600000E789 123.456E789 -> 0
+com479 compare 123.4560000E-89 123.456E-89 -> 0
+com480 compare 123.456000E789 123.456E789 -> 0
+com481 compare 123.45600E-89 123.456E-89 -> 0
+com482 compare 123.4560E789 123.456E789 -> 0
+com483 compare 123.456E-89 123.456E-89 -> 0
+com484 compare 123.456E-89 123.4560000000000000E-89 -> 0
+com485 compare 123.456E789 123.456000000000000E789 -> 0
+com486 compare 123.456E-89 123.45600000000000E-89 -> 0
+com487 compare 123.456E789 123.4560000000000E789 -> 0
+com488 compare 123.456E-89 123.456000000000E-89 -> 0
+com489 compare 123.456E789 123.45600000000E789 -> 0
+com490 compare 123.456E-89 123.4560000000E-89 -> 0
+com491 compare 123.456E789 123.456000000E789 -> 0
+com492 compare 123.456E-89 123.45600000E-89 -> 0
+com493 compare 123.456E789 123.4560000E789 -> 0
+com494 compare 123.456E-89 123.456000E-89 -> 0
+com495 compare 123.456E789 123.45600E789 -> 0
+com496 compare 123.456E-89 123.4560E-89 -> 0
+com497 compare 123.456E789 123.456E789 -> 0
+
+-- wide-ranging, around precision; signs equal
+precision: 9
+com500 compare    1     1E-15    -> 1
+com501 compare    1     1E-14    -> 1
+com502 compare    1     1E-13    -> 1
+com503 compare    1     1E-12    -> 1
+com504 compare    1     1E-11    -> 1
+com505 compare    1     1E-10    -> 1
+com506 compare    1     1E-9     -> 1
+com507 compare    1     1E-8     -> 1
+com508 compare    1     1E-7     -> 1
+com509 compare    1     1E-6     -> 1
+com510 compare    1     1E-5     -> 1
+com511 compare    1     1E-4     -> 1
+com512 compare    1     1E-3     -> 1
+com513 compare    1     1E-2     -> 1
+com514 compare    1     1E-1     -> 1
+com515 compare    1     1E-0     -> 0
+com516 compare    1     1E+1     -> -1
+com517 compare    1     1E+2     -> -1
+com518 compare    1     1E+3     -> -1
+com519 compare    1     1E+4     -> -1
+com521 compare    1     1E+5     -> -1
+com522 compare    1     1E+6     -> -1
+com523 compare    1     1E+7     -> -1
+com524 compare    1     1E+8     -> -1
+com525 compare    1     1E+9     -> -1
+com526 compare    1     1E+10    -> -1
+com527 compare    1     1E+11    -> -1
+com528 compare    1     1E+12    -> -1
+com529 compare    1     1E+13    -> -1
+com530 compare    1     1E+14    -> -1
+com531 compare    1     1E+15    -> -1
+-- LR swap
+com540 compare    1E-15  1       -> -1
+com541 compare    1E-14  1       -> -1
+com542 compare    1E-13  1       -> -1
+com543 compare    1E-12  1       -> -1
+com544 compare    1E-11  1       -> -1
+com545 compare    1E-10  1       -> -1
+com546 compare    1E-9   1       -> -1
+com547 compare    1E-8   1       -> -1
+com548 compare    1E-7   1       -> -1
+com549 compare    1E-6   1       -> -1
+com550 compare    1E-5   1       -> -1
+com551 compare    1E-4   1       -> -1
+com552 compare    1E-3   1       -> -1
+com553 compare    1E-2   1       -> -1
+com554 compare    1E-1   1       -> -1
+com555 compare    1E-0   1       ->  0
+com556 compare    1E+1   1       ->  1
+com557 compare    1E+2   1       ->  1
+com558 compare    1E+3   1       ->  1
+com559 compare    1E+4   1       ->  1
+com561 compare    1E+5   1       ->  1
+com562 compare    1E+6   1       ->  1
+com563 compare    1E+7   1       ->  1
+com564 compare    1E+8   1       ->  1
+com565 compare    1E+9   1       ->  1
+com566 compare    1E+10  1       ->  1
+com567 compare    1E+11  1       ->  1
+com568 compare    1E+12  1       ->  1
+com569 compare    1E+13  1       ->  1
+com570 compare    1E+14  1       ->  1
+com571 compare    1E+15  1       ->  1
+-- similar with an useful coefficient, one side only
+com580 compare  0.000000987654321     1E-15    -> 1
+com581 compare  0.000000987654321     1E-14    -> 1
+com582 compare  0.000000987654321     1E-13    -> 1
+com583 compare  0.000000987654321     1E-12    -> 1
+com584 compare  0.000000987654321     1E-11    -> 1
+com585 compare  0.000000987654321     1E-10    -> 1
+com586 compare  0.000000987654321     1E-9     -> 1
+com587 compare  0.000000987654321     1E-8     -> 1
+com588 compare  0.000000987654321     1E-7     -> 1
+com589 compare  0.000000987654321     1E-6     -> -1
+com590 compare  0.000000987654321     1E-5     -> -1
+com591 compare  0.000000987654321     1E-4     -> -1
+com592 compare  0.000000987654321     1E-3     -> -1
+com593 compare  0.000000987654321     1E-2     -> -1
+com594 compare  0.000000987654321     1E-1     -> -1
+com595 compare  0.000000987654321     1E-0     -> -1
+com596 compare  0.000000987654321     1E+1     -> -1
+com597 compare  0.000000987654321     1E+2     -> -1
+com598 compare  0.000000987654321     1E+3     -> -1
+com599 compare  0.000000987654321     1E+4     -> -1
+
+-- check some unit-y traps
+precision: 20
+com600 compare   12            12.2345 -> -1
+com601 compare   12.0          12.2345 -> -1
+com602 compare   12.00         12.2345 -> -1
+com603 compare   12.000        12.2345 -> -1
+com604 compare   12.0000       12.2345 -> -1
+com605 compare   12.00000      12.2345 -> -1
+com606 compare   12.000000     12.2345 -> -1
+com607 compare   12.0000000    12.2345 -> -1
+com608 compare   12.00000000   12.2345 -> -1
+com609 compare   12.000000000  12.2345 -> -1
+com610 compare   12.1234 12            ->  1
+com611 compare   12.1234 12.0          ->  1
+com612 compare   12.1234 12.00         ->  1
+com613 compare   12.1234 12.000        ->  1
+com614 compare   12.1234 12.0000       ->  1
+com615 compare   12.1234 12.00000      ->  1
+com616 compare   12.1234 12.000000     ->  1
+com617 compare   12.1234 12.0000000    ->  1
+com618 compare   12.1234 12.00000000   ->  1
+com619 compare   12.1234 12.000000000  ->  1
+com620 compare  -12           -12.2345 ->  1
+com621 compare  -12.0         -12.2345 ->  1
+com622 compare  -12.00        -12.2345 ->  1
+com623 compare  -12.000       -12.2345 ->  1
+com624 compare  -12.0000      -12.2345 ->  1
+com625 compare  -12.00000     -12.2345 ->  1
+com626 compare  -12.000000    -12.2345 ->  1
+com627 compare  -12.0000000   -12.2345 ->  1
+com628 compare  -12.00000000  -12.2345 ->  1
+com629 compare  -12.000000000 -12.2345 ->  1
+com630 compare  -12.1234 -12           -> -1
+com631 compare  -12.1234 -12.0         -> -1
+com632 compare  -12.1234 -12.00        -> -1
+com633 compare  -12.1234 -12.000       -> -1
+com634 compare  -12.1234 -12.0000      -> -1
+com635 compare  -12.1234 -12.00000     -> -1
+com636 compare  -12.1234 -12.000000    -> -1
+com637 compare  -12.1234 -12.0000000   -> -1
+com638 compare  -12.1234 -12.00000000  -> -1
+com639 compare  -12.1234 -12.000000000 -> -1
+
+-- trailing zeros; unit-y
+precision: 20
+com680 compare   12    12           -> 0
+com681 compare   12    12.0         -> 0
+com682 compare   12    12.00        -> 0
+com683 compare   12    12.000       -> 0
+com684 compare   12    12.0000      -> 0
+com685 compare   12    12.00000     -> 0
+com686 compare   12    12.000000    -> 0
+com687 compare   12    12.0000000   -> 0
+com688 compare   12    12.00000000  -> 0
+com689 compare   12    12.000000000 -> 0
+com690 compare   12              12 -> 0
+com691 compare   12.0            12 -> 0
+com692 compare   12.00           12 -> 0
+com693 compare   12.000          12 -> 0
+com694 compare   12.0000         12 -> 0
+com695 compare   12.00000        12 -> 0
+com696 compare   12.000000       12 -> 0
+com697 compare   12.0000000      12 -> 0
+com698 compare   12.00000000     12 -> 0
+com699 compare   12.000000000    12 -> 0
+
+-- lostDigits checks
+maxexponent: 999
+minexponent: -999
+precision: 9
+com701 compare 12345678000 1 -> 1 Rounded
+com702 compare 1 12345678000 -> -1 Rounded
+com703 compare 1234567800  1 -> 1 Rounded
+com704 compare 1 1234567800  -> -1 Rounded
+com705 compare 1234567890  1 -> 1 Rounded
+com706 compare 1 1234567890  -> -1 Rounded
+com707 compare 1234567891  1 -> 1 Inexact Lost_digits Rounded
+com708 compare 1 1234567891  -> -1 Inexact Lost_digits Rounded
+com709 compare 12345678901 1 -> 1 Inexact Lost_digits Rounded
+com710 compare 1 12345678901 -> -1 Inexact Lost_digits Rounded
+com711 compare 1234567896  1 -> 1 Inexact Lost_digits Rounded
+com712 compare 1 1234567896  -> -1 Inexact Lost_digits Rounded
+com713 compare -1234567891  1 -> -1 Inexact Lost_digits Rounded
+com714 compare 1 -1234567891  -> 1 Inexact Lost_digits Rounded
+com715 compare -12345678901 1 -> -1 Inexact Lost_digits Rounded
+com716 compare 1 -12345678901 -> 1 Inexact Lost_digits Rounded
+com717 compare -1234567896  1 -> -1 Inexact Lost_digits Rounded
+com718 compare 1 -1234567896  -> 1 Inexact Lost_digits Rounded
+
+precision: 15
+-- still checking for [no] lostDigits
+com741 compare 12345678000 1 -> 1
+com742 compare 1 12345678000 -> -1
+com743 compare 1234567800  1 -> 1
+com744 compare 1 1234567800  -> -1
+com745 compare 1234567890  1 -> 1
+com746 compare 1 1234567890  -> -1
+com747 compare 1234567891  1 -> 1
+com748 compare 1 1234567891  -> -1
+com749 compare 12345678901 1 -> 1
+com750 compare 1 12345678901 -> -1
+com751 compare 1234567896  1 -> 1
+com752 compare 1 1234567896  -> -1
+
+-- Null tests
+com900 compare 10  # -> ? Invalid_operation
+com901 compare  # 10 -> ? Invalid_operation
+

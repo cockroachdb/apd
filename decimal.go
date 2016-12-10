@@ -99,6 +99,12 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 	return d
 }
 
+// SetInt sets d.'s Coefficient value to x. The exponent is not changed.
+func (d *Decimal) SetInt64(x int64) *Decimal {
+	d.Coeff.SetInt64(x)
+	return d
+}
+
 var ErrExponentOutOfRange = errors.New("exponent out of range")
 
 // addExponent adds x to d's Exponent and checks that it is in range.

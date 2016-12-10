@@ -169,6 +169,7 @@ func TestGDA(t *testing.T) {
 	files := []string{
 		"abs0",
 		"add0",
+		"compare0",
 		"subtract0",
 	}
 	var buf bytes.Buffer
@@ -249,6 +250,10 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					_, err = d.Abs(operands[0])
 				case "add":
 					_, err = d.Add(operands[0], operands[1])
+				case "compare":
+					var c int
+					c, err = operands[0].Cmp(operands[1])
+					d.SetInt64(int64(c))
 				case "subtract":
 					_, err = d.Sub(operands[0], operands[1])
 				default:
