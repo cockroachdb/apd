@@ -212,3 +212,10 @@ func (d *Decimal) Abs(x *Decimal) (*Decimal, error) {
 	d.Coeff.Abs(&d.Coeff)
 	return d.Round(d)
 }
+
+// Neg sets z to -x and returns z.
+func (d *Decimal) Neg(x *Decimal) (*Decimal, error) {
+	d.Set(x)
+	d.Coeff.Neg(&d.Coeff)
+	return d.Round(d)
+}
