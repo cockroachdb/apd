@@ -1,0 +1,276 @@
+------------------------------------------------------------------------
+-- multiply0.decTest -- decimal multiplication (simplified)           --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+version: 2.62
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+mul000 multiply 2      2 -> 4
+mul001 multiply 2      3 -> 6
+mul002 multiply 5      1 -> 5
+mul003 multiply 5      2 -> 10
+mul004 multiply 1.20   2 -> 2.40
+mul005 multiply 1.20   0 -> 0
+mul006 multiply 1.20  -2 -> -2.40
+mul007 multiply -1.20  2 -> -2.40
+mul008 multiply -1.20  0 -> 0
+mul009 multiply -1.20 -2 -> 2.40
+mul010 multiply 5.09 7.1 -> 36.139
+mul011 multiply 2.5    4 -> 10.0
+mul012 multiply 2.50   4 -> 10.00
+mul013 multiply 1.23456789 1.00000000 -> 1.23456789 Rounded
+mul014 multiply 9.999999999 9.999999999 -> 100.000000 Inexact Lost_digits Rounded
+mul015 multiply 2.50   4 -> 10.00
+
+precision: 6
+mul016 multiply 2.50   4 -> 10.00
+mul017 multiply 9.999999999 9.999999999 -> 100.000 Inexact Lost_digits Rounded
+
+precision: 9
+mul031 multiply 5.00 1E-3    -> 0.00500
+mul032 multiply 00.00 0.000  -> 0
+mul033 multiply 00.00 0E-3   -> 0            -- rhs is 0
+mul034 multiply 0E-3  00.00  -> 0            -- lhs is 0
+
+-- 1999.12.21: next one is a edge case if intermediate longs are used
+precision: 15
+mul039 multiply 999999999999 9765625 -> 9.76562499999023E+18 Inexact Rounded
+precision: 9
+
+mul050 multiply 123.45 1e7  ->  1.2345E+9
+mul051 multiply 123.45 1e8  ->  1.2345E+10
+mul052 multiply 123.45 1e+9 ->  1.2345E+11
+mul053 multiply 123.45 1e10 ->  1.2345E+12
+mul054 multiply 123.45 1e11 ->  1.2345E+13
+mul055 multiply 123.45 1e12 ->  1.2345E+14
+mul056 multiply 123.45 1e13 ->  1.2345E+15
+
+
+-- test some intermediate lengths
+precision: 9
+mul080 multiply 0.1 123456789           -> 12345678.9
+mul081 multiply 0.1 1234567891          -> 123456789 Inexact Lost_digits Rounded
+mul082 multiply 0.1 12345678912         -> 1.23456789E+9 Inexact Lost_digits Rounded
+mul083 multiply 0.1 12345678912345      -> 1.23456789E+12 Inexact Lost_digits Rounded
+mul084 multiply 0.1 123456789           -> 12345678.9
+precision: 8
+mul085 multiply 0.1 12345678912         -> 1.2345679E+9 Inexact Lost_digits Rounded
+mul086 multiply 0.1 12345678912345      -> 1.2345679E+12 Inexact Lost_digits Rounded
+precision: 7
+mul087 multiply 0.1 12345678912         -> 1.234568E+9 Inexact Lost_digits Rounded
+mul088 multiply 0.1 12345678912345      -> 1.234568E+12 Inexact Lost_digits Rounded
+
+precision: 9
+mul090 multiply 123456789          0.1 -> 12345678.9
+mul091 multiply 1234567891         0.1 -> 123456789 Inexact Lost_digits Rounded
+mul092 multiply 12345678912        0.1 -> 1.23456789E+9 Inexact Lost_digits Rounded
+mul093 multiply 12345678912345     0.1 -> 1.23456789E+12 Inexact Lost_digits Rounded
+mul094 multiply 123456789          0.1 -> 12345678.9
+precision: 8
+mul095 multiply 12345678912        0.1 -> 1.2345679E+9 Inexact Lost_digits Rounded
+mul096 multiply 12345678912345     0.1 -> 1.2345679E+12 Inexact Lost_digits Rounded
+precision: 7
+mul097 multiply 12345678912        0.1 -> 1.234568E+9 Inexact Lost_digits Rounded
+mul098 multiply 12345678912345     0.1 -> 1.234568E+12 Inexact Lost_digits Rounded
+
+-- test some more edge cases and carries
+maxexponent: 9999
+minexponent: -9999
+precision: 33
+mul101 multiply 9 9   -> 81
+mul102 multiply 9 90   -> 810
+mul103 multiply 9 900   -> 8100
+mul104 multiply 9 9000   -> 81000
+mul105 multiply 9 90000   -> 810000
+mul106 multiply 9 900000   -> 8100000
+mul107 multiply 9 9000000   -> 81000000
+mul108 multiply 9 90000000   -> 810000000
+mul109 multiply 9 900000000   -> 8100000000
+mul110 multiply 9 9000000000   -> 81000000000
+mul111 multiply 9 90000000000   -> 810000000000
+mul112 multiply 9 900000000000   -> 8100000000000
+mul113 multiply 9 9000000000000   -> 81000000000000
+mul114 multiply 9 90000000000000   -> 810000000000000
+mul115 multiply 9 900000000000000   -> 8100000000000000
+mul116 multiply 9 9000000000000000   -> 81000000000000000
+mul117 multiply 9 90000000000000000   -> 810000000000000000
+mul118 multiply 9 900000000000000000   -> 8100000000000000000
+mul119 multiply 9 9000000000000000000   -> 81000000000000000000
+mul120 multiply 9 90000000000000000000   -> 810000000000000000000
+mul121 multiply 9 900000000000000000000   -> 8100000000000000000000
+mul122 multiply 9 9000000000000000000000   -> 81000000000000000000000
+mul123 multiply 9 90000000000000000000000   -> 810000000000000000000000
+-- test some more edge cases without carries
+mul131 multiply 3 3   -> 9
+mul132 multiply 3 30   -> 90
+mul133 multiply 3 300   -> 900
+mul134 multiply 3 3000   -> 9000
+mul135 multiply 3 30000   -> 90000
+mul136 multiply 3 300000   -> 900000
+mul137 multiply 3 3000000   -> 9000000
+mul138 multiply 3 30000000   -> 90000000
+mul139 multiply 3 300000000   -> 900000000
+mul140 multiply 3 3000000000   -> 9000000000
+mul141 multiply 3 30000000000   -> 90000000000
+mul142 multiply 3 300000000000   -> 900000000000
+mul143 multiply 3 3000000000000   -> 9000000000000
+mul144 multiply 3 30000000000000   -> 90000000000000
+mul145 multiply 3 300000000000000   -> 900000000000000
+mul146 multiply 3 3000000000000000   -> 9000000000000000
+mul147 multiply 3 30000000000000000   -> 90000000000000000
+mul148 multiply 3 300000000000000000   -> 900000000000000000
+mul149 multiply 3 3000000000000000000   -> 9000000000000000000
+mul150 multiply 3 30000000000000000000   -> 90000000000000000000
+mul151 multiply 3 300000000000000000000   -> 900000000000000000000
+mul152 multiply 3 3000000000000000000000   -> 9000000000000000000000
+mul153 multiply 3 30000000000000000000000   -> 90000000000000000000000
+
+-- 1999.12.21: next one is a edge case if intermediate longs are used
+precision: 30
+mul160 multiply 999999999999 9765625 -> 9765624999990234375
+precision: 9
+-----
+
+maxexponent: 999999999
+minexponent: -999999999
+-- test some cases that are close to exponent overflow/underflow
+mul170 multiply 1 9e999999999    -> 9E+999999999
+mul171 multiply 1 9.9e999999999  -> 9.9E+999999999
+mul172 multiply 1 9.99e999999999 -> 9.99E+999999999
+mul173 multiply 9e999999999    1 -> 9E+999999999
+mul174 multiply 9.9e999999999  1 -> 9.9E+999999999
+mul176 multiply 9.99e999999999 1 -> 9.99E+999999999
+mul177 multiply 1 9.99999999e999999999 -> 9.99999999E+999999999
+mul178 multiply 9.99999999e999999999 1 -> 9.99999999E+999999999
+
+mul180 multiply 0.1 9e-999999998   -> 9E-999999999
+mul181 multiply 0.1 99e-999999998  -> 9.9E-999999998
+mul182 multiply 0.1 999e-999999998 -> 9.99E-999999997
+
+mul183 multiply 0.1 9e-999999998     -> 9E-999999999
+mul184 multiply 0.1 99e-999999998    -> 9.9E-999999998
+mul185 multiply 0.1 999e-999999998   -> 9.99E-999999997
+mul186 multiply 0.1 999e-999999997   -> 9.99E-999999996
+mul187 multiply 0.1 9999e-999999997  -> 9.999E-999999995
+mul188 multiply 0.1 99999e-999999997 -> 9.9999E-999999994
+
+mul190 multiply 1 9e-999999998   -> 9E-999999998
+mul191 multiply 1 99e-999999998  -> 9.9E-999999997
+mul192 multiply 1 999e-999999998 -> 9.99E-999999996
+mul193 multiply 9e-999999998   1 -> 9E-999999998
+mul194 multiply 99e-999999998  1 -> 9.9E-999999997
+mul195 multiply 999e-999999998 1 -> 9.99E-999999996
+
+mul196 multiply 1e-599999999 1e-400000000 -> 1E-999999999
+mul197 multiply 1e-600000000 1e-399999999 -> 1E-999999999
+mul198 multiply 1.2e-599999999 1.2e-400000000 -> 1.44E-999999999
+mul199 multiply 1.2e-600000000 1.2e-399999999 -> 1.44E-999999999
+
+mul201 multiply 1e599999999 1e400000000 -> 1E+999999999
+mul202 multiply 1e600000000 1e399999999 -> 1E+999999999
+mul203 multiply 1.2e599999999 1.2e400000000 -> 1.44E+999999999
+mul204 multiply 1.2e600000000 1.2e399999999 -> 1.44E+999999999
+
+-- overflow and underflow tests
+maxexponent: 999999999
+minexponent: -999999999
+mul230 multiply +1.23456789012345E-0 9E+999999999 -> ? Inexact Lost_digits Overflow Rounded
+mul231 multiply 9E+999999999 +1.23456789012345E-0 -> ? Inexact Lost_digits Overflow Rounded
+mul232 multiply +0.100 9E-999999999 -> ? Underflow Subnormal Inexact Rounded
+mul233 multiply 9E-999999999 +0.100 -> ? Underflow Subnormal Inexact Rounded
+mul235 multiply -1.23456789012345E-0 9E+999999999 -> ? Inexact Lost_digits Overflow Rounded
+mul236 multiply 9E+999999999 -1.23456789012345E-0 -> ? Inexact Lost_digits Overflow Rounded
+mul237 multiply -0.100 9E-999999999 -> ? Underflow Subnormal Inexact Rounded
+mul238 multiply 9E-999999999 -0.100 -> ? Underflow Subnormal Inexact Rounded
+
+mul239 multiply 1e-599999999 1e-400000001 -> ? Underflow Subnormal Inexact Rounded
+mul240 multiply 1e-599999999 1e-400000000 -> 1E-999999999
+mul241 multiply 1e-600000000 1e-400000000 -> ? Underflow Subnormal Inexact Rounded
+mul242 multiply 9e-999999998 0.01 -> ? Underflow Subnormal Inexact Rounded
+mul243 multiply 9e-999999998 0.1  -> 9E-999999999
+mul244 multiply 0.01 9e-999999998 -> ? Underflow Subnormal Inexact Rounded
+mul245 multiply 1e599999999 1e400000001 -> ? Overflow Inexact Rounded
+mul246 multiply 1e599999999 1e400000000 -> 1E+999999999
+mul247 multiply 1e600000000 1e400000000 -> ? Overflow Inexact Rounded
+mul248 multiply 9e999999998 100  -> ? Overflow Inexact Rounded
+mul249 multiply 9e999999998 10   -> 9.0E+999999999
+mul250 multiply 100  9e999999998 -> ? Overflow Inexact Rounded
+
+-- 'subnormal' results (all underflow or overflow in base arithemtic)
+precision: 9
+mul260 multiply 1e-600000000 1e-400000001 -> ? Underflow Subnormal Inexact Rounded
+mul261 multiply 1e-600000000 1e-400000002 -> ? Underflow Subnormal Inexact Rounded
+mul262 multiply 1e-600000000 1e-400000003 -> ? Underflow Subnormal Inexact Rounded
+mul263 multiply 1e-600000000 1e-400000004 -> ? Underflow Subnormal Inexact Rounded
+mul264 multiply 1e-600000000 1e-400000005 -> ? Underflow Subnormal Inexact Rounded
+mul265 multiply 1e-600000000 1e-400000006 -> ? Underflow Subnormal Inexact Rounded
+mul266 multiply 1e-600000000 1e-400000007 -> ? Underflow Subnormal Inexact Rounded
+mul267 multiply 1e-600000000 1e-400000008 -> ? Underflow Subnormal Inexact Rounded
+mul268 multiply 1e-600000000 1e-400000009 -> ? Underflow Subnormal Inexact Rounded
+mul269 multiply 1e-600000000 1e-400000010 -> ? Underflow Subnormal Inexact Rounded
+mul270 multiply 1e+600000000 1e+400000001 -> ? Overflow Inexact Rounded
+mul271 multiply 1e+600000000 1e+400000002 -> ? Overflow Inexact Rounded
+mul272 multiply 1e+600000000 1e+400000003 -> ? Overflow Inexact Rounded
+mul273 multiply 1e+600000000 1e+400000004 -> ? Overflow Inexact Rounded
+mul274 multiply 1e+600000000 1e+400000005 -> ? Overflow Inexact Rounded
+mul275 multiply 1e+600000000 1e+400000006 -> ? Overflow Inexact Rounded
+mul276 multiply 1e+600000000 1e+400000007 -> ? Overflow Inexact Rounded
+mul277 multiply 1e+600000000 1e+400000008 -> ? Overflow Inexact Rounded
+mul278 multiply 1e+600000000 1e+400000009 -> ? Overflow Inexact Rounded
+mul279 multiply 1e+600000000 1e+400000010 -> ? Overflow Inexact Rounded
+
+-- lostDigits checks
+maxexponent: 999
+minexponent: -999
+precision: 9
+mul301 multiply 12345678000 1 -> 1.23456780E+10 Rounded
+mul302 multiply 1 12345678000 -> 1.23456780E+10 Rounded
+mul303 multiply 1234567800  1 -> 1.23456780E+9 Rounded
+mul304 multiply 1 1234567800  -> 1.23456780E+9 Rounded
+mul305 multiply 1234567890  1 -> 1.23456789E+9 Rounded
+mul306 multiply 1 1234567890  -> 1.23456789E+9 Rounded
+mul307 multiply 1234567891  1 -> 1.23456789E+9 Inexact Lost_digits Rounded
+mul308 multiply 1 1234567891  -> 1.23456789E+9 Inexact Lost_digits Rounded
+mul309 multiply 12345678901 1 -> 1.23456789E+10 Inexact Lost_digits Rounded
+mul310 multiply 1 12345678901 -> 1.23456789E+10 Inexact Lost_digits Rounded
+mul311 multiply 1234567896  1 -> 1.23456790E+9 Inexact Lost_digits Rounded
+mul312 multiply 1 1234567896  -> 1.23456790E+9 Inexact Lost_digits Rounded
+
+precision: 15
+-- still checking for [no] lostDigits
+mul341 multiply 12345678000 1 -> 12345678000
+mul342 multiply 1 12345678000 -> 12345678000
+mul343 multiply 1234567800  1 -> 1234567800
+mul344 multiply 1 1234567800  -> 1234567800
+mul345 multiply 1234567890  1 -> 1234567890
+mul346 multiply 1 1234567890  -> 1234567890
+mul347 multiply 1234567891  1 -> 1234567891
+mul348 multiply 1 1234567891  -> 1234567891
+mul349 multiply 12345678901 1 -> 12345678901
+mul350 multiply 1 12345678901 -> 12345678901
+mul351 multiply 1234567896  1 -> 1234567896
+mul352 multiply 1 1234567896  -> 1234567896
+
+-- Null tests
+mul400 multiply 10  # -> ? Invalid_operation
+mul401 multiply  # 10 -> ? Invalid_operation
+

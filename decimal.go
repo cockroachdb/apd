@@ -219,3 +219,14 @@ func (d *Decimal) Neg(x *Decimal) (*Decimal, error) {
 	d.Coeff.Neg(&d.Coeff)
 	return d.Round(d)
 }
+
+// Mul sets d to the product x*y and returns d.
+func (d *Decimal) Mul(x, y *Decimal) (*Decimal, error) {
+	a, b, s, err := upscale(x, y)
+	if err != nil {
+		return nil, errors.Wrap(err, "Mul")
+	}
+	d.Coeff.Mul(a, b)
+	d.Exponent = s * 2
+	return d.Round(d)
+}

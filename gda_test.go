@@ -22,6 +22,7 @@ var (
 	flagPython   = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
 	flagSummary  = flag.Bool("summary", false, "print a summary")
 	flagFailFast = flag.Bool("fast", false, "stop work after first error")
+	flagIgnore   = flag.Bool("ignore", false, "print ignore lines on errors")
 )
 
 type TestCase struct {
@@ -171,6 +172,7 @@ func TestGDA(t *testing.T) {
 		"add0",
 		"compare0",
 		"minus0",
+		"multiply0",
 		"subtract0",
 	}
 	var buf bytes.Buffer
@@ -257,6 +259,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					d.SetInt64(int64(c))
 				case "minus":
 					_, err = d.Neg(operands[0])
+				case "multiply":
+					_, err = d.Mul(operands[0], operands[1])
 				case "subtract":
 					_, err = d.Sub(operands[0], operands[1])
 				default:
@@ -296,6 +300,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			success++
 		} else {
 			fail++
+			if *flagIgnore {
+				tc.PrintIgnore()
+			}
 			if *flagFailFast {
 				break
 			}
@@ -317,6 +324,8 @@ print %s`
 	switch tc.Operation {
 	case "add":
 		op = "+"
+	case "multiply":
+		op = "*"
 	case "subtract":
 		op = "-"
 	default:
@@ -345,10 +354,14 @@ print %s`
 		t.Errorf("python's result: %s", so)
 	} else {
 		// python and apd agree, print ignore line
-		fmt.Printf("	\"%s\": true,\n", tc.Id)
+		tc.PrintIgnore()
 	}
 
 	return c == 0
+}
+
+func (tc TestCase) PrintIgnore() {
+	fmt.Printf("	\"%s\": true,\n", tc.Id)
 }
 
 var GDAignore = map[string]bool{
@@ -478,4 +491,39 @@ var GDAignore = map[string]bool{
 	"add697": true,
 	"add707": true,
 	"add717": true,
+	"mul170": true,
+	"mul171": true,
+	"mul172": true,
+	"mul173": true,
+	"mul174": true,
+	"mul176": true,
+	"mul177": true,
+	"mul178": true,
+	"mul180": true,
+	"mul181": true,
+	"mul182": true,
+	"mul183": true,
+	"mul184": true,
+	"mul185": true,
+	"mul186": true,
+	"mul187": true,
+	"mul188": true,
+	"mul190": true,
+	"mul191": true,
+	"mul192": true,
+	"mul193": true,
+	"mul194": true,
+	"mul195": true,
+	"mul196": true,
+	"mul197": true,
+	"mul198": true,
+	"mul199": true,
+	"mul201": true,
+	"mul202": true,
+	"mul203": true,
+	"mul204": true,
+	"mul240": true,
+	"mul243": true,
+	"mul246": true,
+	"mul249": true,
 }
