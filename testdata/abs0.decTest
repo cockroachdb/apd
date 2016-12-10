@@ -1,0 +1,116 @@
+------------------------------------------------------------------------
+-- abs0.decTest -- decimal absolute value (simplified)                --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+version: 2.62
+
+-- This set of tests primarily tests the existence of the operator.
+-- Additon, subtraction, rounding, and more overflows are tested
+-- elsewhere.
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+abs001 abs '1'      -> '1'
+abs002 abs '-1'     -> '1'
+abs003 abs '1.00'   -> '1.00'
+abs004 abs '-1.00'  -> '1.00'
+abs005 abs '0'      -> '0'
+abs006 abs '0.00'   -> '0'
+abs007 abs '00.0'   -> '0'
+abs008 abs '00.00'  -> '0'
+abs009 abs '00'     -> '0'
+
+abs010 abs '-2'     -> '2'
+abs011 abs '2'      -> '2'
+abs012 abs '-2.00'  -> '2.00'
+abs013 abs '2.00'   -> '2.00'
+abs014 abs '-0'     -> '0'
+abs015 abs '-0.00'  -> '0'
+abs016 abs '-00.0'  -> '0'
+abs017 abs '-00.00' -> '0'
+abs018 abs '-00'    -> '0'
+
+abs020 abs '-2000000' -> '2000000'
+abs021 abs '2000000'  -> '2000000'
+precision: 7
+abs022 abs '-2000000' -> '2000000'
+abs023 abs '2000000'  -> '2000000'
+precision: 6
+abs024 abs '-2000000' -> '2.00000E+6' Rounded
+abs025 abs '2000000'  -> '2.00000E+6' Rounded
+precision: 3
+abs026 abs '-2000000' -> '2.00E+6' Rounded
+abs027 abs '2000000'  -> '2.00E+6' Rounded
+
+abs030 abs '+0.1'            -> '0.1'
+abs031 abs '-0.1'            -> '0.1'
+abs032 abs '+0.01'           -> '0.01'
+abs033 abs '-0.01'           -> '0.01'
+abs034 abs '+0.001'          -> '0.001'
+abs035 abs '-0.001'          -> '0.001'
+abs036 abs '+0.000001'       -> '0.000001'
+abs037 abs '-0.000001'       -> '0.000001'
+abs038 abs '+0.000000000001' -> '1E-12'
+abs039 abs '-0.000000000001' -> '1E-12'
+
+-- examples from decArith
+precision: 9
+abs040 abs '2.1'     ->  '2.1'
+abs041 abs '-100'    ->  '100'
+abs042 abs '101.5'   ->  '101.5'
+abs043 abs '-101.5'  ->  '101.5'
+
+-- more fixed, potential LHS swaps/overlays if done by subtract 0
+precision: 9
+abs060 abs '-56267E-10'  -> '0.0000056267'
+abs061 abs '-56267E-5'   -> '0.56267'
+abs062 abs '-56267E-2'   -> '562.67'
+abs063 abs '-56267E-1'   -> '5626.7'
+abs065 abs '-56267E-0'   -> '56267'
+
+-- overflow tests [underflow not possible]
+maxexponent: 999999999
+minexponent: -999999999
+precision: 3
+abs120 abs 9.999E+999999999 -> ? Inexact Lost_digits Overflow Rounded
+
+-- lostDigits checks
+maxexponent: 999
+minexponent: -999
+precision: 9
+abs301 abs 12345678000  -> 1.23456780E+10 Rounded
+abs302 abs 1234567800   -> 1.23456780E+9 Rounded
+abs303 abs 1234567890   -> 1.23456789E+9 Rounded
+abs304 abs 1234567891   -> 1.23456789E+9 Inexact Lost_digits Rounded
+abs305 abs 12345678901  -> 1.23456789E+10 Inexact Lost_digits Rounded
+abs306 abs 1234567896   -> 1.23456790E+9 Inexact Lost_digits Rounded
+
+precision: 15
+-- still checking for [no] lostDigits
+abs321 abs 12345678000  -> 12345678000
+abs322 abs 1234567800   -> 1234567800
+abs323 abs 1234567890   -> 1234567890
+abs324 abs 1234567891   -> 1234567891
+abs325 abs 12345678901  -> 12345678901
+abs326 abs 1234567896   -> 1234567896
+
+-- Null tests
+abs400 abs  # -> ? Invalid_operation

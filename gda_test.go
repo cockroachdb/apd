@@ -167,6 +167,7 @@ func TestParseDecTest(t *testing.T) {
 
 func TestGDA(t *testing.T) {
 	files := []string{
+		"abs0",
 		"add0",
 		"subtract0",
 	}
@@ -244,6 +245,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			var err error
 			go func() {
 				switch tc.Operation {
+				case "abs":
+					_, err = d.Abs(operands[0])
 				case "add":
 					_, err = d.Add(operands[0], operands[1])
 				case "subtract":

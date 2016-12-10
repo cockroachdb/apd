@@ -199,3 +199,10 @@ func (d *Decimal) Sub(x, y *Decimal) (*Decimal, error) {
 	d.Exponent = s
 	return d.Round(d)
 }
+
+// Abs sets d to |x| (the absolute value of x) and returns d.
+func (d *Decimal) Abs(x *Decimal) (*Decimal, error) {
+	d.Set(x)
+	d.Coeff.Abs(&d.Coeff)
+	return d.Round(d)
+}
