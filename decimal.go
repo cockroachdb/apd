@@ -164,6 +164,12 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	return y, x, b.Exponent, nil
 }
 
+// Cmp compares d and x and returns:
+//
+//   -1 if d <  x
+//    0 if d == x
+//   +1 if d >  x
+//
 func (d *Decimal) Cmp(x *Decimal) (int, error) {
 	a, b, _, err := upscale(d, x)
 	if err != nil {
