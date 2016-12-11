@@ -1,3 +1,4 @@
+// Package apd implements arbitrary-precision decimals.
 package apd
 
 import (
@@ -16,7 +17,6 @@ import (
 //
 // All arithmetic operations on a Decimal are subject to the result's
 // Precision and Rounding settings. RoundDown is the default Rounding.
-
 type Decimal struct {
 	Coeff    big.Int
 	Exponent int32
