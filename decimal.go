@@ -247,6 +247,9 @@ func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
 		return nil, errors.Wrap(err, "Quo")
 	}
 
+	// In order to compute the decimal remainder part, add enough 0s to the
+	// numerator to accurately round with the given precision.
+	// TODO(mjibson): determine a better algorithm for this instead of p*2+8.
 	nf := d.Precision*2 + 8
 	f := big.NewInt(int64(nf))
 	e := new(big.Int).Exp(bigTen, f, nil)
