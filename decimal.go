@@ -2,7 +2,6 @@
 package apd
 
 import (
-	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -27,13 +26,15 @@ type Decimal struct {
 	Rounding    Rounder
 }
 
-func New(i int64, scale int32) *Decimal {
+// New creates a new decimal with the given coefficient and exponent.
+func New(coeff int64, exponent int32) *Decimal {
 	return &Decimal{
-		Coeff:    *big.NewInt(i),
-		Exponent: scale,
+		Coeff:    *big.NewInt(coeff),
+		Exponent: exponent,
 	}
 }
 
+// NewFromString creates a new decimal from s.
 func NewFromString(s string) (*Decimal, error) {
 	var err error
 
@@ -87,10 +88,6 @@ func (d *Decimal) String() string {
 		s = "-" + s
 	}
 	return s
-}
-
-func (d *Decimal) GoString() string {
-	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, MaxExponent: %d, MinExponent: %d, Precision: %d}`, d.Coeff.String(), d.Exponent, d.MaxExponent, d.MinExponent, d.Precision)
 }
 
 func (d *Decimal) Set(x *Decimal) *Decimal {
@@ -313,7 +310,7 @@ func (d *Decimal) Rem(x, y *Decimal) (*Decimal, error) {
 
 var ErrSqrtNegative = errors.New("square root of negative number")
 
-// Sqrt set d to the square root of x and returns d.
+// Sqrt sets d to the square root of x and returns d.
 func (d *Decimal) Sqrt(x *Decimal) (*Decimal, error) {
 	// The square root calculation is implemented using Newton's Method.
 	// We start with an initial estimate for sqrt(d), and then iterate:

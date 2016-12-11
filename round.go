@@ -14,7 +14,7 @@ func (d *Decimal) Round(x *Decimal) (*Decimal, error) {
 	}
 	rounder := d.Rounding
 	if rounder == nil {
-		rounder = RoundDown
+		rounder = roundDown
 	}
 	err := rounder(d, x)
 	if err != nil {
@@ -27,7 +27,18 @@ func (d *Decimal) Round(x *Decimal) (*Decimal, error) {
 // Round rounds x with d's precision settings and stores the result in d.
 type Rounder func(d, x *Decimal) error
 
-func RoundDown(d, x *Decimal) error {
+var (
+	// RoundDown rounds toward 0; truncate.
+	RoundDown Rounder = roundDown
+	// RoundHalfUp rounds up if the digits are >= 0.5.
+	RoundHalfUp Rounder = roundHalfUp
+	// RoundHalfEven rounds up if the digits are > 0.5. If the digits are equal
+	// to 0.5, it rounds up if the previous digit is odd, always producing an
+	// even digit.
+	RoundHalfEven Rounder = roundHalfEven
+)
+
+func roundDown(d, x *Decimal) error {
 	d.Set(x)
 	nd := x.numDigits()
 	if diff := nd - int64(d.Precision); diff > 0 {
@@ -58,7 +69,7 @@ func roundAddOne(b *big.Int, diff *int64) {
 	}
 }
 
-func RoundHalfUp(d, x *Decimal) error {
+func roundHalfUp(d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Add(&d.Coeff, bigZero)
 	nd := x.numDigits()
@@ -81,7 +92,7 @@ func RoundHalfUp(d, x *Decimal) error {
 	return nil
 }
 
-func RoundHalfEven(d, x *Decimal) error {
+func roundHalfEven(d, x *Decimal) error {
 	d.Set(x)
 	nd := x.numDigits()
 	if diff := nd - int64(d.Precision); diff > 0 {

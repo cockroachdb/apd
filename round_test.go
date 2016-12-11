@@ -6,9 +6,9 @@ import (
 )
 
 var rounders = map[string]Rounder{
-	"down":      RoundDown,
-	"half_up":   RoundHalfUp,
-	"half_even": RoundHalfEven,
+	"down":      roundDown,
+	"half_up":   roundHalfUp,
+	"half_even": roundHalfEven,
 }
 
 func TestRound(t *testing.T) {

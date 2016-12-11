@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+func (d *Decimal) GoString() string {
+	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, MaxExponent: %d, MinExponent: %d, Precision: %d}`, d.Coeff.String(), d.Exponent, d.MaxExponent, d.MinExponent, d.Precision)
+}
+
 func TestNewFromString(t *testing.T) {
 	tests := []struct {
 		s   string
