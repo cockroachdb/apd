@@ -9,7 +9,7 @@ import "math/big"
 func (d *Decimal) Round(x *Decimal) (*Decimal, error) {
 	if d.Precision == 0 {
 		d.Set(x)
-		err := d.addExponent(0)
+		err := d.setExponent(int64(d.Exponent))
 		return d, err
 	}
 	rounder := d.Rounding
@@ -20,7 +20,7 @@ func (d *Decimal) Round(x *Decimal) (*Decimal, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = d.addExponent(0)
+	err = d.setExponent(int64(d.Exponent))
 	return d, err
 }
 
@@ -35,7 +35,7 @@ func RoundDown(d, x *Decimal) error {
 		e := new(big.Int).Exp(bigTen, y, nil)
 		y.Quo(&d.Coeff, e)
 		d.Coeff.Set(y)
-		err := d.addExponent(diff)
+		err := d.setExponent(int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func RoundHalfUp(d, x *Decimal) error {
 			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
-		err := d.addExponent(diff)
+		err := d.setExponent(int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func RoundHalfEven(d, x *Decimal) error {
 			}
 		}
 		d.Coeff.Set(y)
-		err := d.addExponent(diff)
+		err := d.setExponent(int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}

@@ -107,20 +107,24 @@ func (d *Decimal) SetInt64(x int64) *Decimal {
 
 var ErrExponentOutOfRange = errors.New("exponent out of range")
 
-// addExponent adds x to d's Exponent and checks that it is in range.
-func (d *Decimal) addExponent(x int64) error {
-	if x > math.MaxInt32 || x < math.MinInt32 {
+// setExponent sets d's Exponent to the sum of xs. Each value and the sum
+// of xs must fit within an int32. An error occurs if the sum is outside of
+// the MaxExponent or MinExponent range.
+func (d *Decimal) setExponent(xs ...int64) error {
+	var sum int64
+	for _, x := range xs {
+		if x > math.MaxInt32 || x < math.MinInt32 {
+			return ErrExponentOutOfRange
+		}
+		sum += x
+	}
+	if sum > math.MaxInt32 || sum < math.MinInt32 {
 		return ErrExponentOutOfRange
 	}
-	// Now both d.Exponent and x are guaranteed to fit in an int32, so we can
-	// add them without overflow.
-	r := int64(d.Exponent) + int64(x)
-	if r > math.MaxInt32 || r < math.MinInt32 {
-		return ErrExponentOutOfRange
-	}
+	r := int32(sum)
 	if d.MaxExponent != 0 || d.MinExponent != 0 {
 		// For max/min exponent calculation, add in the number of digits for each power of 10.
-		nr := r + d.numDigits() - 1
+		nr := sum + d.numDigits() - 1
 		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
 		if nr > math.MaxInt32 || nr < math.MinInt32 {
 			return ErrExponentOutOfRange
@@ -131,7 +135,7 @@ func (d *Decimal) addExponent(x int64) error {
 			return ErrExponentOutOfRange
 		}
 	}
-	d.Exponent = int32(r)
+	d.Exponent = r
 	return nil
 }
 
@@ -248,7 +252,8 @@ func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
 	e := new(big.Int).Exp(bigTen, f, nil)
 	f.Mul(a, e)
 	d.Coeff.Quo(f, b)
-	// TODO(mjibson): check for overflow
-	d.Exponent = -int32(nf)
+	if err := d.setExponent(-int64(nf)); err != nil {
+		return nil, err
+	}
 	return d.Round(d)
 }
