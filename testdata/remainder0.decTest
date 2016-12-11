@@ -1,0 +1,325 @@
+------------------------------------------------------------------------
+-- remainder0.decTest -- decimal remainder (simplified)               --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+version: 2.62
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+rem001 remainder  1     1    ->  0
+rem002 remainder  2     1    ->  0
+rem003 remainder  1     2    ->  1
+rem004 remainder  2     2    ->  0
+rem005 remainder  0     1    ->  0
+rem006 remainder  0     2    ->  0
+rem007 remainder  1     3    ->  1
+rem008 remainder  2     3    ->  2
+rem009 remainder  3     3    ->  0
+
+rem010 remainder  2.4   1    ->  0.4
+rem011 remainder  2.4   -1   ->  0.4
+rem012 remainder  -2.4  1    ->  -0.4
+rem013 remainder  -2.4  -1   ->  -0.4
+rem014 remainder  2.40  1    ->  0.40
+rem015 remainder  2.400 1    ->  0.400
+rem016 remainder  2.4   2    ->  0.4
+rem017 remainder  2.400 2    ->  0.400
+rem018 remainder  2.    2    ->  0
+rem019 remainder  20    20   ->  0
+
+rem020 remainder  187   187    ->  0
+rem021 remainder  5     2      ->  1
+rem022 remainder  5     2.0    ->  1.0
+rem023 remainder  5     2.000  ->  1.000
+rem024 remainder  5     0.200  ->  0
+rem025 remainder  5     0.200  ->  0
+
+rem030 remainder  1     2      ->  1
+rem031 remainder  1     4      ->  1
+rem032 remainder  1     8      ->  1
+rem033 remainder  1     16     ->  1
+rem034 remainder  1     32     ->  1
+rem035 remainder  1     64     ->  1
+rem040 remainder  1    -2      ->  1
+rem041 remainder  1    -4      ->  1
+rem042 remainder  1    -8      ->  1
+rem043 remainder  1    -16     ->  1
+rem044 remainder  1    -32     ->  1
+rem045 remainder  1    -64     ->  1
+rem050 remainder -1     2      ->  -1
+rem051 remainder -1     4      ->  -1
+rem052 remainder -1     8      ->  -1
+rem053 remainder -1     16     ->  -1
+rem054 remainder -1     32     ->  -1
+rem055 remainder -1     64     ->  -1
+rem060 remainder -1    -2      ->  -1
+rem061 remainder -1    -4      ->  -1
+rem062 remainder -1    -8      ->  -1
+rem063 remainder -1    -16     ->  -1
+rem064 remainder -1    -32     ->  -1
+rem065 remainder -1    -64     ->  -1
+
+rem070 remainder  999999999     1  -> 0
+rem071 remainder  999999999.4   1  -> 0 Inexact Lost_digits Rounded
+rem072 remainder  999999999.5   1  -> ? Division_impossible Inexact Lost_digits Rounded
+rem073 remainder  999999999.9   1  -> ? Division_impossible Inexact Lost_digits Rounded
+rem074 remainder  999999999.999 1  -> ? Division_impossible Inexact Lost_digits Rounded
+precision: 6
+rem080 remainder  999999999     1  -> ? Division_impossible Inexact Lost_digits Rounded
+rem081 remainder  99999999      1  -> ? Division_impossible Inexact Lost_digits Rounded
+rem082 remainder  9999999       1  -> ? Division_impossible Inexact Lost_digits Rounded
+rem083 remainder  999999        1  -> 0
+rem084 remainder  99999         1  -> 0
+rem085 remainder  9999          1  -> 0
+rem086 remainder  999           1  -> 0
+rem087 remainder  99            1  -> 0
+rem088 remainder  9             1  -> 0
+
+precision: 9
+rem090 remainder  0.            1  -> 0
+rem091 remainder  .0            1  -> 0
+rem092 remainder  0.00          1  -> 0
+rem093 remainder  0.00E+9       1  -> 0
+rem094 remainder  0.0000E-50    1  -> 0
+
+rem100 remainder  1  1   -> 0
+rem101 remainder  1  2   -> 1
+rem102 remainder  1  3   -> 1
+rem103 remainder  1  4   -> 1
+rem104 remainder  1  5   -> 1
+rem105 remainder  1  6   -> 1
+rem106 remainder  1  7   -> 1
+rem107 remainder  1  8   -> 1
+rem108 remainder  1  9   -> 1
+rem109 remainder  1  10  -> 1
+rem110 remainder  1  1   -> 0
+rem111 remainder  2  1   -> 0
+rem112 remainder  3  1   -> 0
+rem113 remainder  4  1   -> 0
+rem114 remainder  5  1   -> 0
+rem115 remainder  6  1   -> 0
+rem116 remainder  7  1   -> 0
+rem117 remainder  8  1   -> 0
+rem118 remainder  9  1   -> 0
+rem119 remainder  10 1   -> 0
+
+-- Various flavours of remainder by 0
+maxexponent: 999999999
+minexponent: -999999999
+rem201 remainder  0      0   -> ? Division_undefined
+rem202 remainder  0.0E5  0   -> ? Division_undefined
+rem203 remainder  0.000  0   -> ? Division_undefined
+rem204 remainder  0.0001 0   -> ? Invalid_operation
+rem205 remainder  0.01   0   -> ? Invalid_operation
+rem206 remainder  0.1    0   -> ? Invalid_operation
+rem207 remainder  1      0   -> ? Invalid_operation
+rem208 remainder  1      0.0 -> ? Invalid_operation
+rem209 remainder 10      0.0 -> ? Invalid_operation
+rem210 remainder 1E+100  0.0 -> ? Invalid_operation
+rem211 remainder 1E+1000 0   -> ? Invalid_operation
+
+-- some differences from remainderNear
+rem231 remainder   0.4  1.020 ->  0.400
+rem232 remainder   0.50 1.020 ->  0.500
+rem233 remainder   0.51 1.020 ->  0.510
+rem234 remainder   0.52 1.020 ->  0.520
+rem235 remainder   0.6  1.020 ->  0.600
+
+-- test some cases that are close to exponent overflow
+maxexponent: 999999999
+minexponent: -999999999
+rem270 remainder 1 1e999999999    -> 1
+rem271 remainder 1 0.9e999999999  -> 1
+rem272 remainder 1 0.99e999999999 -> 1
+rem273 remainder 1 0.999999999e999999999 -> 1
+rem274 remainder 9e999999999          1 -> ? Division_impossible
+rem275 remainder 9.9e999999999        1 -> ? Division_impossible
+rem276 remainder 9.99e999999999       1 -> ? Division_impossible
+rem277 remainder 9.99999999e999999999 1 -> ? Division_impossible
+
+rem280 remainder 0.1 9e-999999999       -> ? Division_impossible
+rem281 remainder 0.1 99e-999999999      -> ? Division_impossible
+rem282 remainder 0.1 999e-999999999     -> ? Division_impossible
+
+rem283 remainder 0.1 9e-999999998       -> ? Division_impossible
+rem284 remainder 0.1 99e-999999998      -> ? Division_impossible
+rem285 remainder 0.1 999e-999999998     -> ? Division_impossible
+rem286 remainder 0.1 999e-999999997     -> ? Division_impossible
+rem287 remainder 0.1 9999e-999999997    -> ? Division_impossible
+rem288 remainder 0.1 99999e-999999997   -> ? Division_impossible
+
+-- rem3xx are from DiagBigDecimal
+rem301 remainder   1    3     ->  1
+rem302 remainder   5    5     ->  0
+rem303 remainder   13   10    ->  3
+rem304 remainder   13   50    ->  13
+rem305 remainder   13   100   ->  13
+rem306 remainder   13   1000  ->  13
+rem307 remainder   .13    1   ->  0.13
+rem308 remainder   0.133  1   ->  0.133
+rem309 remainder   0.1033 1   ->  0.1033
+rem310 remainder   1.033  1   ->  0.033
+rem311 remainder   10.33  1   ->  0.33
+rem312 remainder   10.33 10   ->  0.33
+rem313 remainder   103.3  1   ->  0.3
+rem314 remainder   133   10   ->  3
+rem315 remainder   1033  10   ->  3
+rem316 remainder   1033  50   ->  33
+rem317 remainder   101.0  3   ->  2.0
+rem318 remainder   102.0  3   ->  0
+rem319 remainder   103.0  3   ->  1.0
+rem320 remainder   2.40   1   ->  0.40
+rem321 remainder   2.400  1   ->  0.400
+rem322 remainder   2.4    1   ->  0.4
+rem323 remainder   2.4    2   ->  0.4
+rem324 remainder   2.400  2   ->  0.400
+rem325 remainder   1   0.3    ->  0.1
+rem326 remainder   1   0.30   ->  0.10
+rem327 remainder   1   0.300  ->  0.100
+rem328 remainder   1   0.3000 ->  0.1000
+rem329 remainder   1.0    0.3 ->  0.1
+rem330 remainder   1.00   0.3 ->  0.10
+rem331 remainder   1.000  0.3 ->  0.100
+rem332 remainder   1.0000 0.3 ->  0.1000
+rem333 remainder   0.5  2     ->  0.5
+rem334 remainder   0.5  2.1   ->  0.5
+rem335 remainder   0.5  2.01  ->  0.50
+rem336 remainder   0.5  2.001 ->  0.500
+rem337 remainder   0.50 2     ->  0.50
+rem338 remainder   0.50 2.01  ->  0.50
+rem339 remainder   0.50 2.001 ->  0.500
+
+rem340 remainder   0.5   0.5000001    ->  0.5000000
+rem341 remainder   0.5   0.50000001    ->  0.50000000
+rem342 remainder   0.5   0.500000001    ->  0.500000000
+rem343 remainder   0.5   0.5000000001    ->  0 Inexact Lost_digits Rounded
+rem344 remainder   0.5   0.50000000001    ->  0 Inexact Lost_digits Rounded
+rem345 remainder   0.5   0.4999999    ->  1E-7
+rem346 remainder   0.5   0.49999999    ->  1E-8
+rem347 remainder   0.5   0.499999999    ->  1E-9
+rem348 remainder   0.5   0.4999999999    ->  0 Inexact Lost_digits Rounded
+rem349 remainder   0.5   0.49999999999    ->  0 Inexact Lost_digits Rounded
+
+rem350 remainder   0.03  7  ->  0.03
+rem351 remainder   5   2    ->  1
+rem352 remainder   4.1   2    ->  0.1
+rem353 remainder   4.01   2    ->  0.01
+rem354 remainder   4.001   2    ->  0.001
+rem355 remainder   4.0001   2    ->  0.0001
+rem356 remainder   4.00001   2    ->  0.00001
+rem357 remainder   4.000001   2    ->  0.000001
+rem358 remainder   4.0000001   2    ->  1E-7
+
+rem360 remainder   1.2   0.7345 ->  0.4655
+rem361 remainder   0.8   12     ->  0.8
+rem362 remainder   0.8   0.2    ->  0
+rem363 remainder   0.8   0.3    ->  0.2
+rem364 remainder   0.800   12   ->  0.800
+rem365 remainder   0.800   1.7  ->  0.800
+rem366 remainder   2.400   2    ->  0.400
+
+precision: 6
+rem371 remainder   2.400  2        ->  0.400
+precision: 3
+-- lostDigits in the next one
+rem372 remainder   12345678900000 12e+12 -> 3E+11 Inexact Lost_digits Rounded
+
+precision: 5
+rem381 remainder 12345  1         ->  0
+rem382 remainder 12345  1.0001    ->  0.7657
+rem383 remainder 12345  1.001     ->  0.668
+rem384 remainder 12345  1.01      ->  0.78
+rem385 remainder 12345  1.1       ->  0.8
+rem386 remainder 12355  4         ->  3
+rem387 remainder 12345  4         ->  1
+rem388 remainder 12355  4.0001    ->  2.6912
+rem389 remainder 12345  4.0001    ->  0.6914
+rem390 remainder 12345  4.9       ->  1.9
+rem391 remainder 12345  4.99      ->  4.73
+rem392 remainder 12345  4.999     ->  2.469
+rem393 remainder 12345  4.9999    ->  0.2469
+rem394 remainder 12345  5         ->  0
+rem395 remainder 12345  5.0001    ->  4.7532
+rem396 remainder 12345  5.001     ->  2.532
+rem397 remainder 12345  5.01      ->  0.36
+rem398 remainder 12345  5.1       ->  3.0
+
+precision: 9
+-- some nasty division-by-1 cases [some similar above]
+rem401 remainder   0.5         1   ->  0.5
+rem402 remainder   0.55        1   ->  0.55
+rem403 remainder   0.555       1   ->  0.555
+rem404 remainder   0.5555      1   ->  0.5555
+rem405 remainder   0.55555     1   ->  0.55555
+rem406 remainder   0.555555    1   ->  0.555555
+rem407 remainder   0.5555555   1   ->  0.5555555
+rem408 remainder   0.55555555  1   ->  0.55555555
+rem409 remainder   0.555555555 1   ->  0.555555555
+
+-- overflow and underflow tests [from divide]
+precision: 9
+maxexponent: 999999999
+minexponent: -999999999
+rem430 remainder +1.23456789012345E-0 9E+999999999 -> 1.23456789 Inexact Lost_digits Rounded
+rem431 remainder 9E+999999999 +0.23456789012345E-0 -> ? Division_impossible Inexact Lost_digits Rounded
+rem432 remainder +0.100 9E+999999999               -> 0.100
+rem433 remainder 9E-999999999 +9.100               -> 9E-999999999
+rem435 remainder -1.23456789012345E-0 9E+999999999 -> -1.23456789 Inexact Lost_digits Rounded
+rem436 remainder 9E+999999999 -0.83456789012345E-0 -> ? Division_impossible Inexact Lost_digits Rounded
+rem437 remainder -0.100 9E+999999999               -> -0.100
+rem438 remainder 9E-999999999 -9.100               -> 9E-999999999
+
+-- lostDigits checks
+maxexponent: 999
+minexponent: -999
+precision: 9
+rem501 remainder 12345678000 100 -> 0 Rounded
+rem502 remainder 1 12345678000   -> 1 Rounded
+rem503 remainder 1234567800  10  -> 0 Rounded
+rem504 remainder 1 1234567800    -> 1 Rounded
+rem505 remainder 1234567890  10  -> 0 Rounded
+rem506 remainder 1 1234567890    -> 1 Rounded
+rem507 remainder 1234567891  10  -> 0 Inexact Lost_digits Rounded
+rem508 remainder 1 1234567891    -> 1 Inexact Lost_digits Rounded
+rem509 remainder 12345678901 100 -> 0 Inexact Lost_digits Rounded
+rem510 remainder 1 12345678901   -> 1 Inexact Lost_digits Rounded
+rem511 remainder 1234567896  10  -> 0 Inexact Lost_digits Rounded
+rem512 remainder 1 1234567896    -> 1 Inexact Lost_digits Rounded
+
+precision: 15
+-- still checking for [no] lostDigits
+rem541 remainder 12345678000 100 -> 0
+rem542 remainder 1 12345678000   -> 1
+rem543 remainder 1234567800  10  -> 0
+rem544 remainder 1 1234567800    -> 1
+rem545 remainder 1234567890  10  -> 0
+rem546 remainder 1 1234567890    -> 1
+rem547 remainder 1234567891  10  -> 1
+rem548 remainder 1 1234567891    -> 1
+rem549 remainder 12345678901 100 -> 1
+rem550 remainder 1 12345678901   -> 1
+rem551 remainder 1234567896  10  -> 6
+rem552 remainder 1 1234567896    -> 1
+
+-- Null tests
+rem900 remainder 10  # -> ? Invalid_operation
+rem901 remainder  # 10 -> ? Invalid_operation
+

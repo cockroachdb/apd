@@ -244,7 +244,7 @@ func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "Mul")
+		return nil, errors.Wrap(err, "Quo")
 	}
 
 	nf := d.Precision*2 + 8
@@ -255,5 +255,44 @@ func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
 	if err := d.setExponent(-int64(nf)); err != nil {
 		return nil, err
 	}
+	return d.Round(d)
+}
+
+var ErrIntegerDivisionImpossible = errors.New("integer division impossible")
+
+// QuoInteger sets d to the integer part of the quotient x/y and returns
+// d. If the result cannot fit in d.Precision digits, an error is returned.
+func (d *Decimal) QuoInteger(x, y *Decimal) (*Decimal, error) {
+	if y.Coeff.Sign() == 0 {
+		return nil, ErrDivideByZero
+	}
+	a, b, _, err := upscale(x, y)
+	if err != nil {
+		return nil, errors.Wrap(err, "QuoInteger")
+	}
+	d.Coeff.Quo(a, b)
+	if d.numDigits() > int64(d.Precision) {
+		return nil, ErrIntegerDivisionImpossible
+	}
+	d.Exponent = 0
+	return nil, err
+}
+
+// Rem sets d to the remainder part of the quotient x/y and returns d. If
+// the integer part cannot fit in d.Precision digits, an error is returned.
+func (d *Decimal) Rem(x, y *Decimal) (*Decimal, error) {
+	if y.Coeff.Sign() == 0 {
+		return nil, ErrDivideByZero
+	}
+	a, b, s, err := upscale(x, y)
+	if err != nil {
+		return nil, errors.Wrap(err, "Rem")
+	}
+	tmp := new(big.Int)
+	tmp.QuoRem(a, b, &d.Coeff)
+	if numDigits(tmp) > int64(d.Precision) {
+		return nil, ErrIntegerDivisionImpossible
+	}
+	d.Exponent = s
 	return d.Round(d)
 }

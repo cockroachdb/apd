@@ -172,8 +172,10 @@ func TestGDA(t *testing.T) {
 		"add0",
 		"compare0",
 		"divide0",
+		"divideint0",
 		"minus0",
 		"multiply0",
+		"remainder0",
 		"subtract0",
 	}
 	var buf bytes.Buffer
@@ -192,8 +194,6 @@ func TestGDA(t *testing.T) {
 					skipped,
 					missing,
 				)
-			}
-			if missing != 0 {
 				t.Fatalf("unaccounted summary result: missing: %d, total: %d, %d, %d, %d", missing, total, ignored, skipped, success)
 			}
 		})
@@ -260,10 +260,14 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					d.SetInt64(int64(c))
 				case "divide":
 					_, err = d.Quo(operands[0], operands[1])
+				case "divideint":
+					_, err = d.QuoInteger(operands[0], operands[1])
 				case "minus":
 					_, err = d.Neg(operands[0])
 				case "multiply":
 					_, err = d.Mul(operands[0], operands[1])
+				case "remainder":
+					_, err = d.Rem(operands[0], operands[1])
 				case "subtract":
 					_, err = d.Sub(operands[0], operands[1])
 				default:
@@ -329,8 +333,12 @@ print %s`
 		op = "+"
 	case "divide":
 		op = "/"
+	case "divideint":
+		op = "//"
 	case "multiply":
 		op = "*"
+	case "remainder":
+		op = "%"
 	case "subtract":
 		op = "-"
 	default:
@@ -399,6 +407,16 @@ var GDAignore = map[string]bool{
 	"add712": true,
 	"add713": true,
 	"div412": true,
+	"dvi411": true,
+	"rem071": true,
+	"rem343": true,
+	"rem344": true,
+	"rem348": true,
+	"rem349": true,
+	"rem372": true,
+	"rem507": true,
+	"rem509": true,
+	"rem511": true,
 	"sub053": true,
 	"sub062": true,
 	"sub063": true,
@@ -549,4 +567,22 @@ var GDAignore = map[string]bool{
 	"mul243": true,
 	"mul246": true,
 	"mul249": true,
+	"rem270": true,
+	"rem271": true,
+	"rem272": true,
+	"rem273": true,
+	"rem430": true,
+	"rem432": true,
+	"rem433": true,
+	"rem435": true,
+	"rem437": true,
+	"rem438": true,
+
+	// lost digits
+	"dvi072": true,
+	"dvi073": true,
+	"dvi074": true,
+	"rem072": true,
+	"rem073": true,
+	"rem074": true,
 }
