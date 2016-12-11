@@ -171,6 +171,7 @@ func TestGDA(t *testing.T) {
 		"abs0",
 		"add0",
 		"compare0",
+		"divide0",
 		"minus0",
 		"multiply0",
 		"subtract0",
@@ -257,6 +258,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					var c int
 					c, err = operands[0].Cmp(operands[1])
 					d.SetInt64(int64(c))
+				case "divide":
+					_, err = d.Quo(operands[0], operands[1])
 				case "minus":
 					_, err = d.Neg(operands[0])
 				case "multiply":
@@ -324,6 +327,8 @@ print %s`
 	switch tc.Operation {
 	case "add":
 		op = "+"
+	case "divide":
+		op = "/"
 	case "multiply":
 		op = "*"
 	case "subtract":
@@ -393,6 +398,7 @@ var GDAignore = map[string]bool{
 	"add711": true,
 	"add712": true,
 	"add713": true,
+	"div412": true,
 	"sub053": true,
 	"sub062": true,
 	"sub063": true,
@@ -491,6 +497,23 @@ var GDAignore = map[string]bool{
 	"add697": true,
 	"add707": true,
 	"add717": true,
+	"div270": true,
+	"div271": true,
+	"div272": true,
+	"div273": true,
+	"div274": true,
+	"div275": true,
+	"div276": true,
+	"div277": true,
+	"div280": true,
+	"div281": true,
+	"div282": true,
+	"div283": true,
+	"div284": true,
+	"div285": true,
+	"div286": true,
+	"div287": true,
+	"div288": true,
 	"mul170": true,
 	"mul171": true,
 	"mul172": true,

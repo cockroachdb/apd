@@ -230,3 +230,25 @@ func (d *Decimal) Mul(x, y *Decimal) (*Decimal, error) {
 	d.Exponent = s * 2
 	return d.Round(d)
 }
+
+var ErrDivideByZero = errors.New("divide by zero")
+
+// Quo sets d to the quotient x/y for y != 0 and returns d.
+func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
+	if y.Coeff.Sign() == 0 {
+		return nil, ErrDivideByZero
+	}
+	a, b, _, err := upscale(x, y)
+	if err != nil {
+		return nil, errors.Wrap(err, "Mul")
+	}
+
+	nf := d.Precision*2 + 8
+	f := big.NewInt(int64(nf))
+	e := new(big.Int).Exp(bigTen, f, nil)
+	f.Mul(a, e)
+	d.Coeff.Quo(f, b)
+	// TODO(mjibson): check for overflow
+	d.Exponent = -int32(nf)
+	return d.Round(d)
+}
