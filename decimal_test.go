@@ -106,7 +106,8 @@ func TestAdd(t *testing.T) {
 		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {
 			x := newDecimal(t, tc.x)
 			y := newDecimal(t, tc.y)
-			d, err := new(Decimal).Add(x, y)
+			d := new(Decimal)
+			err := d.Add(x, y)
 			if err != nil {
 				t.Fatal(err)
 			}

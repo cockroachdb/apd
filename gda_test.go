@@ -254,27 +254,27 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			go func() {
 				switch tc.Operation {
 				case "abs":
-					_, err = d.Abs(operands[0])
+					err = d.Abs(operands[0])
 				case "add":
-					_, err = d.Add(operands[0], operands[1])
+					err = d.Add(operands[0], operands[1])
 				case "compare":
 					var c int
 					c, err = operands[0].Cmp(operands[1])
 					d.SetInt64(int64(c))
 				case "divide":
-					_, err = d.Quo(operands[0], operands[1])
+					err = d.Quo(operands[0], operands[1])
 				case "divideint":
-					_, err = d.QuoInteger(operands[0], operands[1])
+					err = d.QuoInteger(operands[0], operands[1])
 				case "minus":
-					_, err = d.Neg(operands[0])
+					err = d.Neg(operands[0])
 				case "multiply":
-					_, err = d.Mul(operands[0], operands[1])
+					err = d.Mul(operands[0], operands[1])
 				case "remainder":
-					_, err = d.Rem(operands[0], operands[1])
+					err = d.Rem(operands[0], operands[1])
 				case "squareroot":
-					_, err = d.Sqrt(operands[0])
+					err = d.Sqrt(operands[0])
 				case "subtract":
-					_, err = d.Sub(operands[0], operands[1])
+					err = d.Sub(operands[0], operands[1])
 				default:
 					done <- fmt.Errorf("unknown operation: %s", tc.Operation)
 				}

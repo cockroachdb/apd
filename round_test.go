@@ -69,7 +69,7 @@ func TestRound(t *testing.T) {
 					d := new(Decimal)
 					d.Precision = tc.p
 					d.Rounding = rounder
-					_, err := d.Round(x)
+					err := d.Round(x)
 					if err != nil {
 						t.Fatal(err)
 					}

@@ -6,11 +6,11 @@ import "math/big"
 // d has zero Precision, no modification of x is done. If d has no Rounding
 // specified, RoundDown is used.
 
-func (d *Decimal) Round(x *Decimal) (*Decimal, error) {
+func (d *Decimal) Round(x *Decimal) error {
 	if d.Precision == 0 {
 		d.Set(x)
 		err := d.setExponent(int64(d.Exponent))
-		return d, err
+		return err
 	}
 	rounder := d.Rounding
 	if rounder == nil {
@@ -18,10 +18,9 @@ func (d *Decimal) Round(x *Decimal) (*Decimal, error) {
 	}
 	err := rounder(d, x)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = d.setExponent(int64(d.Exponent))
-	return d, err
+	return d.setExponent(int64(d.Exponent))
 }
 
 // Round rounds x with d's precision settings and stores the result in d.

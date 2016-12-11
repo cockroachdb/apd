@@ -196,47 +196,47 @@ func (d *Decimal) Sign() int {
 	return d.Coeff.Sign()
 }
 
-// Add sets d to the sum x+y and returns d.
-func (d *Decimal) Add(x, y *Decimal) (*Decimal, error) {
+// Add sets d to the sum x+y.
+func (d *Decimal) Add(x, y *Decimal) error {
 	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "Add")
+		return errors.Wrap(err, "Add")
 	}
 	d.Coeff.Add(a, b)
 	d.Exponent = s
 	return d.Round(d)
 }
 
-// Sub sets d to the difference x-y and returns d.
-func (d *Decimal) Sub(x, y *Decimal) (*Decimal, error) {
+// Sub sets d to the difference x-y.
+func (d *Decimal) Sub(x, y *Decimal) error {
 	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "Sub")
+		return errors.Wrap(err, "Sub")
 	}
 	d.Coeff.Sub(a, b)
 	d.Exponent = s
 	return d.Round(d)
 }
 
-// Abs sets d to |x| (the absolute value of x) and returns d.
-func (d *Decimal) Abs(x *Decimal) (*Decimal, error) {
+// Abs sets d to |x| (the absolute value of x).
+func (d *Decimal) Abs(x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Abs(&d.Coeff)
 	return d.Round(d)
 }
 
-// Neg sets z to -x and returns z.
-func (d *Decimal) Neg(x *Decimal) (*Decimal, error) {
+// Neg sets z to -x.
+func (d *Decimal) Neg(x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Neg(&d.Coeff)
 	return d.Round(d)
 }
 
-// Mul sets d to the product x*y and returns d.
-func (d *Decimal) Mul(x, y *Decimal) (*Decimal, error) {
+// Mul sets d to the product x*y.
+func (d *Decimal) Mul(x, y *Decimal) error {
 	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "Mul")
+		return errors.Wrap(err, "Mul")
 	}
 	d.Coeff.Mul(a, b)
 	d.Exponent = s * 2
@@ -245,14 +245,14 @@ func (d *Decimal) Mul(x, y *Decimal) (*Decimal, error) {
 
 var ErrDivideByZero = errors.New("divide by zero")
 
-// Quo sets d to the quotient x/y for y != 0 and returns d.
-func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
+// Quo sets d to the quotient x/y for y != 0.
+func (d *Decimal) Quo(x, y *Decimal) error {
 	if y.Coeff.Sign() == 0 {
-		return nil, ErrDivideByZero
+		return ErrDivideByZero
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "Quo")
+		return errors.Wrap(err, "Quo")
 	}
 
 	// In order to compute the decimal remainder part, add enough 0s to the
@@ -264,45 +264,45 @@ func (d *Decimal) Quo(x, y *Decimal) (*Decimal, error) {
 	f.Mul(a, e)
 	d.Coeff.Quo(f, b)
 	if err := d.setExponent(-int64(nf)); err != nil {
-		return nil, err
+		return err
 	}
 	return d.Round(d)
 }
 
 var ErrIntegerDivisionImpossible = errors.New("integer division impossible")
 
-// QuoInteger sets d to the integer part of the quotient x/y and returns
-// d. If the result cannot fit in d.Precision digits, an error is returned.
-func (d *Decimal) QuoInteger(x, y *Decimal) (*Decimal, error) {
+// QuoInteger sets d to the integer part of the quotient x/y. If the result
+// cannot fit in d.Precision digits, an error is returned.
+func (d *Decimal) QuoInteger(x, y *Decimal) error {
 	if y.Coeff.Sign() == 0 {
-		return nil, ErrDivideByZero
+		return ErrDivideByZero
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "QuoInteger")
+		return errors.Wrap(err, "QuoInteger")
 	}
 	d.Coeff.Quo(a, b)
 	if d.numDigits() > int64(d.Precision) {
-		return nil, ErrIntegerDivisionImpossible
+		return ErrIntegerDivisionImpossible
 	}
 	d.Exponent = 0
-	return nil, err
+	return err
 }
 
-// Rem sets d to the remainder part of the quotient x/y and returns d. If
+// Rem sets d to the remainder part of the quotient x/y. If
 // the integer part cannot fit in d.Precision digits, an error is returned.
-func (d *Decimal) Rem(x, y *Decimal) (*Decimal, error) {
+func (d *Decimal) Rem(x, y *Decimal) error {
 	if y.Coeff.Sign() == 0 {
-		return nil, ErrDivideByZero
+		return ErrDivideByZero
 	}
 	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return nil, errors.Wrap(err, "Rem")
+		return errors.Wrap(err, "Rem")
 	}
 	tmp := new(big.Int)
 	tmp.QuoRem(a, b, &d.Coeff)
 	if numDigits(tmp) > int64(d.Precision) {
-		return nil, ErrIntegerDivisionImpossible
+		return ErrIntegerDivisionImpossible
 	}
 	d.Exponent = s
 	return d.Round(d)
@@ -310,8 +310,8 @@ func (d *Decimal) Rem(x, y *Decimal) (*Decimal, error) {
 
 var ErrSqrtNegative = errors.New("square root of negative number")
 
-// Sqrt sets d to the square root of x and returns d.
-func (d *Decimal) Sqrt(x *Decimal) (*Decimal, error) {
+// Sqrt sets d to the square root of x.
+func (d *Decimal) Sqrt(x *Decimal) error {
 	// The square root calculation is implemented using Newton's Method.
 	// We start with an initial estimate for sqrt(d), and then iterate:
 	//     x_{n+1} = 1/2 * ( x_n + (d / x_n) ).
@@ -319,39 +319,39 @@ func (d *Decimal) Sqrt(x *Decimal) (*Decimal, error) {
 	// Validate the sign of x.
 	switch x.Coeff.Sign() {
 	case -1:
-		return nil, ErrSqrtNegative
+		return ErrSqrtNegative
 	case 0:
 		d.Coeff.SetInt64(0)
 		d.Exponent = 0
-		return d, nil
+		return nil
 	}
 
 	// Use half as the initial estimate.
 	z := new(Decimal)
 	z.Precision = d.Precision*2 + 2
-	_, err := z.Mul(x, decimalHalf)
+	err := z.Mul(x, decimalHalf)
 	if err != nil {
-		return nil, errors.Wrap(err, "Sqrt")
+		return errors.Wrap(err, "Sqrt")
 	}
 
 	// Iterate.
 	tmp := new(Decimal)
 	tmp.Precision = z.Precision
 	for loop := newLoop("sqrt", z, 1); ; {
-		_, err := tmp.Quo(x, z) // t = d / x_n
+		err := tmp.Quo(x, z) // t = d / x_n
 		if err != nil {
-			return nil, err
+			return err
 		}
-		_, err = tmp.Add(tmp, z) // t = x_n + (d / x_n)
+		err = tmp.Add(tmp, z) // t = x_n + (d / x_n)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		_, err = z.Mul(tmp, decimalHalf) // x_{n+1} = 0.5 * t
+		err = z.Mul(tmp, decimalHalf) // x_{n+1} = 0.5 * t
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if done, err := loop.done(z); err != nil {
-			return nil, err
+			return err
 		} else if done {
 			break
 		}
