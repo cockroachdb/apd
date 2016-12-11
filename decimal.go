@@ -140,10 +140,11 @@ func (d *Decimal) setExponent(xs ...int64) error {
 }
 
 var (
-	bigZero = big.NewInt(0)
-	bigOne  = big.NewInt(1)
-	bigTwo  = big.NewInt(2)
-	bigTen  = big.NewInt(10)
+	bigZero     = big.NewInt(0)
+	bigOne      = big.NewInt(1)
+	bigTwo      = big.NewInt(2)
+	bigTen      = big.NewInt(10)
+	decimalHalf = New(5, -1)
 )
 
 // upscale converts a and b to big.Ints with the same scaling, and their
@@ -186,6 +187,16 @@ func (d *Decimal) Cmp(x *Decimal) (int, error) {
 		return 0, errors.Wrap(err, "Cmp")
 	}
 	return a.Cmp(b), nil
+}
+
+// Sign returns:
+//
+//	-1 if d <  0
+//	 0 if d == 0
+//	+1 if d >  0
+//
+func (d *Decimal) Sign() int {
+	return d.Coeff.Sign()
 }
 
 // Add sets d to the sum x+y and returns d.
@@ -298,4 +309,56 @@ func (d *Decimal) Rem(x, y *Decimal) (*Decimal, error) {
 	}
 	d.Exponent = s
 	return d.Round(d)
+}
+
+var ErrSqrtNegative = errors.New("square root of negative number")
+
+// Sqrt set d to the square root of x and returns d.
+func (d *Decimal) Sqrt(x *Decimal) (*Decimal, error) {
+	// The square root calculation is implemented using Newton's Method.
+	// We start with an initial estimate for sqrt(d), and then iterate:
+	//     x_{n+1} = 1/2 * ( x_n + (d / x_n) ).
+
+	// Validate the sign of x.
+	switch x.Coeff.Sign() {
+	case -1:
+		return nil, ErrSqrtNegative
+	case 0:
+		d.Coeff.SetInt64(0)
+		d.Exponent = 0
+		return d, nil
+	}
+
+	// Use half as the initial estimate.
+	z := new(Decimal)
+	z.Precision = d.Precision*2 + 2
+	_, err := z.Mul(x, decimalHalf)
+	if err != nil {
+		return nil, errors.Wrap(err, "Sqrt")
+	}
+
+	// Iterate.
+	tmp := new(Decimal)
+	tmp.Precision = z.Precision
+	for loop := newLoop("sqrt", z, 1); ; {
+		_, err := tmp.Quo(x, z) // t = d / x_n
+		if err != nil {
+			return nil, err
+		}
+		_, err = tmp.Add(tmp, z) // t = x_n + (d / x_n)
+		if err != nil {
+			return nil, err
+		}
+		_, err = z.Mul(tmp, decimalHalf) // x_{n+1} = 0.5 * t
+		if err != nil {
+			return nil, err
+		}
+		if done, err := loop.done(z); err != nil {
+			return nil, err
+		} else if done {
+			break
+		}
+	}
+
+	return d.Round(z)
 }
