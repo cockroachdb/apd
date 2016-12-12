@@ -142,18 +142,6 @@ func (d *Decimal) setExponent(xs ...int64) error {
 	return nil
 }
 
-var (
-	bigZero           = big.NewInt(0)
-	bigOne            = big.NewInt(1)
-	bigTwo            = big.NewInt(2)
-	bigTen            = big.NewInt(10)
-	decimalHalf       = New(5, -1)
-	decimalZeroPtNine = New(9, -1)
-	decimalOne        = New(1, 0)
-	decimalOnePtOne   = New(11, -1)
-	decimalTwo        = New(2, 0)
-)
-
 // upscale converts a and b to big.Ints with the same scaling, and their
 // scaling. An error can be produced if the resulting scale factor is out
 // of range.
@@ -169,7 +157,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	s := int64(a.Exponent) - int64(b.Exponent)
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
-	if s > 5000 {
+	if s > 10000 {
 		return nil, nil, 0, errors.Wrapf(errExponentOutOfRange, "upscale: %d", s)
 	}
 	y := big.NewInt(s)
@@ -460,4 +448,14 @@ func (d *Decimal) Ln(x *Decimal) error {
 
 	// Round to the desired scale.
 	return d.Round(z)
+}
+
+// Log10 sets d to the base 10 log of x.
+func (d *Decimal) Log10(x *Decimal) error {
+	z := &Decimal{Precision: d.Precision * 2}
+	err := z.Ln(x)
+	if err != nil {
+		return errors.Wrap(err, "ln")
+	}
+	return d.Quo(z, decimalLog10)
 }

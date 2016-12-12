@@ -174,6 +174,7 @@ func TestGDA(t *testing.T) {
 		"divide0",
 		"divideint0",
 		"ln0",
+		"log100",
 		"minus0",
 		"multiply0",
 		"remainder0",
@@ -233,6 +234,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				skipped++
 				t.Skip("has null")
 			}
+			t.Logf("%s:/%s", path, tc.ID)
 			mode, ok := rounders[tc.Rounding]
 			if !ok {
 				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
@@ -247,7 +249,6 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			d.MinExponent = int32(tc.MinExponent)
 			d.Rounding = mode
 			// helpful acme address link
-			t.Logf("%s:/%s", path, tc.ID)
 			t.Logf("%s %s = %s (prec: %d, round: %s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, tc.Precision, tc.Rounding)
 
 			done := make(chan error, 1)
@@ -268,6 +269,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					err = d.QuoInteger(operands[0], operands[1])
 				case "ln":
 					err = d.Ln(operands[0])
+				case "log10":
+					err = d.Log10(operands[0])
 				case "minus":
 					err = d.Neg(operands[0])
 				case "multiply":
@@ -288,7 +291,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(time.Second):
+			case <-time.After(time.Second * 5):
 				t.Fatalf("timeout")
 			}
 			if tc.Result == "?" {
@@ -351,6 +354,8 @@ print %s`
 		op = "//"
 	case "ln":
 		op = "ln"
+	case "log10":
+		op = "log10"
 	case "multiply":
 		op = "*"
 	case "remainder":
@@ -430,6 +435,11 @@ var GDAignore = map[string]bool{
 	"dvi411":  true,
 	"ln0054":  true,
 	"ln116":   true,
+	"log1308": true,
+	"log1322": true,
+	"log1323": true,
+	"log1325": true,
+	"log1326": true,
 	"rem071":  true,
 	"rem343":  true,
 	"rem344":  true,
@@ -634,6 +644,11 @@ var GDAignore = map[string]bool{
 	"rem074": true,
 
 	// invalid context errors: unsure what these are testing
-	"ln903": true,
-	"ln905": true,
+	"ln903":  true,
+	"ln905":  true,
+	"log903": true,
+	"log905": true,
+
+	// invalid operation errors; most test harnesses probably skip this
+	"log901": true,
 }
