@@ -147,3 +147,69 @@ func TestCmp(t *testing.T) {
 		})
 	}
 }
+
+func TestModf(t *testing.T) {
+	tests := []struct {
+		x string
+		i string
+		f string
+	}{
+		{x: "1", i: "1", f: "0"},
+		{x: "1.0", i: "1", f: "0.0"},
+		{x: "1.0e1", i: "10", f: "0"},
+		{x: "1.0e2", i: "100", f: "0"},
+		{x: "1.0e-1", i: "0", f: "0.10"},
+		{x: "1.0e-2", i: "0", f: "0.010"},
+		{x: "1234.56", i: "1234", f: "0.56"},
+		{x: "1234.56e2", i: "123456", f: "0"},
+		{x: "1234.56e4", i: "12345600", f: "0"},
+		{x: "1234.56e-2", i: "12", f: "0.3456"},
+		{x: "1234.56e-4", i: "0", f: "0.123456"},
+		{x: "1234.56e-6", i: "0", f: "0.00123456"},
+		{x: "123456e-8", i: "0", f: "0.00123456"},
+		{x: ".123456e8", i: "12345600", f: "0"},
+
+		{x: "-1", i: "-1", f: "0"},
+		{x: "-1.0", i: "-1", f: "0.0"},
+		{x: "-1.0e1", i: "-10", f: "0"},
+		{x: "-1.0e2", i: "-100", f: "0"},
+		{x: "-1.0e-1", i: "0", f: "-0.10"},
+		{x: "-1.0e-2", i: "0", f: "-0.010"},
+		{x: "-1234.56", i: "-1234", f: "-0.56"},
+		{x: "-1234.56e2", i: "-123456", f: "0"},
+		{x: "-1234.56e4", i: "-12345600", f: "0"},
+		{x: "-1234.56e-2", i: "-12", f: "-0.3456"},
+		{x: "-1234.56e-4", i: "0", f: "-0.123456"},
+		{x: "-1234.56e-6", i: "0", f: "-0.00123456"},
+		{x: "-123456e-8", i: "0", f: "-0.00123456"},
+		{x: "-.123456e8", i: "-12345600", f: "0"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.x, func(t *testing.T) {
+			x := newDecimal(t, tc.x)
+			integ, frac := new(Decimal), new(Decimal)
+			x.Modf(integ, frac)
+			if tc.i != integ.String() {
+				t.Fatalf("integ: expected: %s, got: %s", tc.i, integ)
+			}
+			if tc.f != frac.String() {
+				t.Fatalf("frac: expected: %s, got: %s", tc.f, frac)
+			}
+			a := new(Decimal)
+			if err := a.Add(integ, frac); err != nil {
+				t.Fatal(err)
+			}
+			if c, err := a.Cmp(x); err != nil {
+				t.Fatal(err)
+			} else if c != 0 {
+				t.Fatalf("%s != %s", a, x)
+			}
+			if integ.Exponent < 0 {
+				t.Fatal(integ.Exponent)
+			}
+			if frac.Exponent > 0 {
+				t.Fatal(frac.Exponent)
+			}
+		})
+	}
+}

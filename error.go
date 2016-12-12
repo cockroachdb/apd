@@ -33,6 +33,14 @@ func (e *ErrDecimal) Cmp(a, b *Decimal) int {
 	return c
 }
 
+// Exp performs d.Exp(x).
+func (e *ErrDecimal) Exp(d, x *Decimal) {
+	if e.Err != nil {
+		return
+	}
+	e.Err = d.Exp(x)
+}
+
 // Ln performs d.Ln(x).
 func (e *ErrDecimal) Ln(d, x *Decimal) {
 	if e.Err != nil {

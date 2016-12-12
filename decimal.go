@@ -427,9 +427,6 @@ func (d *Decimal) Ln(x *Decimal) error {
 		ed.Quo(tmp2, numerator, tmp1)
 		// z += r^n / n
 		ed.Add(z, z, tmp2)
-		if ed.Err != nil {
-			return ed.Err
-		}
 		if done, err := loop.done(z); err != nil {
 			return err
 		} else if done {
@@ -458,4 +455,119 @@ func (d *Decimal) Log10(x *Decimal) error {
 		return errors.Wrap(err, "ln")
 	}
 	return d.Quo(z, decimalLog10)
+}
+
+// Modf sets integ to the integral part of d and frac to the fractional part
+// such that d = integ+frac. If d is negative, both integ or frac will be
+// either 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be
+// <= 0.
+func (d *Decimal) Modf(integ, frac *Decimal) {
+	// No fractional part.
+	if d.Exponent > 0 {
+		frac.Exponent = 0
+		frac.SetInt64(0)
+		integ.Set(d)
+		return
+	}
+	nd := d.numDigits()
+	exp := -int64(d.Exponent)
+	// d < 0 because exponent is larger than number of digits.
+	if exp > nd {
+		integ.Exponent = 0
+		integ.SetInt64(0)
+		frac.Set(d)
+		return
+	}
+
+	y := big.NewInt(exp)
+	e := new(big.Int).Exp(bigTen, y, nil)
+	integ.Coeff.QuoRem(&d.Coeff, e, &frac.Coeff)
+	integ.Exponent = 0
+	frac.Exponent = d.Exponent
+}
+
+// Exp sets d = e**n.
+func (d *Decimal) Exp(n *Decimal) error {
+	// We are computing (e^n) by splitting n into an integer and a float (e.g
+	// 3.1 ==> x = 3, y = 0.1), this allows us to write e^n = e^(x+y) = e^x * e^y
+
+	integ := new(Decimal)
+	frac := new(Decimal)
+	n.Modf(integ, frac)
+
+	if integ.Exponent > 0 {
+		y := big.NewInt(int64(integ.Exponent))
+		e := new(big.Int).Exp(bigTen, y, nil)
+		integ.Coeff.Mul(&integ.Coeff, e)
+		integ.Exponent = 0
+	}
+
+	z := &Decimal{Precision: d.Precision * 2}
+	if err := z.integerPower(decimalE, &integ.Coeff); err != nil {
+		return errors.Wrap(err, "IntegerPower")
+	}
+	return d.smallExp(z, frac)
+}
+
+// smallExp sets d = x * e**y. It should be used with small y values only
+// (|y| < 1).
+func (d *Decimal) smallExp(x, y *Decimal) error {
+	var ed ErrDecimal
+	n := new(Decimal)
+	p := d.Precision * 2
+	z := &Decimal{Precision: p}
+	tmp := &Decimal{Precision: p}
+	z.Set(x)
+	tmp.Set(x)
+	for loop := newLoop("exp", z, 1); ; {
+		if done, err := loop.done(z); err != nil {
+			return err
+		} else if done {
+			break
+		}
+		ed.Add(n, n, decimalOne)
+		ed.Mul(tmp, tmp, y)
+		ed.Quo(tmp, tmp, n)
+		ed.Add(z, z, tmp)
+		if ed.Err != nil {
+			return ed.Err
+		}
+	}
+	// Round to the desired scale.
+	return d.Round(z)
+}
+
+// integerPower sets d = x**y.
+// For integers we use exponentiation by squaring.
+// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring
+func (d *Decimal) integerPower(x *Decimal, y *big.Int) error {
+	b := new(big.Int).Set(y)
+	neg := b.Sign() < 0
+	if neg {
+		b.Abs(b)
+	}
+
+	p := d.Precision * 2
+	n := &Decimal{Precision: p}
+	z := &Decimal{Precision: p}
+	n.Set(x)
+	z.Set(decimalOne)
+	var ed ErrDecimal
+	for b.Sign() > 0 {
+		if b.Bit(0) == 1 {
+			ed.Mul(z, z, n)
+		}
+		b.Rsh(b, 1)
+
+		ed.Mul(n, n, n)
+		if ed.Err != nil {
+			return ed.Err
+		}
+	}
+
+	if neg {
+		ed.Quo(z, decimalOne, z)
+	}
+	ed.Round(d, z)
+	return ed.Err
 }

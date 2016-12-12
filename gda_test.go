@@ -173,6 +173,7 @@ func TestGDA(t *testing.T) {
 		"compare0",
 		"divide0",
 		"divideint0",
+		"exp0",
 		"ln0",
 		"log100",
 		"minus0",
@@ -267,6 +268,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					err = d.Quo(operands[0], operands[1])
 				case "divideint":
 					err = d.QuoInteger(operands[0], operands[1])
+				case "exp":
+					err = d.Exp(operands[0])
 				case "ln":
 					err = d.Ln(operands[0])
 				case "log10":
@@ -352,6 +355,8 @@ print %s`
 		op = "/"
 	case "divideint":
 		op = "//"
+	case "exp":
+		op = "exp"
 	case "ln":
 		op = "ln"
 	case "log10":
@@ -651,4 +656,23 @@ var GDAignore = map[string]bool{
 
 	// invalid operation errors; most test harnesses probably skip this
 	"log901": true,
+
+	// undetected underflow
+	"exp048": true,
+	"exp756": true,
+	"exp757": true,
+	"exp759": true,
+	"exp760": true,
+	"exp761": true,
+	"exp762": true,
+	"exp763": true,
+	"exp764": true,
+	"exp765": true,
+	"exp766": true,
+	"exp769": true,
+	"exp770": true,
+	"exp771": true,
+	"exp772": true,
+	"exp773": true,
+	"exp774": true,
 }
