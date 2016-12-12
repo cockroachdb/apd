@@ -45,14 +45,14 @@ func NewFromString(s string) (*Decimal, error) {
 			return nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
 		if exp > math.MaxInt32 || exp < math.MinInt32 {
-			return nil, ErrExponentOutOfRange
+			return nil, errExponentOutOfRange
 		}
 		s = s[:i]
 	}
 	if i := strings.IndexByte(s, '.'); i >= 0 {
 		exp -= len(s) - i - 1
 		if exp > math.MaxInt32 || exp < math.MinInt32 {
-			return nil, ErrExponentOutOfRange
+			return nil, errExponentOutOfRange
 		}
 		s = s[:i] + s[i+1:]
 	}
@@ -90,19 +90,25 @@ func (d *Decimal) String() string {
 	return s
 }
 
+// Set sets d's coefficient and exponent from x.
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
 	return d
 }
 
-// SetInt sets d.'s Coefficient value to x. The exponent is not changed.
+// SetInt64 sets d.'s Coefficient value to x. The exponent is not changed.
 func (d *Decimal) SetInt64(x int64) *Decimal {
 	d.Coeff.SetInt64(x)
 	return d
 }
 
-var ErrExponentOutOfRange = errors.New("exponent out of range")
+var (
+	errExponentOutOfRange        = errors.New("exponent out of range")
+	errSqrtNegative              = errors.New("square root of negative number")
+	errIntegerDivisionImpossible = errors.New("integer division impossible")
+	errDivideByZero              = errors.New("divide by zero")
+)
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
 // of xs must fit within an int32. An error occurs if the sum is outside of
@@ -111,12 +117,12 @@ func (d *Decimal) setExponent(xs ...int64) error {
 	var sum int64
 	for _, x := range xs {
 		if x > math.MaxInt32 || x < math.MinInt32 {
-			return ErrExponentOutOfRange
+			return errExponentOutOfRange
 		}
 		sum += x
 	}
 	if sum > math.MaxInt32 || sum < math.MinInt32 {
-		return ErrExponentOutOfRange
+		return errExponentOutOfRange
 	}
 	r := int32(sum)
 	if d.MaxExponent != 0 || d.MinExponent != 0 {
@@ -124,12 +130,12 @@ func (d *Decimal) setExponent(xs ...int64) error {
 		nr := sum + d.numDigits() - 1
 		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
 		if nr > math.MaxInt32 || nr < math.MinInt32 {
-			return ErrExponentOutOfRange
+			return errExponentOutOfRange
 		}
 		v := int32(nr)
 		if d.MaxExponent != 0 && v > d.MaxExponent ||
 			d.MinExponent != 0 && v < d.MinExponent {
-			return ErrExponentOutOfRange
+			return errExponentOutOfRange
 		}
 	}
 	d.Exponent = r
@@ -160,7 +166,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
 	if s > 1000 {
-		return nil, nil, 0, ErrExponentOutOfRange
+		return nil, nil, 0, errExponentOutOfRange
 	}
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)
@@ -243,12 +249,10 @@ func (d *Decimal) Mul(x, y *Decimal) error {
 	return d.Round(d)
 }
 
-var ErrDivideByZero = errors.New("divide by zero")
-
 // Quo sets d to the quotient x/y for y != 0.
 func (d *Decimal) Quo(x, y *Decimal) error {
 	if y.Coeff.Sign() == 0 {
-		return ErrDivideByZero
+		return errDivideByZero
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
@@ -269,13 +273,11 @@ func (d *Decimal) Quo(x, y *Decimal) error {
 	return d.Round(d)
 }
 
-var ErrIntegerDivisionImpossible = errors.New("integer division impossible")
-
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
 // cannot fit in d.Precision digits, an error is returned.
 func (d *Decimal) QuoInteger(x, y *Decimal) error {
 	if y.Coeff.Sign() == 0 {
-		return ErrDivideByZero
+		return errDivideByZero
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
@@ -283,7 +285,7 @@ func (d *Decimal) QuoInteger(x, y *Decimal) error {
 	}
 	d.Coeff.Quo(a, b)
 	if d.numDigits() > int64(d.Precision) {
-		return ErrIntegerDivisionImpossible
+		return errIntegerDivisionImpossible
 	}
 	d.Exponent = 0
 	return err
@@ -293,7 +295,7 @@ func (d *Decimal) QuoInteger(x, y *Decimal) error {
 // the integer part cannot fit in d.Precision digits, an error is returned.
 func (d *Decimal) Rem(x, y *Decimal) error {
 	if y.Coeff.Sign() == 0 {
-		return ErrDivideByZero
+		return errDivideByZero
 	}
 	a, b, s, err := upscale(x, y)
 	if err != nil {
@@ -302,13 +304,11 @@ func (d *Decimal) Rem(x, y *Decimal) error {
 	tmp := new(big.Int)
 	tmp.QuoRem(a, b, &d.Coeff)
 	if numDigits(tmp) > int64(d.Precision) {
-		return ErrIntegerDivisionImpossible
+		return errIntegerDivisionImpossible
 	}
 	d.Exponent = s
 	return d.Round(d)
 }
-
-var ErrSqrtNegative = errors.New("square root of negative number")
 
 // Sqrt sets d to the square root of x.
 func (d *Decimal) Sqrt(x *Decimal) error {
@@ -319,7 +319,7 @@ func (d *Decimal) Sqrt(x *Decimal) error {
 	// Validate the sign of x.
 	switch x.Coeff.Sign() {
 	case -1:
-		return ErrSqrtNegative
+		return errSqrtNegative
 	case 0:
 		d.Coeff.SetInt64(0)
 		d.Exponent = 0

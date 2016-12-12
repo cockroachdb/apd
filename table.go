@@ -32,7 +32,7 @@ func init() {
 		elem.digits = int64(len(curVal.String()))
 
 		elem.border.SetInt64(10)
-		curExp.SetInt64(int64(elem.digits))
+		curExp.SetInt64(elem.digits)
 		elem.border.Exp(&elem.border, curExp, nil)
 	}
 }

@@ -5,7 +5,6 @@ import "math/big"
 // Round rounds x with d's settings. The result is stored in d and returned. If
 // d has zero Precision, no modification of x is done. If d has no Rounding
 // specified, RoundDown is used.
-
 func (d *Decimal) Round(x *Decimal) error {
 	if d.Precision == 0 {
 		d.Set(x)
@@ -14,7 +13,7 @@ func (d *Decimal) Round(x *Decimal) error {
 	}
 	rounder := d.Rounding
 	if rounder == nil {
-		rounder = roundDown
+		rounder = RoundDown
 	}
 	err := rounder(d, x)
 	if err != nil {
@@ -23,7 +22,7 @@ func (d *Decimal) Round(x *Decimal) error {
 	return d.setExponent(int64(d.Exponent))
 }
 
-// Round rounds x with d's precision settings and stores the result in d.
+// Rounder rounds x with d's precision settings and stores the result in d.
 type Rounder func(d, x *Decimal) error
 
 var (

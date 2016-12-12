@@ -31,7 +31,7 @@ type TestCase struct {
 	Rounding                 string
 	Extended, Clamp          bool
 
-	Id         string
+	ID         string
 	Operation  string
 	Operands   []string
 	Result     string
@@ -107,7 +107,7 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 			if len(line) < 5 {
 				return nil, fmt.Errorf("short test case line: %q", text)
 			}
-			tc.Id = line[0]
+			tc.ID = line[0]
 			tc.Operation = line[1]
 			tc.Operands = nil
 			var ops []string
@@ -222,9 +222,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 	}
 	var ignored, skipped, success, fail, total int
 	for _, tc := range tcs {
-		succeed := t.Run(tc.Id, func(t *testing.T) {
+		succeed := t.Run(tc.ID, func(t *testing.T) {
 			total++
-			if GDAignore[tc.Id] {
+			if GDAignore[tc.ID] {
 				ignored++
 				t.Skip("ignored")
 			}
@@ -246,7 +246,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			d.MinExponent = int32(tc.MinExponent)
 			d.Rounding = mode
 			// helpful acme address link
-			t.Logf("%s:/%s", path, tc.Id)
+			t.Logf("%s:/%s", path, tc.ID)
 			t.Logf("%s %s = %s (prec: %d, round: %s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, tc.Precision, tc.Rounding)
 
 			done := make(chan error, 1)
@@ -383,7 +383,7 @@ print %s`
 }
 
 func (tc TestCase) PrintIgnore() {
-	fmt.Printf("	\"%s\": true,\n", tc.Id)
+	fmt.Printf("	\"%s\": true,\n", tc.ID)
 }
 
 var GDAignore = map[string]bool{
