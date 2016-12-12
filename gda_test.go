@@ -173,6 +173,7 @@ func TestGDA(t *testing.T) {
 		"compare0",
 		"divide0",
 		"divideint0",
+		"ln0",
 		"minus0",
 		"multiply0",
 		"remainder0",
@@ -265,6 +266,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					err = d.Quo(operands[0], operands[1])
 				case "divideint":
 					err = d.QuoInteger(operands[0], operands[1])
+				case "ln":
+					err = d.Ln(operands[0])
 				case "minus":
 					err = d.Neg(operands[0])
 				case "multiply":
@@ -285,7 +288,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(time.Second / 4):
+			case <-time.After(time.Second):
 				t.Fatalf("timeout")
 			}
 			if tc.Result == "?" {
@@ -293,6 +296,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					return
 				}
 				t.Fatalf("expected error, got %#v", d)
+			}
+			if err != nil {
+				t.Fatalf("%+v", err)
 			}
 			r := newDecimal(t, tc.Result)
 			c, err := d.Cmp(r)
@@ -304,6 +310,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					if tc.CheckPython(t, d) {
 						return
 					}
+				}
+				if d.Exponent < 100 {
+					t.Logf("result: %s", d)
 				}
 				t.Fatalf("got: %#v", d)
 			}
@@ -340,6 +349,8 @@ print %s`
 		op = "/"
 	case "divideint":
 		op = "//"
+	case "ln":
+		op = "ln"
 	case "multiply":
 		op = "*"
 	case "remainder":
@@ -417,6 +428,8 @@ var GDAignore = map[string]bool{
 	"add713":  true,
 	"div412":  true,
 	"dvi411":  true,
+	"ln0054":  true,
+	"ln116":   true,
 	"rem071":  true,
 	"rem343":  true,
 	"rem344":  true,
@@ -543,6 +556,17 @@ var GDAignore = map[string]bool{
 	"div286":  true,
 	"div287":  true,
 	"div288":  true,
+	"ln0903":  true,
+	"ln0904":  true,
+	"ln0905":  true,
+	"ln0906":  true,
+	"ln0910":  true,
+	"ln0911":  true,
+	"ln0912":  true,
+	"ln0913":  true,
+	"ln0914":  true,
+	"ln0915":  true,
+	"ln0916":  true,
 	"mul170":  true,
 	"mul171":  true,
 	"mul172":  true,
@@ -598,4 +622,8 @@ var GDAignore = map[string]bool{
 	"rem072": true,
 	"rem073": true,
 	"rem074": true,
+
+	// invalid context errors: unsure what these are testing
+	"ln903": true,
+	"ln905": true,
 }

@@ -143,11 +143,15 @@ func (d *Decimal) setExponent(xs ...int64) error {
 }
 
 var (
-	bigZero     = big.NewInt(0)
-	bigOne      = big.NewInt(1)
-	bigTwo      = big.NewInt(2)
-	bigTen      = big.NewInt(10)
-	decimalHalf = New(5, -1)
+	bigZero           = big.NewInt(0)
+	bigOne            = big.NewInt(1)
+	bigTwo            = big.NewInt(2)
+	bigTen            = big.NewInt(10)
+	decimalHalf       = New(5, -1)
+	decimalZeroPtNine = New(9, -1)
+	decimalOne        = New(1, 0)
+	decimalOnePtOne   = New(11, -1)
+	decimalTwo        = New(2, 0)
 )
 
 // upscale converts a and b to big.Ints with the same scaling, and their
@@ -165,8 +169,8 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	s := int64(a.Exponent) - int64(b.Exponent)
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
-	if s > 1000 {
-		return nil, nil, 0, errExponentOutOfRange
+	if s > 5000 {
+		return nil, nil, 0, errors.Wrapf(errExponentOutOfRange, "upscale: %d", s)
 	}
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)
@@ -357,5 +361,103 @@ func (d *Decimal) Sqrt(x *Decimal) error {
 		}
 	}
 
+	return d.Round(z)
+}
+
+// Ln sets d to the natural log of x.
+func (d *Decimal) Ln(x *Decimal) error {
+	// Validate the sign of x.
+	if x.Sign() <= 0 {
+		return errors.Errorf("natural log of non-positive value: %s", x)
+	}
+
+	// Attempt to make our precision high enough so that intermediate calculations
+	// will produce enough data to have a correct output at the end. The constants
+	// here were found experimentally and are sufficient to pass many of the
+	// GDA tests, however this may still fail to produce accurate results for
+	// some inputs.
+	// TODO(mjibson): figure out an algorithm that can correctly determine this
+	// for all inputs.
+	p := d.Precision
+	if p < 15 {
+		p = 15
+	}
+	p *= 4
+	xr := &Decimal{Precision: p}
+
+	fact := New(2, 0)
+	var ed ErrDecimal
+
+	// Use the Taylor series approximation:
+	//
+	//   r = (x - 1) / (x + 1)
+	//   ln(x) = 2 * [ r + r^3 / 3 + r^5 / 5 + ... ]
+
+	// The taylor series of ln(x) converges much faster if 0.9 < x < 1.1. We
+	// can use the logarithmic identity:
+	// log_b (sqrt(x)) = log_b (x) / 2
+	// Thus, successively square-root x until it is in that region. Keep track
+	// of how many square-rootings were done using fact and multiply at the end.
+	xr.Set(x)
+	for ed.Cmp(xr, decimalZeroPtNine) < 0 || ed.Cmp(xr, decimalOnePtOne) > 0 {
+		xr.Precision += p
+		ed.Sqrt(xr, xr)
+		ed.Mul(fact, fact, decimalTwo)
+	}
+	if ed.Err != nil {
+		return ed.Err
+	}
+
+	tmp1 := &Decimal{Precision: p}
+	tmp2 := &Decimal{Precision: p}
+	elem := &Decimal{Precision: p}
+	numerator := &Decimal{Precision: p}
+	z := &Decimal{Precision: p}
+
+	// tmp1 = x + 1
+	ed.Add(tmp1, xr, decimalOne)
+	// tmp2 = x - 1
+	ed.Sub(tmp2, xr, decimalOne)
+	// elem = r = (x - 1) / (x + 1)
+	ed.Quo(elem, tmp2, tmp1)
+	// z will be the result. Initialize to elem.
+	z.Set(elem)
+	numerator.Set(elem)
+	// elem = r^2 = ((x - 1) / (x + 1)) ^ 2
+	// Used since the series uses only odd powers of z.
+	ed.Mul(elem, elem, elem)
+	tmp1.Exponent = 0
+	if ed.Err != nil {
+		return ed.Err
+	}
+	for loop := newLoop("log", z, 40); ; {
+		// tmp1 = n, the i'th odd power: 3, 5, 7, 9, etc.
+		tmp1.SetInt64(int64(loop.i)*2 + 3)
+		// numerator = r^n
+		ed.Mul(numerator, numerator, elem)
+		// tmp2 = r^n / n
+		ed.Quo(tmp2, numerator, tmp1)
+		// z += r^n / n
+		ed.Add(z, z, tmp2)
+		if ed.Err != nil {
+			return ed.Err
+		}
+		if done, err := loop.done(z); err != nil {
+			return err
+		} else if done {
+			break
+		}
+		if ed.Err != nil {
+			return ed.Err
+		}
+	}
+
+	// Undo input range reduction.
+	ed.Mul(z, z, fact)
+	if ed.Err != nil {
+		return ed.Err
+	}
+
+	// Round to the desired scale.
 	return d.Round(z)
 }
