@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Decimal is in arbitrary-precision decimal. It's value is:
+// Decimal is in arbitrary-precision decimal. Its value is:
 //
 //     coeff * 10 ^ exponent
 //
@@ -20,10 +20,18 @@ type Decimal struct {
 	Coeff    big.Int
 	Exponent int32
 
+	// MaxExponent, if != 0, specifies the largest effective exponent. The
+	// effective exponent is the value of the Decimal in scientific notation. That
+	// is, for 10e2, the effective exponent is 3 (1.0e3).
 	MaxExponent int32
+	// MinExponent is similar to MaxExponent, but for the smallest effective
+	// exponent.
 	MinExponent int32
-	Precision   uint32
-	Rounding    Rounder
+	// Precision is the number of places to round during rounding.
+	Precision uint32
+	// Rounding specifies the Rounder to use during rounding. RoundDown is used
+	// if nil.
+	Rounding Rounder
 }
 
 // New creates a new decimal with the given coefficient and exponent.
