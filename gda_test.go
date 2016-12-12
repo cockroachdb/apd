@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -223,8 +224,10 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var lock sync.Mutex
 	var ignored, skipped, success, fail, total int
 	for _, tc := range tcs {
+		tc := tc
 		succeed := t.Run(tc.ID, func(t *testing.T) {
 			total++
 			if GDAignore[tc.ID] {
@@ -235,6 +238,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				skipped++
 				t.Skip("has null")
 			}
+			t.Parallel()
 			t.Logf("%s:/%s", path, tc.ID)
 			mode, ok := rounders[tc.Rounding]
 			if !ok {
@@ -323,6 +327,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				t.Fatalf("got: %#v", d)
 			}
 		})
+		lock.Lock()
 		if succeed {
 			success++
 		} else {
@@ -334,6 +339,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				break
 			}
 		}
+		lock.Unlock()
 	}
 	success -= ignored + skipped
 	return ignored, skipped, success, fail, total
