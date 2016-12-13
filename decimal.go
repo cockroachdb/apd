@@ -68,14 +68,14 @@ func NewFromString(s string) (*Decimal, error) {
 			return nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
 		if exp > math.MaxInt32 || exp < math.MinInt32 {
-			return nil, errExponentOutOfRange
+			return nil, errors.Errorf(errExponentOutOfRange, exp)
 		}
 		s = s[:i]
 	}
 	if i := strings.IndexByte(s, '.'); i >= 0 {
 		exp -= len(s) - i - 1
 		if exp > math.MaxInt32 || exp < math.MinInt32 {
-			return nil, errExponentOutOfRange
+			return nil, errors.Errorf(errExponentOutOfRange, exp)
 		}
 		s = s[:i] + s[i+1:]
 	}
@@ -163,7 +163,7 @@ func (d *Decimal) Int64() (int64, error) {
 }
 
 var (
-	errExponentOutOfRange        = errors.New("exponent out of range")
+	errExponentOutOfRange        = "exponent out of range: %v"
 	errSqrtNegative              = errors.New("square root of negative number")
 	errIntegerDivisionImpossible = errors.New("integer division impossible")
 	errDivideByZero              = errors.New("divide by zero")
@@ -179,12 +179,12 @@ func (d *Decimal) setExponent(xs ...int64) error {
 	var sum int64
 	for _, x := range xs {
 		if x > math.MaxInt32 || x < math.MinInt32 {
-			return errExponentOutOfRange
+			return errors.Errorf(errExponentOutOfRange, x)
 		}
 		sum += x
 	}
 	if sum > math.MaxInt32 || sum < math.MinInt32 {
-		return errExponentOutOfRange
+		return errors.Errorf(errExponentOutOfRange, sum)
 	}
 	r := int32(sum)
 	if d.MaxExponent != 0 || d.MinExponent != 0 {
@@ -192,12 +192,12 @@ func (d *Decimal) setExponent(xs ...int64) error {
 		nr := sum + d.numDigits() - 1
 		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
 		if nr > math.MaxInt32 || nr < math.MinInt32 {
-			return errExponentOutOfRange
+			return errors.Errorf(errExponentOutOfRange, nr)
 		}
 		v := int32(nr)
 		if d.MaxExponent != 0 && v > d.MaxExponent ||
 			d.MinExponent != 0 && v < d.MinExponent {
-			return errExponentOutOfRange
+			return errors.Errorf(errExponentOutOfRange, v)
 		}
 	}
 	d.Exponent = r
@@ -220,7 +220,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
 	if s > 10000 {
-		return nil, nil, 0, errors.Wrapf(errExponentOutOfRange, "upscale: %d", s)
+		return nil, nil, 0, errors.Errorf(errExponentOutOfRange, s)
 	}
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)
