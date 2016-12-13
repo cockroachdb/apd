@@ -194,6 +194,7 @@ func TestGDA(t *testing.T) {
 		"log100",
 		"minus0",
 		"multiply0",
+		"plus0",
 		"power0",
 		"remainder0",
 		"rounding0",
@@ -301,6 +302,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					err = d.Neg(operands[0])
 				case "multiply":
 					err = d.Mul(operands[0], operands[1])
+				case "plus":
+					err = d.Add(operands[0], decimalZero)
 				case "power":
 					err = d.Pow(operands[0], operands[1])
 				case "remainder":
