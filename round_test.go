@@ -20,9 +20,13 @@ import (
 )
 
 var rounders = map[string]Rounder{
+	"ceiling":   RoundCeiling,
 	"down":      RoundDown,
-	"half_up":   RoundHalfUp,
+	"floor":     RoundFloor,
+	"half_down": RoundHalfDown,
 	"half_even": RoundHalfEven,
+	"half_up":   RoundHalfUp,
+	"up":        RoundUp,
 }
 
 func TestRound(t *testing.T) {

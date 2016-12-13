@@ -27,7 +27,7 @@ func (d *Decimal) Round(x *Decimal) error {
 	}
 	rounder := d.Rounding
 	if rounder == nil {
-		rounder = RoundDown
+		rounder = RoundHalfUp
 	}
 	err := rounder(d, x)
 	if err != nil {
@@ -48,6 +48,16 @@ var (
 	// to 0.5, it rounds up if the previous digit is odd, always producing an
 	// even digit.
 	RoundHalfEven Rounder = roundHalfEven
+	// RoundCeiling towards +Inf: rounds up if digits are > 0 and the number
+	// is positive.
+	RoundCeiling Rounder = roundCeiling
+	// RoundFloor towards -Inf: rounds up if digits are > 0 and the number
+	// is negative.
+	RoundFloor Rounder = roundFloor
+	// RoundHalfDown rounds up if the digits are > 0.5.
+	RoundHalfDown Rounder = roundHalfDown
+	// RoundUp rounds up if the digits > 0.
+	RoundUp Rounder = roundUp
 )
 
 func roundDown(d, x *Decimal) error {
@@ -120,6 +130,92 @@ func roundHalfEven(d, x *Decimal) error {
 			if y.Bit(0) == 1 {
 				roundAddOne(y, &diff)
 			}
+		}
+		d.Coeff.Set(y)
+		err := d.setExponent(int64(d.Exponent), diff)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func roundHalfDown(d, x *Decimal) error {
+	d.Set(x)
+	d.Coeff.Add(&d.Coeff, bigZero)
+	nd := x.numDigits()
+	if diff := nd - int64(d.Precision); diff > 0 {
+		y := big.NewInt(diff)
+		e := new(big.Int).Exp(bigTen, y, nil)
+		m := new(big.Int)
+		y.QuoRem(&d.Coeff, e, m)
+		m.Abs(m)
+		m.Mul(m, bigTwo)
+		if m.Cmp(e) > 0 {
+			roundAddOne(y, &diff)
+		}
+		d.Coeff.Set(y)
+		err := d.setExponent(int64(d.Exponent), diff)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func roundUp(d, x *Decimal) error {
+	d.Set(x)
+	d.Coeff.Add(&d.Coeff, bigZero)
+	nd := x.numDigits()
+	if diff := nd - int64(d.Precision); diff > 0 {
+		y := big.NewInt(diff)
+		e := new(big.Int).Exp(bigTen, y, nil)
+		m := new(big.Int)
+		y.QuoRem(&d.Coeff, e, m)
+		if m.Sign() != 0 {
+			roundAddOne(y, &diff)
+		}
+		d.Coeff.Set(y)
+		err := d.setExponent(int64(d.Exponent), diff)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func roundFloor(d, x *Decimal) error {
+	d.Set(x)
+	d.Coeff.Add(&d.Coeff, bigZero)
+	nd := x.numDigits()
+	if diff := nd - int64(d.Precision); diff > 0 {
+		y := big.NewInt(diff)
+		e := new(big.Int).Exp(bigTen, y, nil)
+		m := new(big.Int)
+		y.QuoRem(&d.Coeff, e, m)
+		if m.Sign() != 0 && y.Sign() < 0 {
+			roundAddOne(y, &diff)
+		}
+		d.Coeff.Set(y)
+		err := d.setExponent(int64(d.Exponent), diff)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func roundCeiling(d, x *Decimal) error {
+	d.Set(x)
+	d.Coeff.Add(&d.Coeff, bigZero)
+	nd := x.numDigits()
+	if diff := nd - int64(d.Precision); diff > 0 {
+		y := big.NewInt(diff)
+		e := new(big.Int).Exp(bigTen, y, nil)
+		m := new(big.Int)
+		y.QuoRem(&d.Coeff, e, m)
+		if m.Sign() != 0 && y.Sign() >= 0 {
+			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
 		err := d.setExponent(int64(d.Exponent), diff)

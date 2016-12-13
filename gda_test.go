@@ -36,8 +36,8 @@ const testDir = "testdata"
 var (
 	flagPython     = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
 	flagSummary    = flag.Bool("summary", false, "print a summary")
-	flagFailFast   = flag.Bool("fast", false, "stop work after first error")
-	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors")
+	flagFailFast   = flag.Bool("fast", false, "stop work after first error; disables parallel testing")
+	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors; disables parallel testing")
 	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
 )
 
@@ -196,6 +196,7 @@ func TestGDA(t *testing.T) {
 		"multiply0",
 		"power0",
 		"remainder0",
+		"rounding0",
 		"squareroot0",
 		"subtract0",
 	}
@@ -254,7 +255,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				skipped++
 				t.Skip("has null")
 			}
-			if !*flagNoParallel {
+			if !*flagNoParallel && !*flagFailFast && !*flagIgnore {
 				t.Parallel()
 			}
 			t.Logf("%s:/%s", path, tc.ID)
@@ -772,4 +773,8 @@ var GDAignore = map[string]bool{
 	"pow2054": true,
 	"pow2055": true,
 	"pow2056": true,
+
+	// incorrect rounding
+	"rpo213": true,
+	"rpo412": true,
 }
