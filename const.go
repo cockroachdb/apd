@@ -21,6 +21,7 @@ var (
 	bigOne            = big.NewInt(1)
 	bigTwo            = big.NewInt(2)
 	bigTen            = big.NewInt(10)
+	decimalZero       = New(0, 0)
 	decimalHalf       = New(5, -1)
 	decimalZeroPtNine = New(9, -1)
 	decimalOne        = New(1, 0)

@@ -230,3 +230,35 @@ func TestModf(t *testing.T) {
 		})
 	}
 }
+
+func TestInt64(t *testing.T) {
+	tests := []struct {
+		x   string
+		i   int64
+		err bool
+	}{
+		{x: "0.12e1", err: true},
+		{x: "0.1e1", i: 1},
+		{x: "10", i: 10},
+		{x: "12.3e3", i: 12300},
+		{x: "1e-1", err: true},
+		{x: "1e2", i: 100},
+		{x: "1", i: 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.x, func(t *testing.T) {
+			x := newDecimal(t, tc.x)
+			i, err := x.Int64()
+			hasErr := err != nil
+			if tc.err != hasErr {
+				t.Fatalf("expected error: %v, got error: %v", tc.err, err)
+			}
+			if hasErr {
+				return
+			}
+			if i != tc.i {
+				t.Fatalf("expected: %v, got %v", tc.i, i)
+			}
+		})
+	}
+}

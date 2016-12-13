@@ -55,6 +55,16 @@ func (e *ErrDecimal) Exp(d, x *Decimal) {
 	e.Err = d.Exp(x)
 }
 
+// Int64 returns 0 if Err is set. Otherwise returns d.Int64().
+func (e *ErrDecimal) Int64(d *Decimal) int64 {
+	if e.Err != nil {
+		return 0
+	}
+	var r int64
+	r, e.Err = d.Int64()
+	return r
+}
+
 // Ln performs d.Ln(x).
 func (e *ErrDecimal) Ln(d, x *Decimal) {
 	if e.Err != nil {
@@ -85,6 +95,14 @@ func (e *ErrDecimal) Neg(d, x *Decimal) {
 		return
 	}
 	e.Err = d.Neg(x)
+}
+
+// Pow performs d.Pow(x, y).
+func (e *ErrDecimal) Pow(d, x, y *Decimal) {
+	if e.Err != nil {
+		return
+	}
+	e.Err = d.Pow(x, y)
 }
 
 // Quo performs d.Quo(x, y).

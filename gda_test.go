@@ -193,6 +193,7 @@ func TestGDA(t *testing.T) {
 		"log100",
 		"minus0",
 		"multiply0",
+		"power0",
 		"remainder0",
 		"squareroot0",
 		"subtract0",
@@ -296,6 +297,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					err = d.Neg(operands[0])
 				case "multiply":
 					err = d.Mul(operands[0], operands[1])
+				case "power":
+					err = d.Pow(operands[0], operands[1])
 				case "remainder":
 					err = d.Rem(operands[0], operands[1])
 				case "squareroot":
@@ -383,6 +386,8 @@ print %s`
 		op = "log10"
 	case "multiply":
 		op = "*"
+	case "power":
+		op = "**"
 	case "remainder":
 		op = "%"
 	case "squareroot":
@@ -647,6 +652,43 @@ var GDAignore = map[string]bool{
 	"mul243":  true,
 	"mul246":  true,
 	"mul249":  true,
+	"pow063":  true,
+	"pow064":  true,
+	"pow065":  true,
+	"pow066":  true,
+	"pow118":  true,
+	"pow119":  true,
+	"pow120":  true,
+	"pow181":  true,
+	"pow182":  true,
+	"pow186":  true,
+	"pow187":  true,
+	"pow189":  true,
+	"pow190":  true,
+	"pow215":  true,
+	"pow216":  true,
+	"pow220":  true,
+	"pow240":  true,
+	"pow241":  true,
+	"pow242":  true,
+	"pow243":  true,
+	"pow244":  true,
+	"pow260":  true,
+	"pow261":  true,
+	"pow270":  true,
+	"pow271":  true,
+	"pow310":  true,
+	"pow311":  true,
+	"pow320":  true,
+	"pow321":  true,
+	"pow330":  true,
+	"pow331":  true,
+	"pow340":  true,
+	"pow341":  true,
+	"pow440":  true,
+	"pow447":  true,
+	"pow448":  true,
+	"pow449":  true,
 	"rem270":  true,
 	"rem271":  true,
 	"rem272":  true,
@@ -695,4 +737,29 @@ var GDAignore = map[string]bool{
 	"exp772": true,
 	"exp773": true,
 	"exp774": true,
+
+	// should fail with too much precision needed
+	"pow253": true,
+	"pow254": true,
+
+	// 1** big integer, should return 1 instead of fail
+	"pow2011": true,
+	"pow2012": true,
+	"pow2013": true,
+	"pow2014": true,
+	"pow2041": true,
+	"pow2042": true,
+	"pow2043": true,
+	"pow2044": true,
+	"pow2045": true,
+	"pow2046": true,
+	"pow2047": true,
+	"pow2048": true,
+	"pow2049": true,
+	"pow2051": true,
+	"pow2052": true,
+	"pow2053": true,
+	"pow2054": true,
+	"pow2055": true,
+	"pow2056": true,
 }

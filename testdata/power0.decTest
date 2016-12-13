@@ -1,0 +1,390 @@
+------------------------------------------------------------------------
+-- power0.decTest -- decimal exponentiation (simplified)              --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+version: 2.62
+
+-- This set of testcases tests raising numbers to an integer power only.
+-- If arbitrary powers were supported, 1 ulp differences would be
+-- permitted.
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+pow001 power    '0'  '0'         -> '1'
+pow002 power    '0'  '1'         -> '0'
+pow003 power    '0'  '2'         -> '0'
+pow004 power    '1'  '0'         -> '1'
+pow005 power    '1'  '1'         -> '1'
+pow006 power    '1'  '2'         -> '1'
+
+pow010 power    '2'  '0'         -> '1'
+pow011 power    '2'  '1'         -> '2'
+pow012 power    '2'  '2'         -> '4'
+pow013 power    '2'  '3'         -> '8'
+pow014 power    '2'  '4'         -> '16'
+pow015 power    '2'  '5'         -> '32'
+pow016 power    '2'  '6'         -> '64'
+pow017 power    '2'  '7'         -> '128'
+pow018 power    '2'  '8'         -> '256'
+pow019 power    '2'  '9'         -> '512'
+pow020 power    '2'  '10'        -> '1024'
+pow021 power    '2'  '11'        -> '2048'
+pow022 power    '2'  '12'        -> '4096'
+pow023 power    '2'  '15'        -> '32768'
+pow024 power    '2'  '16'        -> '65536'
+pow025 power    '2'  '31'        -> '2.14748365E+9' Inexact Rounded
+-- NB 0 stripped in next
+pow026 power    '2'  '32'        -> '4.2949673E+9' Inexact Rounded
+precision: 10
+pow027 power    '2'  '31'        -> '2147483648'
+pow028 power    '2'  '32'        -> '4294967296'
+precision: 9
+
+pow030 power    '3'  '2'         -> 9
+pow031 power    '4'  '2'         -> 16
+pow032 power    '5'  '2'         -> 25
+pow033 power    '6'  '2'         -> 36
+pow034 power    '7'  '2'         -> 49
+pow035 power    '8'  '2'         -> 64
+pow036 power    '9'  '2'         -> 81
+pow037 power    '10' '2'         -> 100
+pow038 power    '11' '2'         -> 121
+pow039 power    '12' '2'         -> 144
+
+pow040 power    '3'  '3'         -> 27
+pow041 power    '4'  '3'         -> 64
+pow042 power    '5'  '3'         -> 125
+pow043 power    '6'  '3'         -> 216
+pow044 power    '7'  '3'         -> 343
+
+pow050 power   '10'  '0'         -> 1
+pow051 power   '10'  '1'         -> 10
+pow052 power   '10'  '2'         -> 100
+pow053 power   '10'  '3'         -> 1000
+pow054 power   '10'  '4'         -> 10000
+pow055 power   '10'  '5'         -> 100000
+pow056 power   '10'  '6'         -> 1000000
+pow057 power   '10'  '7'         -> 10000000
+pow058 power   '10'  '8'         -> 100000000
+pow059 power   '10'  '9'         -> 1E+9 Rounded
+pow060 power   '10'  '22'        -> 1E+22 Rounded
+pow061 power   '10'  '77'        -> 1E+77 Rounded
+pow062 power   '10'  '99'        -> 1E+99 Rounded
+
+maxexponent: 999999999
+minexponent: -999999999
+pow063 power   '10'  '999999999' -> '1E+999999999' Rounded
+pow064 power   '10'  '999999998' -> '1E+999999998' Rounded
+pow065 power   '10'  '999999997' -> '1E+999999997' Rounded
+pow066 power   '10'  '333333333' -> '1E+333333333' Rounded
+maxexponent: 999999
+minexponent: -999999
+
+pow070 power  '0.3'  '0'           -> '1'
+pow071 power  '0.3'  '1'           -> '0.3'
+pow072 power  '0.3'  '1.00'        -> '0.3'
+pow073 power  '0.3'  '2.00'        -> '0.09'
+pow074 power  '0.3'  '2.000000000' -> '0.09' Rounded
+pow075 power  '6.0'  '2'           -> '36'
+pow076 power   '-3'  '2'           -> '9'  -- from NetRexx book
+pow077 power    '4'  '3'           -> '64' -- .. (sort of)
+
+pow080 power   0.1    0            -> 1
+pow081 power   0.1    1            -> 0.1
+pow082 power   0.1    2            -> 0.01
+pow083 power   0.1    3            -> 0.001
+pow084 power   0.1    4            -> 0.0001
+pow085 power   0.1    5            -> 0.00001
+pow086 power   0.1    6            -> 0.000001
+pow087 power   0.1    7            -> 1E-7
+pow088 power   0.1    8            -> 1E-8
+pow089 power   0.1    9            -> 1E-9
+
+pow090 power   101    2            -> 10201
+pow091 power   101    3            -> 1030301
+pow092 power   101    4            -> 104060401
+pow093 power   101    5            -> 1.05101005E+10 Inexact Rounded
+pow094 power   101    6            -> 1.06152015E+12 Inexact Rounded
+pow095 power   101    7            -> 1.07213535E+14 Inexact Rounded
+
+-- negative powers
+pow100 power  '0'  '-1'  -> ? Invalid_operation
+pow101 power  '2'  '-1'  -> 0.5
+pow102 power  '2'  '-2'  -> 0.25
+pow103 power  '2'  '-4'  -> 0.0625
+pow104 power  '2'  '-8'  -> 0.00390625
+pow105 power  '2'  '-16' -> 0.0000152587891 Inexact Rounded
+pow106 power  '2'  '-32' -> 2.32830644E-10 Inexact Rounded
+pow108 power  '2'  '-64' -> 5.42101086E-20 Inexact Rounded
+pow110 power  '10'  '-8' -> 1E-8
+pow111 power  '10'  '-7' -> 1E-7
+pow112 power  '10'  '-6' -> 0.000001
+pow113 power  '10'  '-5' -> 0.00001
+pow114 power  '10'  '-4' -> 0.0001
+pow115 power  '10'  '-3' -> 0.001
+pow116 power  '10'  '-2' -> 0.01
+pow117 power  '10'  '-1' -> 0.1
+maxexponent: 999999999
+minexponent: -999999999
+pow118 power  '10'  '-333333333'   -> 1E-333333333 Rounded
+pow119 power  '10'  '-999999998'   -> 1E-999999998 Rounded
+pow120 power  '10'  '-999999999'   -> 1E-999999999 Rounded
+maxexponent: 999999
+minexponent: -999999
+pow121 power  '10'  '-77'          -> '1E-77' Rounded
+pow122 power  '10'  '-22'          -> '1E-22' Rounded
+pow123 power   '2'  '-1'           -> '0.5'
+pow124 power   '2'  '-2'           -> '0.25'
+pow125 power   '2'  '-4'           -> '0.0625'
+pow126 power   '0'  '-1'           -> ? Invalid_operation
+pow127 power   '0'  '-2'           -> ? Invalid_operation
+
+-- out-of-range edge cases
+maxexponent: 999999999
+minexponent: -999999999
+pow181 power   '7'   '999999998'   -> 2.10892313E+845098038 Inexact Rounded
+pow182 power   '7'   '999999999'   -> 1.47624619E+845098039 Inexact Rounded
+pow183 power   '7'   '1000000000'  -> ? Invalid_context Rounded
+pow184 power   '7'   '1000000001'  -> ? Invalid_context Inexact Lost_digits Rounded
+pow186 power   '7'   '-1000000001' -> 9.67705411E-845098041 Inexact Lost_digits Rounded
+pow187 power   '7'   '-1000000000' -> 9.67705411E-845098041 Inexact Rounded
+pow189 power   '7'   '-999999999'  -> 6.77393787E-845098040 Inexact Rounded
+pow190 power   '7'   '-999999998'  -> 4.74175651E-845098039 Inexact Rounded
+
+maxexponent: 999999
+minexponent: -999999
+
+-- "0.5" tests from original Rexx diagnostics [loop unrolled]
+pow200 power   0.5    0            -> 1
+pow201 power   0.5    1            -> 0.5
+pow202 power   0.5    2            -> 0.25
+pow203 power   0.5    3            -> 0.125
+pow204 power   0.5    4            -> 0.0625
+pow205 power   0.5    5            -> 0.03125
+pow206 power   0.5    6            -> 0.015625
+pow207 power   0.5    7            -> 0.0078125
+pow208 power   0.5    8            -> 0.00390625
+pow209 power   0.5    9            -> 0.001953125
+pow210 power   0.5   10            -> 0.0009765625
+
+-- A (rare) case where the last digit is not within 0.5 ULP
+maxexponent: 999999999
+minexponent: -999999999
+precision: 9
+pow215 power "-21971575.0E+31454441" "-7" -> "-4.04549502E-220181139" Inexact Rounded
+precision: 20
+pow216 power "-21971575.0E+31454441" "-7" -> "-4.0454950249324891788E-220181139" Inexact Rounded
+maxexponent: 999999
+minexponent: -999999
+
+-- The Vienna case.  Checks both setup and 1/acc working precision
+-- Modified 1998.12.14 as RHS no longer rounded before use (must fit)
+-- Modified 1990.02.04 as LHS is now rounded (instead of truncated to guard)
+--    '123456789E+10'    -- lhs .. rounded to 1.23E+18
+--    '-1.23000e+2'      -- rhs .. [was: -1.23455e+2, rounds to -123]
+-- Without the input rounding, result would be 5.54E-2226
+precision: 3
+pow220 power '123456789E+10' '-1.23000e+2' -> '8.74E-2226' Inexact Lost_digits Rounded
+
+precision: 5
+pow240 power 1      99999 -> 1
+pow241 power 1     100000 -> 1  Rounded
+pow242 power 1     100001 -> 1  Inexact Rounded Lost_digits
+pow243 power 1 1000000000 -> 1  Rounded
+pow244 power 1 9999999999 -> 1  Inexact Rounded Lost_digits
+
+-- Checks for 'Too much precision needed'
+-- For x^12, digits+elength+1 = digits+3
+precision: 999999999
+pow249 add 1 1 -> 2   -- check basic operation at this precision
+pow250 power          2 12  -> ? Overflow
+precision: 999999998
+pow251 power          2 12  -> ? Overflow
+precision: 999999997
+pow252 power          2 12  -> ? Overflow
+precision: 999999996
+pow253 power          2 12  -> 4096
+precision: 999999995
+pow254 power          2 12  -> 4096
+
+
+-- overflow and underflow tests
+maxexponent: 999999999
+minexponent: -999999999
+precision: 9
+pow260 power  9            999999999 -> 3.05550054E+954242508 Inexact Rounded
+pow261 power 10            999999999 -> 1E+999999999 Rounded
+pow262 power 10.0001       999999999 -> ? Overflow Inexact Rounded
+pow263 power 10.1          999999999 -> ? Overflow Inexact Rounded
+pow264 power 11            999999999 -> ? Overflow Inexact Rounded
+pow265 power 12            999999999 -> ? Overflow Inexact Rounded
+pow266 power 999           999999999 -> ? Overflow Inexact Rounded
+pow267 power 999999        999999999 -> ? Overflow Inexact Rounded
+pow268 power 999999999     999999999 -> ? Overflow Inexact Rounded
+pow269 power 9.9E999999999 999999999 -> ? Overflow Inexact Rounded
+
+pow270 power 0.5           999999999 -> 4.33559594E-301029996 Inexact Rounded
+pow271 power 0.1           999999999 -> 1E-999999999
+pow272 power 0.09          999999999 -> ? Underflow Subnormal Inexact Rounded
+pow273 power 0.05          999999999 -> ? Underflow Subnormal Inexact Rounded
+pow274 power 0.01          999999999 -> ? Underflow Subnormal Inexact Rounded
+pow275 power 0.0001        999999999 -> ? Underflow Subnormal Inexact Rounded
+pow277 power 0.0000001     999999999 -> ? Underflow Subnormal Inexact Rounded
+pow278 power 0.0000000001  999999999 -> ? Underflow Subnormal Inexact Rounded
+pow279 power 1E-999999999  999999999 -> ? Underflow Subnormal Inexact Rounded
+
+pow310 power -9             999999999 -> -3.05550054E+954242508 Inexact Rounded
+pow311 power -10            999999999 -> -1E+999999999 Rounded
+pow312 power -10.0001       999999999 -> ? Overflow Inexact Rounded
+pow313 power -10.1          999999999 -> ? Overflow Inexact Rounded
+pow314 power -11            999999999 -> ? Overflow Inexact Rounded
+pow315 power -12            999999999 -> ? Overflow Inexact Rounded
+pow316 power -999           999999999 -> ? Overflow Inexact Rounded
+pow317 power -999999        999999999 -> ? Overflow Inexact Rounded
+pow318 power -999999999     999999999 -> ? Overflow Inexact Rounded
+pow319 power -9.9E999999999 999999999 -> ? Overflow Inexact Rounded
+
+pow320 power -0.5           999999999 -> -4.33559594E-301029996 Inexact Rounded
+pow321 power -0.1           999999999 -> -1E-999999999
+pow322 power -0.09          999999999 -> ? Underflow Subnormal Inexact Rounded
+pow323 power -0.05          999999999 -> ? Underflow Subnormal Inexact Rounded
+pow324 power -0.01          999999999 -> ? Underflow Subnormal Inexact Rounded
+pow325 power -0.0001        999999999 -> ? Underflow Subnormal Inexact Rounded
+pow327 power -0.0000001     999999999 -> ? Underflow Subnormal Inexact Rounded
+pow328 power -0.0000000001  999999999 -> ? Underflow Subnormal Inexact Rounded
+pow329 power -1E-999999999  999999999 -> ? Underflow Subnormal Inexact Rounded
+
+pow330 power -9             999999998 ->  3.3950006E+954242507 Inexact Rounded
+pow331 power -10            999999998 ->  1E+999999998 Rounded
+pow332 power -10.0001       999999998 ->  ? Overflow Inexact Rounded
+pow333 power -10.1          999999998 ->  ? Overflow Inexact Rounded
+pow334 power -11            999999998 ->  ? Overflow Inexact Rounded
+pow335 power -12            999999998 ->  ? Overflow Inexact Rounded
+pow336 power -999           999999998 ->  ? Overflow Inexact Rounded
+pow337 power -999999        999999998 ->  ? Overflow Inexact Rounded
+pow338 power -999999999     999999998 ->  ? Overflow Inexact Rounded
+pow339 power -9.9E999999999 999999998 ->  ? Overflow Inexact Rounded
+
+pow340 power -0.5           999999998 ->  8.67119187E-301029996 Inexact Rounded
+pow341 power -0.1           999999998 ->  1E-999999998
+pow342 power -0.09          999999998 ->  ? Underflow Subnormal Inexact Rounded
+pow343 power -0.05          999999998 ->  ? Underflow Subnormal Inexact Rounded
+pow344 power -0.01          999999998 ->  ? Underflow Subnormal Inexact Rounded
+pow345 power -0.0001        999999998 ->  ? Underflow Subnormal Inexact Rounded
+pow347 power -0.0000001     999999998 ->  ? Underflow Subnormal Inexact Rounded
+pow348 power -0.0000000001  999999998 ->  ? Underflow Subnormal Inexact Rounded
+pow349 power -1E-999999999  999999998 ->  ? Underflow Subnormal Inexact Rounded
+
+-- lostDigits and RHS range checks
+maxexponent: 999
+minexponent: -999
+precision: 9
+pow401 power 12345678000 1 -> 1.2345678E+10 Rounded
+pow402 power 1234567800  1 -> 1.2345678E+9 Rounded
+pow403 power 1234567890  1 -> 1.23456789E+9 Rounded
+pow404 power 1234567891  1 -> 1.23456789E+9 Inexact Lost_digits Rounded
+pow405 power 12345678901 1 -> 1.23456789E+10 Inexact Lost_digits Rounded
+pow406 power 1234567896  1 -> 1.2345679E+9 Inexact Lost_digits Rounded
+
+precision: 15
+-- still checking for [no] lostDigits
+pow441 power 12345678000 1 -> 12345678000
+pow442 power 1234567800  1 -> 1234567800
+pow443 power 1234567890  1 -> 1234567890
+pow444 power 1234567891  1 -> 1234567891
+pow445 power 12345678901 1 -> 12345678901
+pow446 power 1234567896  1 -> 1234567896
+pow447 power 1 12345678000  -> 1
+pow448 power 1 -1234567896  -> 1
+pow449 power 1 1000000000   -> 1
+pow440 power 1 -1000000000  -> 1
+
+-- Null tests
+pow500 power  1 # -> ? Invalid_operation
+pow501 power  # 1 -> ? Invalid_operation
+
+----------------------------------------------------------------------
+-- Below here are the tests with a non-integer rhs, including the   --
+-- tests that previously caused Invalid operation.  An integer-only --
+-- (on rhs) implementation should handle all the tests above as     --
+-- shown, and flag most of the following tests as Invalid.          --
+----------------------------------------------------------------------
+precision:   16
+rounding:    half_up
+maxExponent: 384
+minExponent: -383
+
+pow2000 power 7 '10000000000'        -> ? Overflow Inexact Rounded
+pow2001 power 2 '2.000001'           -> 4.000002772589683 Inexact Rounded
+pow2002 power 2 '2.00000000'         -> 4
+pow2003 power 2 '2.000000001'        -> 4.000000002772589 Inexact Rounded
+pow2004 power 2 '2.0000000001'       -> 4.000000000277259 Inexact Rounded
+pow2005 power 2 '2.00000000001'      -> 4.000000000027726 Inexact Rounded
+pow2006 power 2 '2.000000000001'     -> 4.000000000002773 Inexact Rounded
+pow2007 power 2 '2.0000000000001'    -> 4.000000000000277 Inexact Rounded
+pow2008 power 2 '2.00000000000001'   -> 4.000000000000028 Inexact Rounded
+pow2009 power 2 '2.000000000000001'  -> 4.000000000000003 Inexact Rounded
+pow2010 power 2 '2.0000000000000001' -> 4                 Inexact Rounded Lost_digits
+--               1 234567890123456
+
+pow2011 power 1 1234 -> 1
+precision: 4
+pow2012 power 1 1234 -> 1
+precision: 3
+pow2013 power 1 1234     -> 1 Inexact Rounded Lost_digits
+pow2014 power 1 12.34e+2 -> 1 Inexact Rounded Lost_digits
+pow2015 power 1 12.3     -> 1 Inexact Rounded
+pow2016 power 1 12.0     -> 1
+pow2017 power 1 1.01     -> 1 Inexact Rounded
+pow2018 power 2 1.00     -> 2
+pow2019 power 2 2.00     -> 4
+precision: 9
+pow2030 power 1 1.0001           -> 1 Inexact Rounded
+pow2031 power 1 1.0000001        -> 1 Inexact Rounded
+pow2032 power 1 1.0000000001     -> 1 Inexact Rounded Lost_digits
+pow2033 power 1 1.0000000000001  -> 1 Inexact Rounded Lost_digits
+precision: 5
+pow2034 power 1 1.0001           -> 1 Inexact Rounded
+pow2035 power 1 1.0000001        -> 1 Inexact Rounded Lost_digits
+pow2036 power 1 1.0000000001     -> 1 Inexact Rounded Lost_digits
+pow2037 power 1 1.0000000000001  -> 1 Inexact Rounded Lost_digits
+pow2038 power 1 1.0000000000001  -> 1 Inexact Rounded Lost_digits
+
+-- 1 ** big integer should be exact if no input rounding
+precision: 15
+pow2041 power 1 1000000000   -> 1
+pow2042 power 1 9999999999   -> 1
+pow2043 power 1 12345678000  -> 1
+pow2044 power 1 1234567800   -> 1
+pow2045 power 1 1234567890   -> 1
+pow2046 power 1 11234567891  -> 1
+pow2047 power 1 12345678901  -> 1
+pow2048 power 1 1234567896   -> 1
+pow2049 power 1 -1234567896  -> 1
+pow2051 power 1 1000000000   -> 1
+pow2052 power 1 -1000000000  -> 1
+pow2053 power 1 12345678000  -> 1
+pow2054 power 1 -1234567896  -> 1
+pow2055 power 1 1000000000   -> 1
+pow2056 power 1 -1000000000  -> 1
+
+-- (Other x**y results tested in power.decTest)
+

@@ -125,11 +125,38 @@ func (d *Decimal) SetInt64(x int64) *Decimal {
 	return d
 }
 
+// Int64 returns the int64 representation of x. If x cannot be represented in an int64, an error is returned.
+func (d *Decimal) Int64() (int64, error) {
+	integ, frac := new(Decimal), new(Decimal)
+	d.Modf(integ, frac)
+	if frac.Sign() != 0 {
+		return 0, errors.Errorf("%s: has fractional part", d)
+	}
+	var ed ErrDecimal
+	if c := ed.Cmp(integ, New(math.MaxInt64, 0)); c > 0 {
+		return 0, errors.Errorf("%s: greater than max int64", d)
+	}
+	if c := ed.Cmp(integ, New(math.MinInt64, 0)); c < 0 {
+		return 0, errors.Errorf("%s: less than min int64", d)
+	}
+	if ed.Err != nil {
+		return 0, ed.Err
+	}
+	v := integ.Coeff.Int64()
+	for i := int32(0); i < integ.Exponent; i++ {
+		v *= 10
+	}
+	return v, nil
+}
+
 var (
 	errExponentOutOfRange        = errors.New("exponent out of range")
 	errSqrtNegative              = errors.New("square root of negative number")
 	errIntegerDivisionImpossible = errors.New("integer division impossible")
 	errDivideByZero              = errors.New("divide by zero")
+	errPowZeroNegative           = errors.New("zero raised to a negative power is undefined")
+	errPowNegNonInteger          = errors.New("a negative number raised to a non-integer power yields a complex result")
+	errArgumentTooLarge          = errors.New("argument too large")
 )
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
@@ -592,4 +619,85 @@ func (d *Decimal) integerPower(x *Decimal, y *big.Int) error {
 	}
 	ed.Round(d, z)
 	return ed.Err
+}
+
+// Pow sets d = x**y.
+func (d *Decimal) Pow(x, y *Decimal) error {
+	// maxPrecision is the largest number of decimal digits (sum of number of
+	// digits before and after the decimal point) before an errArgumentTooLarge
+	// is returned for any computation.
+	const maxPrecision = 2000
+
+	// Check if y is of type int.
+	tmp := new(Decimal)
+	if err := tmp.Abs(y); err != nil {
+		return errors.Wrap(err, "Abs")
+	}
+	integ, frac := new(Decimal), new(Decimal)
+	tmp.Modf(integ, frac)
+	isInt := frac.Sign() == 0
+
+	xs := x.Sign()
+	if xs == 0 {
+		switch y.Sign() {
+		case 0:
+			d.Set(decimalOne)
+			return nil
+		case 1:
+			d.Set(decimalZero)
+			return nil
+		default: // -1
+			// undefined for y < 0
+			return errors.Wrapf(errPowZeroNegative, "%s", y)
+		}
+	}
+
+	neg := xs < 0
+
+	if !isInt && neg {
+		return errors.Wrapf(errPowNegNonInteger, "%s**%s", x, y)
+	}
+
+	// Exponent Precision Explanation (RaduBerinde):
+	// Say we compute the Log with a scale of k. That means that the result we
+	// get is:
+	//   ln x +/- 10^-k
+	// This leads to an error of y * 10^-k in the exponent, which leads to a
+	// multiplicative error of e^(y*10^-k) in the result. For small values of u,
+	// e^u can be approximated by 1 + u, so for large k that error is around 1
+	// + y*10^-k. So the additive error will be x^y * y * 10^-k, and we want
+	// this to be less than 10^-s. This approximately means that k has to be
+	// s + the number of digits before the decimal point in x^y (where s =
+	// d.Precision). Which roughly is
+	//   s + <the number of digits before decimal point in x> * y
+
+	x.Modf(tmp, frac)
+	// numDigits = <the number of digits before decimal point in x>
+	numDigits := tmp.numDigits()
+
+	var ed ErrDecimal
+
+	// numDigits *= y
+	numDigits *= ed.Int64(integ)
+	// numDigits += s
+	numDigits += int64(d.Precision)
+
+	if numDigits < 0 || numDigits > maxPrecision {
+		return errors.Wrapf(errArgumentTooLarge, "precision: %d", numDigits)
+	}
+	tmp.Precision = uint32(numDigits)
+
+	ed.Abs(tmp, x)
+	ed.Ln(tmp, tmp)
+	ed.Mul(tmp, tmp, y)
+	ed.Exp(tmp, tmp)
+
+	if neg && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
+		ed.Neg(tmp, tmp)
+	}
+
+	if ed.Err != nil {
+		return ed.Err
+	}
+	return d.Round(tmp)
 }

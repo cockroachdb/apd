@@ -26,6 +26,7 @@ func TestErrDecimal(t *testing.T) {
 	ed.Ln(a, a)
 	ed.Log10(a, a)
 	ed.Neg(a, a)
+	ed.Pow(a, a, a)
 	ed.QuoInteger(a, a, a)
 	ed.Rem(a, a, a)
 }
