@@ -318,6 +318,15 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			case <-time.After(time.Second * 5):
 				t.Fatalf("timeout")
 			}
+			// Verify the operands didn't change.
+			for i, o := range tc.Operands {
+				v := newDecimal(t, o)
+				if c, err := v.Cmp(operands[i]); err != nil {
+					t.Fatal(err)
+				} else if c != 0 {
+					t.Fatalf("operand %d changed from %s to %s", i, o, operands[i])
+				}
+			}
 			if tc.Result == "?" {
 				if err != nil {
 					return

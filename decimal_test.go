@@ -20,9 +20,6 @@ import (
 	"testing"
 )
 
-// TODO(mjibson): audit functions to guarantee they still function correctly
-// if the receiver and args are the same variable.
-
 func (d *Decimal) GoString() string {
 	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, MaxExponent: %d, MinExponent: %d, Precision: %d}`, d.Coeff.String(), d.Exponent, d.MaxExponent, d.MinExponent, d.Precision)
 }
