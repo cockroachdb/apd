@@ -17,6 +17,7 @@ package apd
 import (
 	"bufio"
 	"bytes"
+	"flag"
 	"go/build"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,10 @@ import (
 	"testing"
 
 	"github.com/ghemawat/stream"
+)
+
+var (
+	flagStyle = flag.Bool("style", false, "enable style test")
 )
 
 func dirCmd(
@@ -41,6 +46,10 @@ func dirCmd(
 }
 
 func TestStyle(t *testing.T) {
+	if !*flagStyle {
+		t.Skip("enable with -style")
+	}
+
 	const apd = "github.com/cockroachdb/apd"
 	const pkgScope = "./..."
 
