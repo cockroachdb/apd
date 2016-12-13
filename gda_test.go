@@ -444,6 +444,9 @@ func (tc TestCase) PrintIgnore() {
 }
 
 var GDAignore = map[string]bool{
+
+	// --- These do not need not be fixed.
+
 	// python-identical results
 	// Both apd and python disagree with GDA in these cases.
 	"add303":  true,
@@ -576,6 +579,18 @@ var GDAignore = map[string]bool{
 	"sub945":  true,
 	"sub946":  true,
 	"sub947":  true,
+
+	// invalid operation errors; most test harnesses probably skip this
+	"log901": true,
+
+	// invalid context errors: unsure what these are testing
+	"ln903":  true,
+	"ln905":  true,
+	"log903": true,
+	"log905": true,
+
+	// --- These should be fixed.
+	// TODO(mjibson): fix these broken tests
 
 	// large exponents
 	"add607":  true,
@@ -720,15 +735,6 @@ var GDAignore = map[string]bool{
 	"rem072": true,
 	"rem073": true,
 	"rem074": true,
-
-	// invalid context errors: unsure what these are testing
-	"ln903":  true,
-	"ln905":  true,
-	"log903": true,
-	"log905": true,
-
-	// invalid operation errors; most test harnesses probably skip this
-	"log901": true,
 
 	// undetected underflow
 	"exp048": true,
