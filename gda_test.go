@@ -34,10 +34,11 @@ import (
 const testDir = "testdata"
 
 var (
-	flagPython   = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
-	flagSummary  = flag.Bool("summary", false, "print a summary")
-	flagFailFast = flag.Bool("fast", false, "stop work after first error")
-	flagIgnore   = flag.Bool("ignore", false, "print ignore lines on errors")
+	flagPython     = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
+	flagSummary    = flag.Bool("summary", false, "print a summary")
+	flagFailFast   = flag.Bool("fast", false, "stop work after first error")
+	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors")
+	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
 )
 
 type TestCase struct {
@@ -253,7 +254,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				skipped++
 				t.Skip("has null")
 			}
-			t.Parallel()
+			if !*flagNoParallel {
+				t.Parallel()
+			}
 			t.Logf("%s:/%s", path, tc.ID)
 			mode, ok := rounders[tc.Rounding]
 			if !ok {
