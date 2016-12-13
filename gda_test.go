@@ -338,9 +338,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 						return
 					}
 				}
-				if d.Exponent < 100 {
-					t.Logf("result: %s", d)
-				}
+				t.Logf("result: %s", d)
 				t.Fatalf("got: %#v", d)
 			}
 		})

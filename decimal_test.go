@@ -53,6 +53,8 @@ func TestNewFromString(t *testing.T) {
 		{s: "1e-10", out: "0.0000000001"},
 		{s: "0.1e10", out: "1000000000"},
 		{s: "0.1e-10", out: "0.00000000001"},
+		{s: "12.34e2000", out: "1234E1998"},
+		{s: "12.34e-2000", out: "1234E-2002"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.s, func(t *testing.T) {

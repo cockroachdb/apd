@@ -16,6 +16,7 @@
 package apd
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -89,13 +90,21 @@ func NewFromString(s string) (*Decimal, error) {
 }
 
 func (d *Decimal) String() string {
+	// forceExp is the number of trailing 0s or 0s after the decimal after which
+	// a scientific notation is used instead.
+	const forceExp = 1000
+
 	s := d.Coeff.String()
 	neg := d.Coeff.Sign() < 0
 	if neg {
 		s = s[1:]
 	}
+	nd := d.numDigits()
+	e := int64(d.Exponent)
 	if d.Exponent < 0 {
-		if left := -int(d.Exponent) - len(s); left > 0 {
+		if nd+e < -forceExp {
+			s = fmt.Sprintf("%sE%d", s, d.Exponent)
+		} else if left := -int(d.Exponent) - len(s); left > 0 {
 			s = "0." + strings.Repeat("0", left) + s
 		} else if left < 0 {
 			offset := -left
@@ -104,7 +113,11 @@ func (d *Decimal) String() string {
 			s = "0." + s
 		}
 	} else if d.Exponent > 0 {
-		s += strings.Repeat("0", int(d.Exponent))
+		if e > forceExp {
+			s = fmt.Sprintf("%sE%d", s, d.Exponent)
+		} else {
+			s += strings.Repeat("0", int(d.Exponent))
+		}
 	}
 	if neg {
 		s = "-" + s
