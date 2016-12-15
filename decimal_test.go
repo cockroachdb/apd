@@ -17,6 +17,7 @@ package apd
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 )
 
@@ -68,10 +69,21 @@ func TestNewFromString(t *testing.T) {
 	}
 }
 
+func testExponentError(t *testing.T, err error) {
+	if err == nil {
+		return
+	}
+	es := err.Error()
+	if strings.Contains(es, "exponent out of range") {
+		t.Skip(err)
+	}
+}
+
 func newDecimal(t *testing.T, s string) *Decimal {
 	d, err := NewFromString(s)
+	testExponentError(t, err)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%s: %+v", s, err)
 	}
 	return d
 }

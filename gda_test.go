@@ -247,13 +247,27 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 	for _, tc := range tcs {
 		tc := tc
 		succeed := t.Run(tc.ID, func(t *testing.T) {
-			total++
+			defer func() {
+				lock.Lock()
+				total++
+				if GDAignore[tc.ID] {
+					ignored++
+				} else if t.Skipped() {
+					skipped++
+				} else if t.Failed() {
+					fail++
+					if *flagIgnore {
+						tc.PrintIgnore()
+					}
+				} else {
+					success++
+				}
+				lock.Unlock()
+			}()
 			if GDAignore[tc.ID] {
-				ignored++
 				t.Skip("ignored")
 			}
 			if tc.HasNull() {
-				skipped++
 				t.Skip("has null")
 			}
 			if !*flagNoParallel && !*flagFailFast && !*flagIgnore {
@@ -275,6 +289,10 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			d.Rounding = mode
 			// helpful acme address link
 			t.Logf("%s %s = %s (prec: %d, round: %s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, tc.Precision, tc.Rounding)
+			start := time.Now()
+			defer func() {
+				t.Logf("duration: %s", time.Since(start))
+			}()
 
 			done := make(chan error, 1)
 			var err error
@@ -322,7 +340,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 120):
 				t.Fatalf("timeout")
 			}
 			// Verify the operands didn't change.
@@ -341,6 +359,12 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				t.Fatalf("expected error, got %#v", d)
 			}
 			if err != nil {
+				testExponentError(t, err)
+				if *flagPython {
+					if tc.CheckPython(t, d) {
+						return
+					}
+				}
 				t.Fatalf("%+v", err)
 			}
 			r := newDecimal(t, tc.Result)
@@ -358,19 +382,13 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				t.Fatalf("got: %#v", d)
 			}
 		})
-		lock.Lock()
-		if succeed {
-			success++
-		} else {
-			fail++
-			if *flagIgnore {
-				tc.PrintIgnore()
-			}
+		if !succeed {
 			if *flagFailFast {
 				break
 			}
+		} else {
+			success++
 		}
-		lock.Unlock()
 	}
 	success -= ignored + skipped
 	return ignored, skipped, success, fail, total
@@ -595,142 +613,6 @@ var GDAignore = map[string]bool{
 	// --- These should be fixed.
 	// TODO(mjibson): fix these broken tests
 
-	// large exponents
-	"add607":  true,
-	"add617":  true,
-	"add627":  true,
-	"add637":  true,
-	"add647":  true,
-	"add657":  true,
-	"add667":  true,
-	"add677":  true,
-	"add687":  true,
-	"add697":  true,
-	"add707":  true,
-	"add717":  true,
-	"div270":  true,
-	"div271":  true,
-	"div272":  true,
-	"div273":  true,
-	"div274":  true,
-	"div275":  true,
-	"div276":  true,
-	"div277":  true,
-	"div280":  true,
-	"div281":  true,
-	"div282":  true,
-	"div283":  true,
-	"div284":  true,
-	"div285":  true,
-	"div286":  true,
-	"div287":  true,
-	"div288":  true,
-	"dvi270":  true,
-	"dvi271":  true,
-	"dvi272":  true,
-	"dvi273":  true,
-	"dvi330":  true,
-	"dvi332":  true,
-	"dvi333":  true,
-	"dvi335":  true,
-	"dvi337":  true,
-	"dvi338":  true,
-	"ln0903":  true,
-	"ln0904":  true,
-	"ln0905":  true,
-	"ln0906":  true,
-	"ln0910":  true,
-	"ln0911":  true,
-	"ln0912":  true,
-	"ln0913":  true,
-	"ln0914":  true,
-	"ln0915":  true,
-	"ln0916":  true,
-	"mul170":  true,
-	"mul171":  true,
-	"mul172":  true,
-	"mul173":  true,
-	"mul174":  true,
-	"mul176":  true,
-	"mul177":  true,
-	"mul178":  true,
-	"mul180":  true,
-	"mul181":  true,
-	"mul182":  true,
-	"mul183":  true,
-	"mul184":  true,
-	"mul185":  true,
-	"mul186":  true,
-	"mul187":  true,
-	"mul188":  true,
-	"mul190":  true,
-	"mul191":  true,
-	"mul192":  true,
-	"mul193":  true,
-	"mul194":  true,
-	"mul195":  true,
-	"mul196":  true,
-	"mul197":  true,
-	"mul198":  true,
-	"mul199":  true,
-	"mul201":  true,
-	"mul202":  true,
-	"mul203":  true,
-	"mul204":  true,
-	"mul240":  true,
-	"mul243":  true,
-	"mul246":  true,
-	"mul249":  true,
-	"pow063":  true,
-	"pow064":  true,
-	"pow065":  true,
-	"pow066":  true,
-	"pow118":  true,
-	"pow119":  true,
-	"pow120":  true,
-	"pow181":  true,
-	"pow182":  true,
-	"pow186":  true,
-	"pow187":  true,
-	"pow189":  true,
-	"pow190":  true,
-	"pow215":  true,
-	"pow216":  true,
-	"pow220":  true,
-	"pow240":  true,
-	"pow241":  true,
-	"pow242":  true,
-	"pow243":  true,
-	"pow244":  true,
-	"pow260":  true,
-	"pow261":  true,
-	"pow270":  true,
-	"pow271":  true,
-	"pow310":  true,
-	"pow311":  true,
-	"pow320":  true,
-	"pow321":  true,
-	"pow330":  true,
-	"pow331":  true,
-	"pow340":  true,
-	"pow341":  true,
-	"pow440":  true,
-	"pow447":  true,
-	"pow448":  true,
-	"pow449":  true,
-	"rem270":  true,
-	"rem271":  true,
-	"rem272":  true,
-	"rem273":  true,
-	"rem430":  true,
-	"rem432":  true,
-	"rem433":  true,
-	"rem435":  true,
-	"rem437":  true,
-	"rem438":  true,
-	"sqtx765": true,
-	"sqtx766": true,
-
 	// lost digits
 	"dvi072": true,
 	"dvi073": true,
@@ -739,8 +621,13 @@ var GDAignore = map[string]bool{
 	"rem073": true,
 	"rem074": true,
 
+	// undetected overflow
+	"sqtx765": true,
+	"sqtx766": true,
+
 	// undetected underflow
 	"exp048": true,
+	"exp755": true,
 	"exp756": true,
 	"exp757": true,
 	"exp759": true,

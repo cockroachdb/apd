@@ -68,17 +68,20 @@ func (d *Decimal) numDigits() int64 {
 }
 
 func numDigits(b *big.Int) int64 {
-	if val, ok := lookupBits(b.BitLen()); ok {
+	bl := b.BitLen()
+	if val, ok := lookupBits(bl); ok {
 		ab := new(big.Int).Abs(b)
 		if ab.Cmp(&val.border) < 0 {
 			return val.digits
 		}
 		return val.digits + 1
 	}
-	s := b.String()
-	n := len(s)
-	if b.Sign() < 0 {
-		n--
+
+	n := int64(float64(bl) / digitsToBitsRatio)
+	a := new(big.Int).Abs(b)
+	e := new(big.Int).Exp(bigTen, big.NewInt(n), nil)
+	if a.Cmp(e) >= 0 {
+		n++
 	}
-	return int64(n)
+	return n
 }

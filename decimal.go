@@ -67,14 +67,14 @@ func NewFromString(s string) (*Decimal, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
-		if exp > math.MaxInt32 || exp < math.MinInt32 {
+		if exp > MaxExponent || exp < MinExponent {
 			return nil, errors.Errorf(errExponentOutOfRange, exp)
 		}
 		s = s[:i]
 	}
 	if i := strings.IndexByte(s, '.'); i >= 0 {
 		exp -= len(s) - i - 1
-		if exp > math.MaxInt32 || exp < math.MinInt32 {
+		if exp > MaxExponent || exp < MinExponent {
 			return nil, errors.Errorf(errExponentOutOfRange, exp)
 		}
 		s = s[:i] + s[i+1:]
@@ -169,7 +169,6 @@ var (
 	errDivideByZero              = errors.New("divide by zero")
 	errPowZeroNegative           = errors.New("zero raised to a negative power is undefined")
 	errPowNegNonInteger          = errors.New("a negative number raised to a non-integer power yields a complex result")
-	errArgumentTooLarge          = errors.New("argument too large")
 )
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
@@ -178,12 +177,12 @@ var (
 func (d *Decimal) setExponent(xs ...int64) error {
 	var sum int64
 	for _, x := range xs {
-		if x > math.MaxInt32 || x < math.MinInt32 {
+		if x > MaxExponent || x < MinExponent {
 			return errors.Errorf(errExponentOutOfRange, x)
 		}
 		sum += x
 	}
-	if sum > math.MaxInt32 || sum < math.MinInt32 {
+	if sum > MaxExponent || sum < MinExponent {
 		return errors.Errorf(errExponentOutOfRange, sum)
 	}
 	r := int32(sum)
@@ -191,7 +190,7 @@ func (d *Decimal) setExponent(xs ...int64) error {
 		// For max/min exponent calculation, add in the number of digits for each power of 10.
 		nr := sum + d.numDigits() - 1
 		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
-		if nr > math.MaxInt32 || nr < math.MinInt32 {
+		if nr > MaxExponent || nr < MinExponent {
 			return errors.Errorf(errExponentOutOfRange, nr)
 		}
 		v := int32(nr)
@@ -203,6 +202,18 @@ func (d *Decimal) setExponent(xs ...int64) error {
 	d.Exponent = r
 	return nil
 }
+
+const (
+	// TODO(mjibson): MaxExponent is set because both upscale and Round
+	// perform a calculation of 10^x, where x is an exponent. This is done by
+	// big.Int.Exp. This restriction could be lifted if better algorithms were
+	// determined during upscale and Round that don't need to perform Exp.
+
+	// MaxExponent and MinExponent are the highest exponents supported. Exponents
+	// near this range will perform very slowly (many seconds per operation).
+	MaxExponent = 100000
+	MinExponent = -MaxExponent
+)
 
 // upscale converts a and b to big.Ints with the same scaling, and their
 // scaling. An error can be produced if the resulting scale factor is out
@@ -219,7 +230,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	s := int64(a.Exponent) - int64(b.Exponent)
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
-	if s > 10000 {
+	if s > MaxExponent {
 		return nil, nil, 0, errors.Errorf(errExponentOutOfRange, s)
 	}
 	y := big.NewInt(s)
@@ -694,9 +705,10 @@ func (d *Decimal) Pow(x, y *Decimal) error {
 	numDigits *= ed.Int64(integ)
 	// numDigits += s
 	numDigits += int64(d.Precision)
+	numDigits += 2
 
 	if numDigits < 0 || numDigits > maxPrecision {
-		return errors.Wrapf(errArgumentTooLarge, "precision: %d", numDigits)
+		return errors.Errorf(errExponentOutOfRange, numDigits)
 	}
 	tmp.Precision = uint32(numDigits)
 
