@@ -241,8 +241,8 @@ func (c *Context) Ln(d, x *Decimal) error {
 		ed.Sqrt(xr, xr)
 		ed.Mul(fact, fact, decimalTwo)
 	}
-	if ed.Err != nil {
-		return ed.Err
+	if err := ed.Err(); err != nil {
+		return err
 	}
 
 	tmp1 := new(Decimal)
@@ -264,8 +264,8 @@ func (c *Context) Ln(d, x *Decimal) error {
 	// Used since the series uses only odd powers of z.
 	ed.Mul(elem, elem, elem)
 	tmp1.Exponent = 0
-	if ed.Err != nil {
-		return ed.Err
+	if err := ed.Err(); err != nil {
+		return err
 	}
 	for loop := nc.newLoop("log", z, 40); ; {
 		// tmp1 = n, the i'th odd power: 3, 5, 7, 9, etc.
@@ -281,15 +281,15 @@ func (c *Context) Ln(d, x *Decimal) error {
 		} else if done {
 			break
 		}
-		if ed.Err != nil {
-			return ed.Err
+		if err := ed.Err(); err != nil {
+			return err
 		}
 	}
 
 	// Undo input range reduction.
 	ed.Mul(z, z, fact)
-	if ed.Err != nil {
-		return ed.Err
+	if err := ed.Err(); err != nil {
+		return err
 	}
 
 	// Round to the desired scale.
@@ -351,8 +351,8 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 		ed.Mul(tmp, tmp, y)
 		ed.Quo(tmp, tmp, n)
 		ed.Add(z, z, tmp)
-		if ed.Err != nil {
-			return ed.Err
+		if err := ed.Err(); err != nil {
+			return err
 		}
 	}
 	// Round to the desired scale.
@@ -381,8 +381,8 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 		b.Rsh(b, 1)
 
 		ed.Mul(n, n, n)
-		if ed.Err != nil {
-			return ed.Err
+		if err := ed.Err(); err != nil {
+			return err
 		}
 	}
 
@@ -390,7 +390,7 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 		ed.Quo(z, decimalOne, z)
 	}
 	ed.Round(d, z)
-	return ed.Err
+	return ed.Err()
 }
 
 // Pow sets d = x**y.
@@ -470,8 +470,8 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 		ed.Neg(tmp, tmp)
 	}
 
-	if ed.Err != nil {
-		return ed.Err
+	if err := ed.Err(); err != nil {
+		return err
 	}
 	return c.Round(d, tmp)
 }

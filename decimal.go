@@ -137,8 +137,8 @@ func (d *Decimal) Int64() (int64, error) {
 	if c := ed.Cmp(integ, New(math.MinInt64, 0)); c < 0 {
 		return 0, errors.Errorf("%s: less than min int64", d)
 	}
-	if ed.Err != nil {
-		return 0, ed.Err
+	if err := ed.Err(); err != nil {
+		return 0, err
 	}
 	v := integ.Coeff.Int64()
 	for i := int32(0); i < integ.Exponent; i++ {

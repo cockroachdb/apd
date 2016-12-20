@@ -25,138 +25,157 @@ func NewErrDecimal(c *Context) *ErrDecimal {
 // operations. If an error is already set, the operation is skipped. Designed to
 // be used for many operations in a row, with a single error check at the end.
 type ErrDecimal struct {
-	Err error
+	err error
 	Ctx *Context
 }
 
-// Abs performs e.Ctx.Abs(d, x).
-func (e *ErrDecimal) Abs(d, x *Decimal) {
-	if e.Err != nil {
-		return
-	}
-	e.Err = e.Ctx.Abs(d, x)
+// Err returns the first error encountered.
+func (e *ErrDecimal) Err() error {
+	return e.err
 }
 
-// Add performs e.Ctx.Add(d, x, y).
-func (e *ErrDecimal) Add(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// Abs performs e.Ctx.Abs(d, x) and returns d.
+func (e *ErrDecimal) Abs(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Add(d, x, y)
+	e.err = e.Ctx.Abs(d, x)
+	return d
 }
 
-// Cmp returns 0 if Err is set. Otherwise returns e.Ctx.Cmp(a, b).
+// Add performs e.Ctx.Add(d, x, y) and returns d.
+func (e *ErrDecimal) Add(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
+	}
+	e.err = e.Ctx.Add(d, x, y)
+	return d
+}
+
+// Cmp returns 0 if err is set. Otherwise returns e.Ctx.Cmp(a, b).
 func (e *ErrDecimal) Cmp(a, b *Decimal) int {
-	if e.Err != nil {
+	if e.Err() != nil {
 		return 0
 	}
 	var c int
-	c, e.Err = a.Cmp(b)
+	c, e.err = a.Cmp(b)
 	return c
 }
 
-// Exp performs e.Ctx.Exp(d, x).
-func (e *ErrDecimal) Exp(d, x *Decimal) {
-	if e.Err != nil {
-		return
+// Exp performs e.Ctx.Exp(d, x) and returns d.
+func (e *ErrDecimal) Exp(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Exp(d, x)
+	e.err = e.Ctx.Exp(d, x)
+	return d
 }
 
-// Int64 returns 0 if Err is set. Otherwise returns d.Int64().
+// Int64 returns 0 if err is set. Otherwise returns d.Int64().
 func (e *ErrDecimal) Int64(d *Decimal) int64 {
-	if e.Err != nil {
+	if e.Err() != nil {
 		return 0
 	}
 	var r int64
-	r, e.Err = d.Int64()
+	r, e.err = d.Int64()
 	return r
 }
 
-// Ln performs e.Ctx.Ln(d, x).
-func (e *ErrDecimal) Ln(d, x *Decimal) {
-	if e.Err != nil {
-		return
+// Ln performs e.Ctx.Ln(d, x) and returns d.
+func (e *ErrDecimal) Ln(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Ln(d, x)
+	e.err = e.Ctx.Ln(d, x)
+	return d
 }
 
-// Log10 performs d.Log10(x).
-func (e *ErrDecimal) Log10(d, x *Decimal) {
-	if e.Err != nil {
-		return
+// Log10 performs d.Log10(x) and returns d.
+func (e *ErrDecimal) Log10(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Log10(d, x)
+	e.err = e.Ctx.Log10(d, x)
+	return d
 }
 
-// Mul performs e.Ctx.Mul(d, x, y).
-func (e *ErrDecimal) Mul(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// Mul performs e.Ctx.Mul(d, x, y) and returns d.
+func (e *ErrDecimal) Mul(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Mul(d, x, y)
+	e.err = e.Ctx.Mul(d, x, y)
+	return d
 }
 
-// Neg performs e.Ctx.Neg(d, x).
-func (e *ErrDecimal) Neg(d, x *Decimal) {
-	if e.Err != nil {
-		return
+// Neg performs e.Ctx.Neg(d, x) and returns d.
+func (e *ErrDecimal) Neg(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Neg(d, x)
+	e.err = e.Ctx.Neg(d, x)
+	return d
 }
 
-// Pow performs e.Ctx.Pow(d, x, y).
-func (e *ErrDecimal) Pow(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// Pow performs e.Ctx.Pow(d, x, y) and returns d.
+func (e *ErrDecimal) Pow(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Pow(d, x, y)
+	e.err = e.Ctx.Pow(d, x, y)
+	return d
 }
 
-// Quo performs e.Ctx.Quo(d, x, y).
-func (e *ErrDecimal) Quo(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// Quo performs e.Ctx.Quo(d, x, y) and returns d.
+func (e *ErrDecimal) Quo(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Quo(d, x, y)
+	e.err = e.Ctx.Quo(d, x, y)
+	return d
 }
 
-// QuoInteger performs e.Ctx.QuoInteger(d, x, y).
-func (e *ErrDecimal) QuoInteger(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// QuoInteger performs e.Ctx.QuoInteger(d, x, y) and returns d.
+func (e *ErrDecimal) QuoInteger(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.QuoInteger(d, x, y)
+	e.err = e.Ctx.QuoInteger(d, x, y)
+	return d
 }
 
-// Rem performs e.Ctx.Rem(d, x, y).
-func (e *ErrDecimal) Rem(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// Rem performs e.Ctx.Rem(d, x, y) and returns d.
+func (e *ErrDecimal) Rem(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Rem(d, x, y)
+	e.err = e.Ctx.Rem(d, x, y)
+	return d
 }
 
-// Round performs e.Ctx.Round(d, x).
-func (e *ErrDecimal) Round(d, x *Decimal) {
-	if e.Err != nil {
-		return
+// Round performs e.Ctx.Round(d, x) and returns d.
+func (e *ErrDecimal) Round(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Round(d, x)
+	e.err = e.Ctx.Round(d, x)
+	return d
 }
 
-// Sqrt performs e.Ctx.Sqrt(d, x).
-func (e *ErrDecimal) Sqrt(d, x *Decimal) {
-	if e.Err != nil {
-		return
+// Sqrt performs e.Ctx.Sqrt(d, x) and returns d.
+func (e *ErrDecimal) Sqrt(d, x *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Sqrt(d, x)
+	e.err = e.Ctx.Sqrt(d, x)
+	return d
 }
 
-// Sub performs e.Ctx.Sub(d, x, y).
-func (e *ErrDecimal) Sub(d, x, y *Decimal) {
-	if e.Err != nil {
-		return
+// Sub performs e.Ctx.Sub(d, x, y) and returns d.
+func (e *ErrDecimal) Sub(d, x, y *Decimal) *Decimal {
+	if e.Err() != nil {
+		return d
 	}
-	e.Err = e.Ctx.Sub(d, x, y)
+	e.err = e.Ctx.Sub(d, x, y)
+	return d
 }
