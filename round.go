@@ -16,28 +16,28 @@ package apd
 
 import "math/big"
 
-// Round rounds x with d's settings. The result is stored in d and returned. If
+// Round sets d to rounded x. The result is stored in d and returned. If
 // d has zero Precision, no modification of x is done. If d has no Rounding
 // specified, RoundDown is used.
-func (d *Decimal) Round(x *Decimal) error {
-	if d.Precision == 0 {
+func (c *Context) Round(d, x *Decimal) error {
+	if c.Precision == 0 {
 		d.Set(x)
-		err := d.setExponent(int64(d.Exponent))
+		err := d.setExponent(c, int64(d.Exponent))
 		return err
 	}
-	rounder := d.Rounding
+	rounder := c.Rounding
 	if rounder == nil {
 		rounder = RoundHalfUp
 	}
-	err := rounder(d, x)
+	err := rounder(c, d, x)
 	if err != nil {
 		return err
 	}
-	return d.setExponent(int64(d.Exponent))
+	return d.setExponent(c, int64(d.Exponent))
 }
 
-// Rounder rounds x with d's precision settings and stores the result in d.
-type Rounder func(d, x *Decimal) error
+// Rounder sets d to rounded x.
+type Rounder func(c *Context, d, x *Decimal) error
 
 var (
 	// RoundDown rounds toward 0; truncate.
@@ -60,15 +60,15 @@ var (
 	RoundUp Rounder = roundUp
 )
 
-func roundDown(d, x *Decimal) error {
+func roundDown(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		y.Quo(&d.Coeff, e)
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -91,11 +91,11 @@ func roundAddOne(b *big.Int, diff *int64) {
 	}
 }
 
-func roundHalfUp(d, x *Decimal) error {
+func roundHalfUp(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Add(&d.Coeff, bigZero)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
@@ -106,7 +106,7 @@ func roundHalfUp(d, x *Decimal) error {
 			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -114,10 +114,10 @@ func roundHalfUp(d, x *Decimal) error {
 	return nil
 }
 
-func roundHalfEven(d, x *Decimal) error {
+func roundHalfEven(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
@@ -132,7 +132,7 @@ func roundHalfEven(d, x *Decimal) error {
 			}
 		}
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -140,11 +140,11 @@ func roundHalfEven(d, x *Decimal) error {
 	return nil
 }
 
-func roundHalfDown(d, x *Decimal) error {
+func roundHalfDown(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Add(&d.Coeff, bigZero)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
@@ -155,7 +155,7 @@ func roundHalfDown(d, x *Decimal) error {
 			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -163,11 +163,11 @@ func roundHalfDown(d, x *Decimal) error {
 	return nil
 }
 
-func roundUp(d, x *Decimal) error {
+func roundUp(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Add(&d.Coeff, bigZero)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
@@ -176,7 +176,7 @@ func roundUp(d, x *Decimal) error {
 			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -184,11 +184,11 @@ func roundUp(d, x *Decimal) error {
 	return nil
 }
 
-func roundFloor(d, x *Decimal) error {
+func roundFloor(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Add(&d.Coeff, bigZero)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
@@ -197,7 +197,7 @@ func roundFloor(d, x *Decimal) error {
 			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}
@@ -205,11 +205,11 @@ func roundFloor(d, x *Decimal) error {
 	return nil
 }
 
-func roundCeiling(d, x *Decimal) error {
+func roundCeiling(c *Context, d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Add(&d.Coeff, bigZero)
 	nd := x.numDigits()
-	if diff := nd - int64(d.Precision); diff > 0 {
+	if diff := nd - int64(c.Precision); diff > 0 {
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
 		m := new(big.Int)
@@ -218,7 +218,7 @@ func roundCeiling(d, x *Decimal) error {
 			roundAddOne(y, &diff)
 		}
 		d.Coeff.Set(y)
-		err := d.setExponent(int64(d.Exponent), diff)
+		err := d.setExponent(c, int64(d.Exponent), diff)
 		if err != nil {
 			return err
 		}

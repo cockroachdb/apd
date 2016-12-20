@@ -19,7 +19,7 @@ import "testing"
 // Appease the unused test.
 // TODO(mjibson): actually test all the ErrDecimal methods.
 func TestErrDecimal(t *testing.T) {
-	var ed ErrDecimal
+	ed := NewErrDecimal(&Context{})
 	a := New(1, 0)
 	ed.Abs(a, a)
 	ed.Exp(a, a)
@@ -29,4 +29,22 @@ func TestErrDecimal(t *testing.T) {
 	ed.Pow(a, a, a)
 	ed.QuoInteger(a, a, a)
 	ed.Rem(a, a, a)
+}
+
+func TestNewErrDecimal(t *testing.T) {
+	c := &Context{
+		Precision:   5,
+		MaxExponent: 2,
+	}
+	nc := c.WithPrecision(c.Precision * 2)
+	ed := NewErrDecimal(&nc)
+	if ed.Ctx.Precision != 10 {
+		t.Fatalf("expected %d, got %d", 10, ed.Ctx.Precision)
+	}
+	if c.Precision != 5 {
+		t.Fatalf("expected %d, got %d", 5, c.Precision)
+	}
+	if c.MaxExponent != 2 {
+		t.Fatalf("expected %d, got %d", 2, c.MaxExponent)
+	}
 }

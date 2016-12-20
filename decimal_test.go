@@ -21,8 +21,12 @@ import (
 	"testing"
 )
 
+var (
+	testCtx = &Context{}
+)
+
 func (d *Decimal) GoString() string {
-	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, MaxExponent: %d, MinExponent: %d, Precision: %d}`, d.Coeff.String(), d.Exponent, d.MaxExponent, d.MinExponent, d.Precision)
+	return fmt.Sprintf(`{Coeff: %s, Exponent: %d}`, d.Coeff.String(), d.Exponent)
 }
 
 func TestNewFromString(t *testing.T) {
@@ -135,7 +139,7 @@ func TestAdd(t *testing.T) {
 			x := newDecimal(t, tc.x)
 			y := newDecimal(t, tc.y)
 			d := new(Decimal)
-			err := d.Add(x, y)
+			err := testCtx.Add(d, x, y)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -224,7 +228,7 @@ func TestModf(t *testing.T) {
 				t.Fatalf("frac: expected: %s, got: %s", tc.f, frac)
 			}
 			a := new(Decimal)
-			if err := a.Add(integ, frac); err != nil {
+			if err := testCtx.Add(a, integ, frac); err != nil {
 				t.Fatal(err)
 			}
 			if c, err := a.Cmp(x); err != nil {

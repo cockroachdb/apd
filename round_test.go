@@ -85,9 +85,11 @@ func TestRound(t *testing.T) {
 				t.Run(fmt.Sprintf("%s, %d", tc.x, tc.p), func(t *testing.T) {
 					x := newDecimal(t, tc.x)
 					d := new(Decimal)
-					d.Precision = tc.p
-					d.Rounding = rounder
-					err := d.Round(x)
+					c := Context{
+						Precision: tc.p,
+						Rounding:  rounder,
+					}
+					err := c.Round(d, x)
 					if err != nil {
 						t.Fatal(err)
 					}

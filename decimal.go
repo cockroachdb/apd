@@ -27,26 +27,11 @@ import (
 
 // Decimal is in arbitrary-precision decimal. Its value is:
 //
-//     coeff * 10 ^ exponent
+//     Coeff * 10 ^ Exponent
 //
-// All arithmetic operations on a Decimal are subject to the result's
-// Precision and Rounding settings. RoundDown is the default Rounding.
 type Decimal struct {
 	Coeff    big.Int
 	Exponent int32
-
-	// MaxExponent, if != 0, specifies the largest effective exponent. The
-	// effective exponent is the value of the Decimal in scientific notation. That
-	// is, for 10e2, the effective exponent is 3 (1.0e3).
-	MaxExponent int32
-	// MinExponent is similar to MaxExponent, but for the smallest effective
-	// exponent.
-	MinExponent int32
-	// Precision is the number of places to round during rounding.
-	Precision uint32
-	// Rounding specifies the Rounder to use during rounding. RoundDown is used
-	// if nil.
-	Rounding Rounder
 }
 
 // New creates a new decimal with the given coefficient and exponent.
@@ -174,7 +159,7 @@ var (
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
 // of xs must fit within an int32. An error occurs if the sum is outside of
 // the MaxExponent or MinExponent range.
-func (d *Decimal) setExponent(xs ...int64) error {
+func (d *Decimal) setExponent(c *Context, xs ...int64) error {
 	var sum int64
 	for _, x := range xs {
 		if x > MaxExponent || x < MinExponent {
@@ -186,7 +171,7 @@ func (d *Decimal) setExponent(xs ...int64) error {
 		return errors.Errorf(errExponentOutOfRange, sum)
 	}
 	r := int32(sum)
-	if d.MaxExponent != 0 || d.MinExponent != 0 {
+	if c.MaxExponent != 0 || c.MinExponent != 0 {
 		// For max/min exponent calculation, add in the number of digits for each power of 10.
 		nr := sum + d.numDigits() - 1
 		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
@@ -194,8 +179,8 @@ func (d *Decimal) setExponent(xs ...int64) error {
 			return errors.Errorf(errExponentOutOfRange, nr)
 		}
 		v := int32(nr)
-		if d.MaxExponent != 0 && v > d.MaxExponent ||
-			d.MinExponent != 0 && v < d.MinExponent {
+		if c.MaxExponent != 0 && v > c.MaxExponent ||
+			c.MinExponent != 0 && v < c.MinExponent {
 			return errors.Errorf(errExponentOutOfRange, v)
 		}
 	}
@@ -209,9 +194,11 @@ const (
 	// big.Int.Exp. This restriction could be lifted if better algorithms were
 	// determined during upscale and Round that don't need to perform Exp.
 
-	// MaxExponent and MinExponent are the highest exponents supported. Exponents
-	// near this range will perform very slowly (many seconds per operation).
+	// MaxExponent is the highest exponent supported. Exponents near this range will
+	// perform very slowly (many seconds per operation).
 	MaxExponent = 100000
+	// MinExponent is the lowest exponent supported with the same limitations as
+	// MaxExponent.
 	MinExponent = -MaxExponent
 )
 
@@ -267,269 +254,6 @@ func (d *Decimal) Sign() int {
 	return d.Coeff.Sign()
 }
 
-// Add sets d to the sum x+y.
-func (d *Decimal) Add(x, y *Decimal) error {
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return errors.Wrap(err, "Add")
-	}
-	d.Coeff.Add(a, b)
-	d.Exponent = s
-	return d.Round(d)
-}
-
-// Sub sets d to the difference x-y.
-func (d *Decimal) Sub(x, y *Decimal) error {
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return errors.Wrap(err, "Sub")
-	}
-	d.Coeff.Sub(a, b)
-	d.Exponent = s
-	return d.Round(d)
-}
-
-// Abs sets d to |x| (the absolute value of x).
-func (d *Decimal) Abs(x *Decimal) error {
-	d.Set(x)
-	d.Coeff.Abs(&d.Coeff)
-	return d.Round(d)
-}
-
-// Neg sets z to -x.
-func (d *Decimal) Neg(x *Decimal) error {
-	d.Set(x)
-	d.Coeff.Neg(&d.Coeff)
-	return d.Round(d)
-}
-
-// Mul sets d to the product x*y.
-func (d *Decimal) Mul(x, y *Decimal) error {
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return errors.Wrap(err, "Mul")
-	}
-	d.Coeff.Mul(a, b)
-	d.Exponent = s * 2
-	return d.Round(d)
-}
-
-// Quo sets d to the quotient x/y for y != 0.
-func (d *Decimal) Quo(x, y *Decimal) error {
-	if y.Coeff.Sign() == 0 {
-		return errDivideByZero
-	}
-	a, b, _, err := upscale(x, y)
-	if err != nil {
-		return errors.Wrap(err, "Quo")
-	}
-
-	// In order to compute the decimal remainder part, add enough 0s to the
-	// numerator to accurately round with the given precision.
-	// TODO(mjibson): determine a better algorithm for this instead of p*2+8.
-	nf := d.Precision*2 + 8
-	f := big.NewInt(int64(nf))
-	e := new(big.Int).Exp(bigTen, f, nil)
-	f.Mul(a, e)
-	d.Coeff.Quo(f, b)
-	if err := d.setExponent(-int64(nf)); err != nil {
-		return err
-	}
-	return d.Round(d)
-}
-
-// QuoInteger sets d to the integer part of the quotient x/y. If the result
-// cannot fit in d.Precision digits, an error is returned.
-func (d *Decimal) QuoInteger(x, y *Decimal) error {
-	if y.Coeff.Sign() == 0 {
-		return errDivideByZero
-	}
-	a, b, _, err := upscale(x, y)
-	if err != nil {
-		return errors.Wrap(err, "QuoInteger")
-	}
-	d.Coeff.Quo(a, b)
-	if d.numDigits() > int64(d.Precision) {
-		return errIntegerDivisionImpossible
-	}
-	d.Exponent = 0
-	return err
-}
-
-// Rem sets d to the remainder part of the quotient x/y. If
-// the integer part cannot fit in d.Precision digits, an error is returned.
-func (d *Decimal) Rem(x, y *Decimal) error {
-	if y.Coeff.Sign() == 0 {
-		return errDivideByZero
-	}
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return errors.Wrap(err, "Rem")
-	}
-	tmp := new(big.Int)
-	tmp.QuoRem(a, b, &d.Coeff)
-	if numDigits(tmp) > int64(d.Precision) {
-		return errIntegerDivisionImpossible
-	}
-	d.Exponent = s
-	return d.Round(d)
-}
-
-// Sqrt sets d to the square root of x.
-func (d *Decimal) Sqrt(x *Decimal) error {
-	// The square root calculation is implemented using Newton's Method.
-	// We start with an initial estimate for sqrt(d), and then iterate:
-	//     x_{n+1} = 1/2 * ( x_n + (d / x_n) ).
-
-	// Validate the sign of x.
-	switch x.Coeff.Sign() {
-	case -1:
-		return errSqrtNegative
-	case 0:
-		d.Coeff.SetInt64(0)
-		d.Exponent = 0
-		return nil
-	}
-
-	// Use half as the initial estimate.
-	z := new(Decimal)
-	z.Precision = d.Precision*2 + 2
-	err := z.Mul(x, decimalHalf)
-	if err != nil {
-		return errors.Wrap(err, "Sqrt")
-	}
-
-	// Iterate.
-	tmp := new(Decimal)
-	tmp.Precision = z.Precision
-	for loop := newLoop("sqrt", z, 1); ; {
-		err := tmp.Quo(x, z) // t = d / x_n
-		if err != nil {
-			return err
-		}
-		err = tmp.Add(tmp, z) // t = x_n + (d / x_n)
-		if err != nil {
-			return err
-		}
-		err = z.Mul(tmp, decimalHalf) // x_{n+1} = 0.5 * t
-		if err != nil {
-			return err
-		}
-		if done, err := loop.done(z); err != nil {
-			return err
-		} else if done {
-			break
-		}
-	}
-
-	return d.Round(z)
-}
-
-// Ln sets d to the natural log of x.
-func (d *Decimal) Ln(x *Decimal) error {
-	// Validate the sign of x.
-	if x.Sign() <= 0 {
-		return errors.Errorf("natural log of non-positive value: %s", x)
-	}
-
-	// Attempt to make our precision high enough so that intermediate calculations
-	// will produce enough data to have a correct output at the end. The constants
-	// here were found experimentally and are sufficient to pass many of the
-	// GDA tests, however this may still fail to produce accurate results for
-	// some inputs.
-	// TODO(mjibson): figure out an algorithm that can correctly determine this
-	// for all inputs.
-	p := d.Precision
-	if p < 15 {
-		p = 15
-	}
-	p *= 4
-	xr := &Decimal{Precision: p}
-
-	fact := New(2, 0)
-	var ed ErrDecimal
-
-	// Use the Taylor series approximation:
-	//
-	//   r = (x - 1) / (x + 1)
-	//   ln(x) = 2 * [ r + r^3 / 3 + r^5 / 5 + ... ]
-
-	// The taylor series of ln(x) converges much faster if 0.9 < x < 1.1. We
-	// can use the logarithmic identity:
-	// log_b (sqrt(x)) = log_b (x) / 2
-	// Thus, successively square-root x until it is in that region. Keep track
-	// of how many square-rootings were done using fact and multiply at the end.
-	xr.Set(x)
-	for ed.Cmp(xr, decimalZeroPtNine) < 0 || ed.Cmp(xr, decimalOnePtOne) > 0 {
-		xr.Precision += p
-		ed.Sqrt(xr, xr)
-		ed.Mul(fact, fact, decimalTwo)
-	}
-	if ed.Err != nil {
-		return ed.Err
-	}
-
-	tmp1 := &Decimal{Precision: p}
-	tmp2 := &Decimal{Precision: p}
-	elem := &Decimal{Precision: p}
-	numerator := &Decimal{Precision: p}
-	z := &Decimal{Precision: p}
-
-	// tmp1 = x + 1
-	ed.Add(tmp1, xr, decimalOne)
-	// tmp2 = x - 1
-	ed.Sub(tmp2, xr, decimalOne)
-	// elem = r = (x - 1) / (x + 1)
-	ed.Quo(elem, tmp2, tmp1)
-	// z will be the result. Initialize to elem.
-	z.Set(elem)
-	numerator.Set(elem)
-	// elem = r^2 = ((x - 1) / (x + 1)) ^ 2
-	// Used since the series uses only odd powers of z.
-	ed.Mul(elem, elem, elem)
-	tmp1.Exponent = 0
-	if ed.Err != nil {
-		return ed.Err
-	}
-	for loop := newLoop("log", z, 40); ; {
-		// tmp1 = n, the i'th odd power: 3, 5, 7, 9, etc.
-		tmp1.SetInt64(int64(loop.i)*2 + 3)
-		// numerator = r^n
-		ed.Mul(numerator, numerator, elem)
-		// tmp2 = r^n / n
-		ed.Quo(tmp2, numerator, tmp1)
-		// z += r^n / n
-		ed.Add(z, z, tmp2)
-		if done, err := loop.done(z); err != nil {
-			return err
-		} else if done {
-			break
-		}
-		if ed.Err != nil {
-			return ed.Err
-		}
-	}
-
-	// Undo input range reduction.
-	ed.Mul(z, z, fact)
-	if ed.Err != nil {
-		return ed.Err
-	}
-
-	// Round to the desired scale.
-	return d.Round(z)
-}
-
-// Log10 sets d to the base 10 log of x.
-func (d *Decimal) Log10(x *Decimal) error {
-	z := &Decimal{Precision: d.Precision * 2}
-	err := z.Ln(x)
-	if err != nil {
-		return errors.Wrap(err, "ln")
-	}
-	return d.Quo(z, decimalLog10)
-}
-
 // Modf sets integ to the integral part of d and frac to the fractional part
 // such that d = integ+frac. If d is negative, both integ or frac will be
 // either 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be
@@ -557,172 +281,4 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	integ.Coeff.QuoRem(&d.Coeff, e, &frac.Coeff)
 	integ.Exponent = 0
 	frac.Exponent = d.Exponent
-}
-
-// Exp sets d = e**n.
-func (d *Decimal) Exp(n *Decimal) error {
-	// We are computing (e^n) by splitting n into an integer and a float (e.g
-	// 3.1 ==> x = 3, y = 0.1), this allows us to write e^n = e^(x+y) = e^x * e^y
-
-	integ := new(Decimal)
-	frac := new(Decimal)
-	n.Modf(integ, frac)
-
-	if integ.Exponent > 0 {
-		y := big.NewInt(int64(integ.Exponent))
-		e := new(big.Int).Exp(bigTen, y, nil)
-		integ.Coeff.Mul(&integ.Coeff, e)
-		integ.Exponent = 0
-	}
-
-	z := &Decimal{Precision: d.Precision * 2}
-	if err := z.integerPower(decimalE, &integ.Coeff); err != nil {
-		return errors.Wrap(err, "IntegerPower")
-	}
-	return d.smallExp(z, frac)
-}
-
-// smallExp sets d = x * e**y. It should be used with small y values only
-// (|y| < 1).
-func (d *Decimal) smallExp(x, y *Decimal) error {
-	var ed ErrDecimal
-	n := new(Decimal)
-	p := d.Precision * 2
-	z := &Decimal{Precision: p}
-	tmp := &Decimal{Precision: p}
-	z.Set(x)
-	tmp.Set(x)
-	for loop := newLoop("exp", z, 1); ; {
-		if done, err := loop.done(z); err != nil {
-			return err
-		} else if done {
-			break
-		}
-		ed.Add(n, n, decimalOne)
-		ed.Mul(tmp, tmp, y)
-		ed.Quo(tmp, tmp, n)
-		ed.Add(z, z, tmp)
-		if ed.Err != nil {
-			return ed.Err
-		}
-	}
-	// Round to the desired scale.
-	return d.Round(z)
-}
-
-// integerPower sets d = x**y.
-// For integers we use exponentiation by squaring.
-// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring
-func (d *Decimal) integerPower(x *Decimal, y *big.Int) error {
-	b := new(big.Int).Set(y)
-	neg := b.Sign() < 0
-	if neg {
-		b.Abs(b)
-	}
-
-	p := d.Precision * 2
-	n := &Decimal{Precision: p}
-	z := &Decimal{Precision: p}
-	n.Set(x)
-	z.Set(decimalOne)
-	var ed ErrDecimal
-	for b.Sign() > 0 {
-		if b.Bit(0) == 1 {
-			ed.Mul(z, z, n)
-		}
-		b.Rsh(b, 1)
-
-		ed.Mul(n, n, n)
-		if ed.Err != nil {
-			return ed.Err
-		}
-	}
-
-	if neg {
-		ed.Quo(z, decimalOne, z)
-	}
-	ed.Round(d, z)
-	return ed.Err
-}
-
-// Pow sets d = x**y.
-func (d *Decimal) Pow(x, y *Decimal) error {
-	// maxPrecision is the largest number of decimal digits (sum of number of
-	// digits before and after the decimal point) before an errArgumentTooLarge
-	// is returned for any computation.
-	const maxPrecision = 2000
-
-	// Check if y is of type int.
-	tmp := new(Decimal)
-	if err := tmp.Abs(y); err != nil {
-		return errors.Wrap(err, "Abs")
-	}
-	integ, frac := new(Decimal), new(Decimal)
-	tmp.Modf(integ, frac)
-	isInt := frac.Sign() == 0
-
-	xs := x.Sign()
-	if xs == 0 {
-		switch y.Sign() {
-		case 0:
-			d.Set(decimalOne)
-			return nil
-		case 1:
-			d.Set(decimalZero)
-			return nil
-		default: // -1
-			// undefined for y < 0
-			return errors.Wrapf(errPowZeroNegative, "%s", y)
-		}
-	}
-
-	neg := xs < 0
-
-	if !isInt && neg {
-		return errors.Wrapf(errPowNegNonInteger, "%s**%s", x, y)
-	}
-
-	// Exponent Precision Explanation (RaduBerinde):
-	// Say we compute the Log with a scale of k. That means that the result we
-	// get is:
-	//   ln x +/- 10^-k
-	// This leads to an error of y * 10^-k in the exponent, which leads to a
-	// multiplicative error of e^(y*10^-k) in the result. For small values of u,
-	// e^u can be approximated by 1 + u, so for large k that error is around 1
-	// + y*10^-k. So the additive error will be x^y * y * 10^-k, and we want
-	// this to be less than 10^-s. This approximately means that k has to be
-	// s + the number of digits before the decimal point in x^y (where s =
-	// d.Precision). Which roughly is
-	//   s + <the number of digits before decimal point in x> * y
-
-	x.Modf(tmp, frac)
-	// numDigits = <the number of digits before decimal point in x>
-	numDigits := tmp.numDigits()
-
-	var ed ErrDecimal
-
-	// numDigits *= y
-	numDigits *= ed.Int64(integ)
-	// numDigits += s
-	numDigits += int64(d.Precision)
-	numDigits += 2
-
-	if numDigits < 0 || numDigits > maxPrecision {
-		return errors.Errorf(errExponentOutOfRange, numDigits)
-	}
-	tmp.Precision = uint32(numDigits)
-
-	ed.Abs(tmp, x)
-	ed.Ln(tmp, tmp)
-	ed.Mul(tmp, tmp, y)
-	ed.Exp(tmp, tmp)
-
-	if neg && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
-		ed.Neg(tmp, tmp)
-	}
-
-	if ed.Err != nil {
-		return ed.Err
-	}
-	return d.Round(tmp)
 }

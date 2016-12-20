@@ -50,7 +50,7 @@ func TestStyle(t *testing.T) {
 		t.Skip("enable with -style")
 	}
 
-	const apd = "github.com/cockroachdb/apd"
+	const apd = "github.com/mjibson/apd"
 	const pkgScope = "./..."
 
 	pkg, err := build.Import(apd, "", build.FindOnly)

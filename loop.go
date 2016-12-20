@@ -24,6 +24,7 @@ import (
 // on an *Decimal has converged. It was adapted from robpike.io/ivy/value's loop
 // implementation.
 type loop struct {
+	c             *Context
 	name          string   // The name of the function we are evaluating.
 	i             uint64   // Loop count.
 	maxIterations uint64   // When to give up.
@@ -40,39 +41,37 @@ const digitsToBitsRatio = math.Ln10 / math.Ln2
 // of the function being evaluated, the argument to the function,
 // and the desired scale of the result, and the iterations
 // per bit.
-func newLoop(name string, x *Decimal, itersPerBit int) *loop {
+func (c *Context) newLoop(name string, x *Decimal, itersPerBit int) *loop {
 	bits := x.Coeff.BitLen()
-	incrPrec := float64(x.Precision) + float64(x.Exponent)
+	incrPrec := float64(c.Precision) + float64(x.Exponent)
 	if incrPrec > 0 {
 		bits += int(incrPrec * digitsToBitsRatio)
 	}
-	if scaleBits := int(float64(x.Precision) * digitsToBitsRatio); scaleBits > bits {
+	if scaleBits := int(float64(c.Precision) * digitsToBitsRatio); scaleBits > bits {
 		bits = scaleBits
 	}
 	l := &loop{
+		c:             c,
 		name:          name,
 		maxIterations: 10 + uint64(itersPerBit*bits),
 	}
 	l.arg = new(Decimal)
 	l.arg.Set(x)
-	l.stallThresh = New(1, -int32(x.Precision+1))
+	l.stallThresh = New(1, -int32(c.Precision+1))
 	l.prevZ = new(Decimal)
 	l.delta = new(Decimal)
-	p := x.Precision + 2
-	l.prevZ.Precision = p
-	l.delta.Precision = p
 	return l
 }
 
 // done reports whether the loop is done. If it does not converge
 // after the maximum number of iterations, it returns an error.
 func (l *loop) done(z *Decimal) (bool, error) {
-	l.delta.Sub(l.prevZ, z)
+	l.c.Sub(l.delta, l.prevZ, z)
 	switch l.delta.Sign() {
 	case 0:
 		return true, nil
 	case -1:
-		l.delta.Neg(l.delta)
+		l.c.Neg(l.delta, l.delta)
 	}
 	if c, err := l.delta.Cmp(l.stallThresh); err != nil {
 		return false, err

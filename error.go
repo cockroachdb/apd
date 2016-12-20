@@ -14,30 +14,38 @@
 
 package apd
 
+// NewErrDecimal creates a ErrDecimal with given context.
+func NewErrDecimal(c *Context) *ErrDecimal {
+	return &ErrDecimal{
+		Ctx: c,
+	}
+}
+
 // ErrDecimal performs operations on decimals and collects errors during
 // operations. If an error is already set, the operation is skipped. Designed to
 // be used for many operations in a row, with a single error check at the end.
 type ErrDecimal struct {
 	Err error
+	Ctx *Context
 }
 
-// Abs performs d.Abs(x).
+// Abs performs e.Ctx.Abs(d, x).
 func (e *ErrDecimal) Abs(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Abs(x)
+	e.Err = e.Ctx.Abs(d, x)
 }
 
-// Add performs d.Add(x, y).
+// Add performs e.Ctx.Add(d, x, y).
 func (e *ErrDecimal) Add(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Add(x, y)
+	e.Err = e.Ctx.Add(d, x, y)
 }
 
-// Cmp returns 0 if Err is set. Otherwise returns a.Cmp(b).
+// Cmp returns 0 if Err is set. Otherwise returns e.Ctx.Cmp(a, b).
 func (e *ErrDecimal) Cmp(a, b *Decimal) int {
 	if e.Err != nil {
 		return 0
@@ -47,12 +55,12 @@ func (e *ErrDecimal) Cmp(a, b *Decimal) int {
 	return c
 }
 
-// Exp performs d.Exp(x).
+// Exp performs e.Ctx.Exp(d, x).
 func (e *ErrDecimal) Exp(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Exp(x)
+	e.Err = e.Ctx.Exp(d, x)
 }
 
 // Int64 returns 0 if Err is set. Otherwise returns d.Int64().
@@ -65,12 +73,12 @@ func (e *ErrDecimal) Int64(d *Decimal) int64 {
 	return r
 }
 
-// Ln performs d.Ln(x).
+// Ln performs e.Ctx.Ln(d, x).
 func (e *ErrDecimal) Ln(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Ln(x)
+	e.Err = e.Ctx.Ln(d, x)
 }
 
 // Log10 performs d.Log10(x).
@@ -78,77 +86,77 @@ func (e *ErrDecimal) Log10(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Log10(x)
+	e.Err = e.Ctx.Log10(d, x)
 }
 
-// Mul performs d.Mul(x, y).
+// Mul performs e.Ctx.Mul(d, x, y).
 func (e *ErrDecimal) Mul(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Mul(x, y)
+	e.Err = e.Ctx.Mul(d, x, y)
 }
 
-// Neg performs d.Neg(x).
+// Neg performs e.Ctx.Neg(d, x).
 func (e *ErrDecimal) Neg(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Neg(x)
+	e.Err = e.Ctx.Neg(d, x)
 }
 
-// Pow performs d.Pow(x, y).
+// Pow performs e.Ctx.Pow(d, x, y).
 func (e *ErrDecimal) Pow(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Pow(x, y)
+	e.Err = e.Ctx.Pow(d, x, y)
 }
 
-// Quo performs d.Quo(x, y).
+// Quo performs e.Ctx.Quo(d, x, y).
 func (e *ErrDecimal) Quo(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Quo(x, y)
+	e.Err = e.Ctx.Quo(d, x, y)
 }
 
-// QuoInteger performs d.QuoInteger(x, y).
+// QuoInteger performs e.Ctx.QuoInteger(d, x, y).
 func (e *ErrDecimal) QuoInteger(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.QuoInteger(x, y)
+	e.Err = e.Ctx.QuoInteger(d, x, y)
 }
 
-// Rem performs d.Rem(x, y).
+// Rem performs e.Ctx.Rem(d, x, y).
 func (e *ErrDecimal) Rem(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Rem(x, y)
+	e.Err = e.Ctx.Rem(d, x, y)
 }
 
-// Round performs d.Round(x).
+// Round performs e.Ctx.Round(d, x).
 func (e *ErrDecimal) Round(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Round(x)
+	e.Err = e.Ctx.Round(d, x)
 }
 
-// Sqrt performs d.Sqrt(x).
+// Sqrt performs e.Ctx.Sqrt(d, x).
 func (e *ErrDecimal) Sqrt(d, x *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Sqrt(x)
+	e.Err = e.Ctx.Sqrt(d, x)
 }
 
-// Sub performs d.Sub(x, y).
+// Sub performs e.Ctx.Sub(d, x, y).
 func (e *ErrDecimal) Sub(d, x, y *Decimal) {
 	if e.Err != nil {
 		return
 	}
-	e.Err = d.Sub(x, y)
+	e.Err = e.Ctx.Sub(d, x, y)
 }
