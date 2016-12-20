@@ -176,24 +176,17 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 	// Use half as the initial estimate.
 	z := new(Decimal)
 	nc := c.WithPrecision(c.Precision*2 + 2)
-	err := c.Mul(z, x, decimalHalf)
-	if err != nil {
-		return errors.Wrap(err, "Sqrt")
-	}
+	ed := NewErrDecimal(&nc)
+	ed.Mul(z, x, decimalHalf)
 
 	// Iterate.
 	tmp := new(Decimal)
 	for loop := nc.newLoop("sqrt", z, 1); ; {
-		err := nc.Quo(tmp, x, z) // t = d / x_n
-		if err != nil {
-			return err
-		}
-		err = nc.Add(tmp, tmp, z) // t = x_n + (d / x_n)
-		if err != nil {
-			return err
-		}
-		err = nc.Mul(z, tmp, decimalHalf) // x_{n+1} = 0.5 * t
-		if err != nil {
+		ed.Quo(tmp, x, z)           // t = d / x_n
+		ed.Add(tmp, tmp, z)         // t = x_n + (d / x_n)
+		ed.Mul(z, tmp, decimalHalf) // x_{n+1} = 0.5 * t
+
+		if err := ed.Err(); err != nil {
 			return err
 		}
 		if done, err := loop.done(z); err != nil {
@@ -203,6 +196,9 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 		}
 	}
 
+	if err := ed.Err(); err != nil {
+		return err
+	}
 	return c.Round(d, z)
 }
 
