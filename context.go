@@ -90,8 +90,14 @@ func (c *Context) Mul(d, x, y *Decimal) error {
 	return c.Round(d, d)
 }
 
-// Quo sets d to the quotient x/y for y != 0.
+// Quo sets d to the quotient x/y for y != 0. c's Precision must be > 0.
 func (c *Context) Quo(d, x, y *Decimal) error {
+	if c.Precision == 0 {
+		// 0 precision is disallowed because we compute the required number of digits
+		// during the 10**x calculation using the precision.
+		return errors.New("Quo requires a Context with > 0 Precision")
+	}
+
 	if y.Coeff.Sign() == 0 {
 		return errDivideByZero
 	}

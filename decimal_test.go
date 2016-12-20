@@ -277,3 +277,29 @@ func TestInt64(t *testing.T) {
 		})
 	}
 }
+
+func TestQuoErr(t *testing.T) {
+	tests := []struct {
+		x, y string
+		p    uint32
+		err  string
+	}{
+		{x: "1", y: "1", p: 0, err: "Quo requires a Context with > 0 Precision"},
+		{x: "1", y: "0", p: 1, err: "divide by zero"},
+	}
+	for _, tc := range tests {
+		c := Context{
+			Precision: tc.p,
+		}
+		x := newDecimal(t, tc.x)
+		y := newDecimal(t, tc.y)
+		d := new(Decimal)
+		err := c.Quo(d, x, y)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if err.Error() != tc.err {
+			t.Fatalf("expected %s, got %s", tc.err, err)
+		}
+	}
+}
