@@ -651,32 +651,7 @@ var GDAignore = map[string]bool{
 	"pow253": true,
 	"pow254": true,
 
-	// 1** big integer, should return 1 instead of fail
-	"pow2011": true,
-	"pow2012": true,
-	"pow2013": true,
-	"pow2014": true,
-	"pow2041": true,
-	"pow2042": true,
-	"pow2043": true,
-	"pow2044": true,
-	"pow2045": true,
-	"pow2046": true,
-	"pow2047": true,
-	"pow2048": true,
-	"pow2049": true,
-	"pow2051": true,
-	"pow2052": true,
-	"pow2053": true,
-	"pow2054": true,
-	"pow2055": true,
-	"pow2056": true,
-
 	// incorrect rounding
-	"rpo107": true,
 	"rpo213": true,
 	"rpo412": true,
-	"rpo507": true,
-	"rpo607": true,
-	"rpo707": true,
 }

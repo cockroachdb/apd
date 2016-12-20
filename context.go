@@ -397,6 +397,19 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 
 // Pow sets d = x**y.
 func (c *Context) Pow(d, x, y *Decimal) error {
+	// x ** 1 == x
+	if p, err := y.Cmp(decimalOne); err != nil {
+		return err
+	} else if p == 0 {
+		return c.Round(d, x)
+	}
+	// 1 ** x == 1
+	if p, err := x.Cmp(decimalOne); err != nil {
+		return err
+	} else if p == 0 {
+		return c.Round(d, x)
+	}
+
 	// maxPrecision is the largest number of decimal digits (sum of number of
 	// digits before and after the decimal point) before an errArgumentTooLarge
 	// is returned for any computation.
