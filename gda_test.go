@@ -358,6 +358,11 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				if err != nil {
 					return
 				}
+				if *flagPython {
+					if tc.CheckPython(t, d) {
+						return
+					}
+				}
 				t.Fatalf("expected error, got %#v", d)
 			}
 			if err != nil {
@@ -499,15 +504,25 @@ var GDAignore = map[string]bool{
 	"add712":  true,
 	"add713":  true,
 	"div412":  true,
+	"dvi072":  true,
+	"dvi073":  true,
+	"dvi074":  true,
 	"dvi411":  true,
 	"ln0054":  true,
 	"ln116":   true,
+	"ln903":   true,
+	"ln905":   true,
 	"log1308": true,
 	"log1322": true,
 	"log1323": true,
 	"log1325": true,
 	"log1326": true,
+	"log903":  true,
+	"log905":  true,
 	"rem071":  true,
+	"rem072":  true,
+	"rem073":  true,
+	"rem074":  true,
 	"rem343":  true,
 	"rem344":  true,
 	"rem348":  true,
@@ -518,6 +533,8 @@ var GDAignore = map[string]bool{
 	"rem511":  true,
 	"sqtx763": true,
 	"sqtx764": true,
+	"sqtx765": true,
+	"sqtx766": true,
 	"sub053":  true,
 	"sub062":  true,
 	"sub063":  true,
@@ -606,50 +623,8 @@ var GDAignore = map[string]bool{
 	// invalid operation errors; most test harnesses probably skip this
 	"log901": true,
 
-	// invalid context errors: unsure what these are testing
-	"ln903":  true,
-	"ln905":  true,
-	"log903": true,
-	"log905": true,
-
 	// --- These should be fixed.
 	// TODO(mjibson): fix these broken tests
-
-	// lost digits
-	"dvi072": true,
-	"dvi073": true,
-	"dvi074": true,
-	"rem072": true,
-	"rem073": true,
-	"rem074": true,
-
-	// undetected overflow
-	"sqtx765": true,
-	"sqtx766": true,
-
-	// undetected underflow
-	"exp048": true,
-	"exp755": true,
-	"exp756": true,
-	"exp757": true,
-	"exp759": true,
-	"exp760": true,
-	"exp761": true,
-	"exp762": true,
-	"exp763": true,
-	"exp764": true,
-	"exp765": true,
-	"exp766": true,
-	"exp769": true,
-	"exp770": true,
-	"exp771": true,
-	"exp772": true,
-	"exp773": true,
-	"exp774": true,
-
-	// should fail with too much precision needed
-	"pow253": true,
-	"pow254": true,
 
 	// incorrect rounding
 	"rpo213": true,
