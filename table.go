@@ -69,6 +69,9 @@ func (d *Decimal) numDigits() int64 {
 
 func numDigits(b *big.Int) int64 {
 	bl := b.BitLen()
+	if bl == 0 {
+		return 1
+	}
 	if val, ok := lookupBits(bl); ok {
 		ab := new(big.Int).Abs(b)
 		if ab.Cmp(&val.border) < 0 {
