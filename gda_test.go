@@ -401,6 +401,16 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 	return ignored, skipped, success, fail, total
 }
 
+var rounders = map[string]Rounder{
+	"ceiling":   RoundCeiling,
+	"down":      RoundDown,
+	"floor":     RoundFloor,
+	"half_down": RoundHalfDown,
+	"half_even": RoundHalfEven,
+	"half_up":   RoundHalfUp,
+	"up":        RoundUp,
+}
+
 // CheckPython returns true if python outputs d for this test case. It prints
 // an ignore line if true.
 func (tc TestCase) CheckPython(t *testing.T, d *Decimal) (ok bool) {
