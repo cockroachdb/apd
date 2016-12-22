@@ -24,8 +24,8 @@ import (
 type Context struct {
 	// Precision is the number of places to round during rounding.
 	Precision uint32
-	// Rounding specifies the Rounder to use during rounding. RoundDown is used
-	// if nil.
+	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
+	// nil.
 	Rounding Rounder
 	// MaxExponent, if != 0, specifies the largest effective exponent. The
 	// effective exponent is the value of the Decimal in scientific notation. That

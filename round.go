@@ -18,7 +18,7 @@ import "math/big"
 
 // Round sets d to rounded x. The result is stored in d and returned. If
 // d has zero Precision, no modification of x is done. If d has no Rounding
-// specified, RoundDown is used.
+// specified, RoundHalfUp is used.
 func (c *Context) Round(d, x *Decimal) error {
 	if c.Precision == 0 {
 		d.Set(x)
