@@ -27,13 +27,23 @@ type Context struct {
 	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
 	// nil.
 	Rounding Rounder
-	// MaxExponent, if != 0, specifies the largest effective exponent. The
+	// MaxExponent specifies the largest effective exponent. The
 	// effective exponent is the value of the Decimal in scientific notation. That
-	// is, for 10e2, the effective exponent is 3 (1.0e3).
+	// is, for 10e2, the effective exponent is 3 (1.0e3). Zero (0) is not a special
+	// value; it does not disable this check.
 	MaxExponent int32
 	// MinExponent is similar to MaxExponent, but for the smallest effective
 	// exponent.
 	MinExponent int32
+}
+
+// BaseContext is a useful default Context.
+var BaseContext = Context{
+	// Disable rounding.
+	Precision: 0,
+	// MaxExponent and MinExponent are set to the packages's limits.
+	MaxExponent: MaxExponent,
+	MinExponent: MinExponent,
 }
 
 // WithPrecision returns a copy of c but with the specified precision.
@@ -109,7 +119,7 @@ func (c *Context) Quo(d, x, y *Decimal) error {
 	// In order to compute the decimal remainder part, add enough 0s to the
 	// numerator to accurately round with the given precision.
 	// TODO(mjibson): determine a better algorithm for this instead of p*2+8.
-	nc := c.WithPrecision(c.Precision*2 + 8)
+	nc := BaseContext.WithPrecision(c.Precision*2 + 8)
 	f := big.NewInt(int64(nc.Precision))
 	e := new(big.Int).Exp(bigTen, f, nil)
 	f.Mul(a, e)
@@ -175,7 +185,7 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 
 	// Use half as the initial estimate.
 	z := new(Decimal)
-	nc := c.WithPrecision(c.Precision*2 + 2)
+	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
 	ed := NewErrDecimal(&nc)
 	ed.Mul(z, x, decimalHalf)
 
@@ -221,7 +231,7 @@ func (c *Context) Ln(d, x *Decimal) error {
 		p = 15
 	}
 	p *= 4
-	nc := c.WithPrecision(p)
+	nc := BaseContext.WithPrecision(p)
 	xr := new(Decimal)
 
 	fact := New(2, 0)
@@ -300,7 +310,7 @@ func (c *Context) Ln(d, x *Decimal) error {
 
 // Log10 sets d to the base 10 log of x.
 func (c *Context) Log10(d, x *Decimal) error {
-	nc := c.WithPrecision(c.Precision * 2)
+	nc := BaseContext.WithPrecision(c.Precision * 2)
 	z := new(Decimal)
 	err := nc.Ln(z, x)
 	if err != nil {
@@ -326,7 +336,7 @@ func (c *Context) Exp(d, n *Decimal) error {
 	}
 
 	z := new(Decimal)
-	nc := c.WithPrecision(c.Precision * 2)
+	nc := BaseContext.WithPrecision(c.Precision * 2)
 	if err := nc.integerPower(z, decimalE, &integ.Coeff); err != nil {
 		return errors.Wrap(err, "IntegerPower")
 	}
@@ -337,13 +347,23 @@ func (c *Context) Exp(d, n *Decimal) error {
 // (|y| < 1).
 func (c *Context) smallExp(d, x, y *Decimal) error {
 	n := new(Decimal)
-	nc := c.WithPrecision(c.Precision * 2)
+	e := x.Exponent
+	if e < 0 {
+		e = -e
+	}
+	nc := BaseContext.WithPrecision((uint32(x.numDigits()) + uint32(e)))
+	if p := c.Precision * 2; nc.Precision < p {
+		nc.Precision = p
+	}
 	ed := NewErrDecimal(&nc)
-	z := new(Decimal)
+	z := d
 	tmp := new(Decimal)
 	z.Set(x)
 	tmp.Set(x)
 	for loop := nc.newLoop("exp", z, 1); ; {
+		if err := ed.Err(); err != nil {
+			return err
+		}
 		if done, err := loop.done(z); err != nil {
 			return err
 		} else if done {
@@ -353,11 +373,10 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 		ed.Mul(tmp, tmp, y)
 		ed.Quo(tmp, tmp, n)
 		ed.Add(z, z, tmp)
-		if err := ed.Err(); err != nil {
-			return err
-		}
 	}
-	// Round to the desired scale.
+	if err := ed.Err(); err != nil {
+		return err
+	}
 	return c.Round(d, z)
 }
 
@@ -371,8 +390,8 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 		b.Abs(b)
 	}
 
-	nc := c.WithPrecision(c.Precision * 2)
-	n, z := new(Decimal), new(Decimal)
+	nc := BaseContext.WithPrecision(c.Precision * 2)
+	n, z := new(Decimal), d
 	n.Set(x)
 	z.Set(decimalOne)
 	ed := NewErrDecimal(&nc)
@@ -389,9 +408,15 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 	}
 
 	if neg {
+		e := z.Exponent
+		if e < 0 {
+			e = -e
+		}
+		qc := nc.WithPrecision((uint32(z.numDigits()) + uint32(e)) * 2)
+		ed.Ctx = &qc
 		ed.Quo(z, decimalOne, z)
+		ed.Ctx = &nc
 	}
-	ed.Round(d, z)
 	return ed.Err()
 }
 
@@ -473,7 +498,7 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	if numDigits < 0 || numDigits > maxPrecision {
 		return errors.Errorf(errExponentOutOfRange, numDigits)
 	}
-	nc := c.WithPrecision(uint32(numDigits))
+	nc := BaseContext.WithPrecision(uint32(numDigits))
 	ed.Ctx = &nc
 
 	ed.Abs(tmp, x)

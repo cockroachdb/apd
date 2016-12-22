@@ -34,10 +34,11 @@ var (
 
 func init() {
 	var err error
-	if decimalLog10, err = NewFromString(strLog10); err != nil {
+	var c Context
+	if decimalLog10, err = c.NewFromString(strLog10); err != nil {
 		panic(err)
 	}
-	if decimalE, err = NewFromString(strE); err != nil {
+	if decimalE, err = c.NewFromString(strE); err != nil {
 		panic(err)
 	}
 }

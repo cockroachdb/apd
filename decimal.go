@@ -42,67 +42,67 @@ func New(coeff int64, exponent int32) *Decimal {
 	}
 }
 
-// NewFromString creates a new decimal from s.
-func NewFromString(s string) (*Decimal, error) {
-	var err error
-
-	exp := 0
+// NewFromString creates a new decimal from s. The returned Decimal has its
+// exponents restricted by the context and its value rounded if needed.
+func (c *Context) NewFromString(s string) (*Decimal, error) {
+	var exps []int64
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
-		exp, err = strconv.Atoi(s[i+1:])
+		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
-		if exp > MaxExponent || exp < MinExponent {
-			return nil, errors.Errorf(errExponentOutOfRange, exp)
-		}
+		exps = append(exps, exp)
 		s = s[:i]
 	}
 	if i := strings.IndexByte(s, '.'); i >= 0 {
-		exp -= len(s) - i - 1
-		if exp > MaxExponent || exp < MinExponent {
-			return nil, errors.Errorf(errExponentOutOfRange, exp)
-		}
+		exp := int64(len(s) - i - 1)
+		exps = append(exps, -exp)
 		s = s[:i] + s[i+1:]
 	}
 	i, ok := new(big.Int).SetString(s, 10)
 	if !ok {
 		return nil, errors.Errorf("parse mantissa: %s", s)
 	}
-	return &Decimal{
-		Coeff:    *i,
-		Exponent: int32(exp),
-	}, nil
+	d := &Decimal{
+		Coeff: *i,
+	}
+	if err := d.setExponent(c, exps...); err != nil {
+		return nil, err
+	}
+	return d, c.Round(d, d)
 }
 
 func (d *Decimal) String() string {
-	// forceExp is the number of trailing 0s or 0s after the decimal after which
-	// a scientific notation is used instead.
-	const forceExp = 1000
+	return d.ToSci()
+}
 
+func (d *Decimal) ToSci() string {
 	s := d.Coeff.String()
+	if s == "0" {
+		return s
+	}
 	neg := d.Coeff.Sign() < 0
 	if neg {
 		s = s[1:]
 	}
-	nd := d.numDigits()
-	e := int64(d.Exponent)
-	if d.Exponent < 0 {
-		if nd+e < -forceExp {
-			s = fmt.Sprintf("%sE%d", s, d.Exponent)
-		} else if left := -int(d.Exponent) - len(s); left > 0 {
-			s = "0." + strings.Repeat("0", left) + s
-		} else if left < 0 {
-			offset := -left
-			s = s[:offset] + "." + s[offset:]
-		} else {
-			s = "0." + s
+	adj := int(d.Exponent) + (len(s) - 1)
+	if d.Exponent <= 0 && adj >= -6 {
+		if d.Exponent < 0 {
+			if left := -int(d.Exponent) - len(s); left > 0 {
+				s = "0." + strings.Repeat("0", left) + s
+			} else if left < 0 {
+				offset := -left
+				s = s[:offset] + "." + s[offset:]
+			} else {
+				s = "0." + s
+			}
 		}
-	} else if d.Exponent > 0 {
-		if e > forceExp {
-			s = fmt.Sprintf("%sE%d", s, d.Exponent)
-		} else {
-			s += strings.Repeat("0", int(d.Exponent))
+	} else {
+		dot := ""
+		if len(s) > 1 {
+			dot = "." + s[1:]
 		}
+		s = fmt.Sprintf("%s%sE%+d", s[:1], dot, adj)
 	}
 	if neg {
 		s = "-" + s
@@ -167,23 +167,21 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) error {
 		}
 		sum += x
 	}
-	if sum > MaxExponent || sum < MinExponent {
-		return errors.Errorf(errExponentOutOfRange, sum)
-	}
 	r := int32(sum)
-	if c.MaxExponent != 0 || c.MinExponent != 0 {
-		// For max/min exponent calculation, add in the number of digits for each power of 10.
-		nr := sum + d.numDigits() - 1
-		// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
-		if nr > MaxExponent || nr < MinExponent {
-			return errors.Errorf(errExponentOutOfRange, nr)
-		}
-		v := int32(nr)
-		if c.MaxExponent != 0 && v > c.MaxExponent ||
-			c.MinExponent != 0 && v < c.MinExponent {
-			return errors.Errorf(errExponentOutOfRange, v)
-		}
+
+	// For max/min exponent calculation, add in the number of digits for each power
+	// of 10.
+	// TODO(mjibson): instead of this check, just convert the coeff and exponent.
+	nr := sum + d.numDigits() - 1
+	// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
+	if nr > MaxExponent || nr < MinExponent {
+		return errors.Errorf(errExponentOutOfRange, nr)
 	}
+	v := int32(nr)
+	if v > c.MaxExponent || v < c.MinExponent {
+		return errors.Errorf("exponent out of context range: %d (%d, %d)", v, c.MinExponent, c.MaxExponent)
+	}
+
 	d.Exponent = r
 	return nil
 }

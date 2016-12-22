@@ -33,7 +33,7 @@ func TestNumDigits(t *testing.T) {
 			buf.WriteByte(c)
 			bs := buf.String()
 			t.Run(bs, func(t *testing.T) {
-				d := newDecimal(t, bs)
+				d := newDecimal(t, testCtx, bs)
 				n := d.numDigits()
 				e := int64(buf.Len() + offset)
 				if n != e {
