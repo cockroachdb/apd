@@ -42,14 +42,11 @@ func New(coeff int64, exponent int32) *Decimal {
 	}
 }
 
-// NewFromString creates a new decimal from s. The returned Decimal has its
-// exponents restricted by the context and its value rounded if needed.
-func (c *Context) NewFromString(s string) (*Decimal, error) {
-	var exps []int64
+func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
+			return nil, nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
 		exps = append(exps, exp)
 		s = s[:i]
@@ -61,7 +58,32 @@ func (c *Context) NewFromString(s string) (*Decimal, error) {
 	}
 	i, ok := new(big.Int).SetString(s, 10)
 	if !ok {
-		return nil, errors.Errorf("parse mantissa: %s", s)
+		return nil, nil, errors.Errorf("parse mantissa: %s", s)
+	}
+	return i, exps, nil
+}
+
+// NewFromString creates a new decimal from s.
+func NewFromString(s string) (*Decimal, error) {
+	i, exps, err := newFromString(s)
+	if err != nil {
+		return nil, err
+	}
+	d := &Decimal{
+		Coeff: *i,
+	}
+	if err := d.setExponent(&BaseContext, exps...); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+// NewFromString creates a new decimal from s. The returned Decimal has its
+// exponents restricted by the context and its value rounded if needed.
+func (c *Context) NewFromString(s string) (*Decimal, error) {
+	i, exps, err := newFromString(s)
+	if err != nil {
+		return nil, err
 	}
 	d := &Decimal{
 		Coeff: *i,

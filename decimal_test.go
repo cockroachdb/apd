@@ -48,6 +48,31 @@ func newDecimal(t *testing.T, c *Context, s string) *Decimal {
 	return d
 }
 
+func TestNewFromString(t *testing.T) {
+	tests := []struct {
+		s    string
+		m    int32
+		err  bool
+		cerr bool
+	}{
+		{s: "1e200", m: 100, err: false, cerr: true},
+	}
+	for _, tc := range tests {
+		c := BaseContext
+		c.MaxExponent = tc.m
+		_, err := NewFromString(tc.s)
+		haserr := err != nil
+		if haserr != tc.err {
+			t.Fatalf("expected error %v, got %v", tc.err, err)
+		}
+		_, err = c.NewFromString(tc.s)
+		haserr = err != nil
+		if haserr != tc.cerr {
+			t.Fatalf("expected error %v, got %v", tc.cerr, err)
+		}
+	}
+}
+
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal
