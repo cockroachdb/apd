@@ -405,12 +405,17 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 // an ignore line if true.
 func (tc TestCase) CheckPython(t *testing.T, d *Decimal) (ok bool) {
 	const tmpl = `from decimal import *
-getcontext().prec = %d
-getcontext().rounding = 'ROUND_%s'
+c = getcontext()
+c.prec=%d
+c.rounding='ROUND_%s'
+c.Emax=%d
+c.Emin=%d
 print %s`
 
 	var op string
 	switch tc.Operation {
+	case "abs":
+		op = "abs"
 	case "add":
 		op = "+"
 	case "divide":
@@ -439,14 +444,14 @@ print %s`
 	var line string
 	switch len(tc.Operands) {
 	case 1:
-		line = fmt.Sprintf("Decimal('%s').%s()", tc.Operands[0], op)
+		line = fmt.Sprintf("c.%s(c.create_decimal('%s'))", op, tc.Operands[0])
 	case 2:
-		line = fmt.Sprintf("Decimal('%s') %s Decimal('%s')", tc.Operands[0], op, tc.Operands[1])
+		line = fmt.Sprintf("c.create_decimal('%s') %s c.create_decimal('%s')", tc.Operands[0], op, tc.Operands[1])
 	default:
 		t.Fatalf("unknown operands: %d", len(tc.Operands))
 	}
 
-	script := fmt.Sprintf(tmpl, tc.Precision, strings.ToUpper(tc.Rounding), line)
+	script := fmt.Sprintf(tmpl, tc.Precision, strings.ToUpper(tc.Rounding), tc.MaxExponent, tc.MinExponent, line)
 	out, err := exec.Command("python", "-c", script).CombinedOutput()
 	if err != nil {
 		t.Fatalf("%s: %s", err, out)
