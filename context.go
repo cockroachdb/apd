@@ -61,7 +61,7 @@ func (c *Context) Add(d, x, y *Decimal) error {
 	}
 	d.Coeff.Add(a, b)
 	d.Exponent = s
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // Sub sets d to the difference x-y.
@@ -72,21 +72,21 @@ func (c *Context) Sub(d, x, y *Decimal) error {
 	}
 	d.Coeff.Sub(a, b)
 	d.Exponent = s
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // Abs sets d to |x| (the absolute value of x).
 func (c *Context) Abs(d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Abs(&d.Coeff)
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // Neg sets z to -x.
 func (c *Context) Neg(d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Neg(&d.Coeff)
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // Mul sets d to the product x*y.
@@ -97,7 +97,7 @@ func (c *Context) Mul(d, x, y *Decimal) error {
 	}
 	d.Coeff.Mul(a, b)
 	d.Exponent = s * 2
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // Quo sets d to the quotient x/y for y != 0. c's Precision must be > 0.
@@ -124,10 +124,10 @@ func (c *Context) Quo(d, x, y *Decimal) error {
 	e := new(big.Int).Exp(bigTen, f, nil)
 	f.Mul(a, e)
 	d.Coeff.Quo(f, b)
-	if err := d.setExponent(c, -int64(nc.Precision)); err != nil {
+	if err := d.setExponent(c, -int64(nc.Precision)).GoError(); err != nil {
 		return err
 	}
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
@@ -164,7 +164,7 @@ func (c *Context) Rem(d, x, y *Decimal) error {
 		return errIntegerDivisionImpossible
 	}
 	d.Exponent = s
-	return c.Round(d, d)
+	return c.Round(d, d).GoError()
 }
 
 // Sqrt sets d to the square root of x.
@@ -209,7 +209,7 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 	if err := ed.Err(); err != nil {
 		return err
 	}
-	return c.Round(d, z)
+	return c.Round(d, z).GoError()
 }
 
 // Ln sets d to the natural log of x.
@@ -305,7 +305,7 @@ func (c *Context) Ln(d, x *Decimal) error {
 	}
 
 	// Round to the desired scale.
-	return c.Round(d, z)
+	return c.Round(d, z).GoError()
 }
 
 // Log10 sets d to the base 10 log of x.
@@ -377,7 +377,7 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 	if err := ed.Err(); err != nil {
 		return err
 	}
-	return c.Round(d, z)
+	return c.Round(d, z).GoError()
 }
 
 // integerPower sets d = x**y.
@@ -426,13 +426,13 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	if p, err := y.Cmp(decimalOne); err != nil {
 		return err
 	} else if p == 0 {
-		return c.Round(d, x)
+		return c.Round(d, x).GoError()
 	}
 	// 1 ** x == 1
 	if p, err := x.Cmp(decimalOne); err != nil {
 		return err
 	} else if p == 0 {
-		return c.Round(d, x)
+		return c.Round(d, x).GoError()
 	}
 
 	// maxPrecision is the largest number of decimal digits (sum of number of
@@ -496,7 +496,7 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	numDigits += 2
 
 	if numDigits < 0 || numDigits > maxPrecision {
-		return errors.Errorf(errExponentOutOfRange, numDigits)
+		return errors.New(errExponentOutOfRange)
 	}
 	nc := BaseContext.WithPrecision(uint32(numDigits))
 	ed.Ctx = &nc
@@ -513,5 +513,5 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	if err := ed.Err(); err != nil {
 		return err
 	}
-	return c.Round(d, tmp)
+	return c.Round(d, tmp).GoError()
 }

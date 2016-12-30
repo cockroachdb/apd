@@ -63,7 +63,8 @@ func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 	return i, exps, nil
 }
 
-// NewFromString creates a new decimal from s.
+// NewFromString creates a new decimal from s. It has no restrictions on
+// exponents or precision.
 func NewFromString(s string) (*Decimal, error) {
 	i, exps, err := newFromString(s)
 	if err != nil {
@@ -72,14 +73,13 @@ func NewFromString(s string) (*Decimal, error) {
 	d := &Decimal{
 		Coeff: *i,
 	}
-	if err := d.setExponent(&BaseContext, exps...); err != nil {
-		return nil, err
-	}
-	return d, nil
+	res := d.setExponent(&BaseContext, exps...)
+	return d, res.GoError()
 }
 
 // NewFromString creates a new decimal from s. The returned Decimal has its
-// exponents restricted by the context and its value rounded if needed.
+// exponents restricted by the context and its value rounded if it contains more
+// digits than the context's precision.
 func (c *Context) NewFromString(s string) (*Decimal, error) {
 	i, exps, err := newFromString(s)
 	if err != nil {
@@ -88,10 +88,11 @@ func (c *Context) NewFromString(s string) (*Decimal, error) {
 	d := &Decimal{
 		Coeff: *i,
 	}
-	if err := d.setExponent(c, exps...); err != nil {
-		return nil, err
+	if err := d.setExponent(c, exps...).GoError(); err != nil {
+		return d, err
 	}
-	return d, c.Round(d, d)
+	err = c.Round(d, d).GoError()
+	return d, err
 }
 
 func (d *Decimal) String() string {
@@ -170,7 +171,7 @@ func (d *Decimal) Int64() (int64, error) {
 }
 
 var (
-	errExponentOutOfRange        = "exponent out of range: %v"
+	errExponentOutOfRange        = "exponent out of range"
 	errSqrtNegative              = errors.New("square root of negative number")
 	errIntegerDivisionImpossible = errors.New("integer division impossible")
 	errDivideByZero              = errors.New("divide by zero")
@@ -181,31 +182,61 @@ var (
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
 // of xs must fit within an int32. An error occurs if the sum is outside of
 // the MaxExponent or MinExponent range.
-func (d *Decimal) setExponent(c *Context, xs ...int64) error {
+func (d *Decimal) setExponent(c *Context, xs ...int64) Result {
 	var sum int64
 	for _, x := range xs {
-		if x > MaxExponent || x < MinExponent {
-			return errors.Errorf(errExponentOutOfRange, x)
+		if x > MaxExponent {
+			return SystemOverflow
+		}
+		if x < MinExponent {
+			return SystemUnderflow
 		}
 		sum += x
 	}
 	r := int32(sum)
 
-	// For max/min exponent calculation, add in the number of digits for each power
-	// of 10.
-	// TODO(mjibson): instead of this check, just convert the coeff and exponent.
-	nr := sum + d.numDigits() - 1
-	// Make sure it still fits in an int32 for comparison to Max/Min Exponent.
-	if nr > MaxExponent || nr < MinExponent {
-		return errors.Errorf(errExponentOutOfRange, nr)
+	// adj is the adjusted exponent: exponent + clength - 1
+	adj := sum + d.numDigits() - 1
+	// Make sure it is less than the system limits.
+	if adj > MaxExponent {
+		return SystemOverflow
 	}
-	v := int32(nr)
-	if v > c.MaxExponent || v < c.MinExponent {
-		return errors.Errorf("exponent out of context range: %d (%d, %d)", v, c.MinExponent, c.MaxExponent)
+	if adj < MinExponent {
+		return SystemUnderflow
+	}
+	v := int32(adj)
+
+	var res Result
+	// d is subnormal.
+	if v < c.MinExponent {
+		res |= Subnormal
+		Etiny := c.MinExponent - (int32(c.Precision) - 1)
+		// Only need to round if exponent < Etiny.
+		if r < Etiny {
+			// Round to keep any precision we can while changing the exponent to Etiny.
+			np := v - Etiny + 1
+			if np < 0 {
+				np = 0
+			}
+			nc := c.WithPrecision(uint32(np))
+			b := new(big.Int).Set(&d.Coeff)
+			tmp := &Decimal{
+				Coeff: *b,
+			}
+			// Ignore the Precision == 0 check by using the Rounding directly.
+			res |= nc.Rounding(&nc, tmp, tmp)
+			if res.Inexact() {
+				res |= Underflow
+			}
+			d.Coeff = tmp.Coeff
+			r = Etiny
+		}
+	} else if v > c.MaxExponent {
+		res |= Overflow
 	}
 
 	d.Exponent = r
-	return nil
+	return res
 }
 
 const (

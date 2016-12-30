@@ -282,7 +282,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			t.Logf("%s:/^%s", path, tc.ID)
 			t.Logf("%s %s = %s (prec: %d, round: %s, Emax: %d, Emin: %d)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
 			mode, ok := rounders[tc.Rounding]
-			if !ok {
+			if !ok || mode == nil {
 				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
 			}
 			operands := make([]*Decimal, len(tc.Operands))
@@ -397,7 +397,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				}
 				return
 			}
-			r := newDecimal(t, c, tc.Result)
+			r := newDecimal(t, testCtx, tc.Result)
 			p, err := d.Cmp(r)
 			if err != nil {
 				t.Fatal(err)
@@ -446,7 +446,7 @@ c.Emin=%d
 print %s`
 
 	var op string
-	switch tc.Operation {
+	switch strings.ToLower(tc.Operation) {
 	case "abs":
 		op = "abs"
 	case "add":
@@ -471,6 +471,8 @@ print %s`
 		op = "sqrt"
 	case "subtract":
 		op = "-"
+	case "tosci":
+		op = "to_sci_string"
 	default:
 		t.Fatalf("unknown operator: %s", tc.Operation)
 	}
@@ -577,19 +579,9 @@ var GDAignore = map[string]bool{
 	"sub946": true,
 	"sub947": true,
 
-	// TODO(mjibson): fix tests below
-
-	// incorrect detection of max/minExponent
+	// GDA thinks these shouldn't over or underflow, but python does
 	"ln0901":  true,
 	"ln0902":  true,
-	"ln759":   true,
-	"ln760":   true,
-	"ln761":   true,
-	"ln762":   true,
-	"ln763":   true,
-	"ln764":   true,
-	"ln765":   true,
-	"ln766":   true,
 	"log0001": true,
 	"log0020": true,
 	"log1146": true,
@@ -598,6 +590,18 @@ var GDAignore = map[string]bool{
 	"log1157": true,
 	"log1166": true,
 	"log1167": true,
+
+	// GDA thinks these aren't subnormal, but python does
+	"ln759": true,
+	"ln760": true,
+	"ln761": true,
+	"ln762": true,
+	"ln763": true,
+	"ln764": true,
+	"ln765": true,
+	"ln766": true,
+
+	// TODO(mjibson): fix tests below
 
 	// incorrect rounding
 	"rpo213": true,

@@ -19,7 +19,7 @@ import "testing"
 // Appease the unused test.
 // TODO(mjibson): actually test all the ErrDecimal methods.
 func TestErrDecimal(t *testing.T) {
-	ed := NewErrDecimal(&Context{})
+	ed := NewErrDecimal(testCtx)
 	a := New(1, 0)
 	ed.Abs(a, a)
 	ed.Exp(a, a)

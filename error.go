@@ -158,7 +158,7 @@ func (e *ErrDecimal) Round(d, x *Decimal) *Decimal {
 	if e.Err() != nil {
 		return d
 	}
-	e.err = e.Ctx.Round(d, x)
+	e.err = e.Ctx.Round(d, x).GoError()
 	return d
 }
 

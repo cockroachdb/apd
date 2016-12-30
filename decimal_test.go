@@ -17,7 +17,6 @@ package apd
 import (
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 )
 
@@ -33,8 +32,7 @@ func testExponentError(t *testing.T, err error) {
 	if err == nil {
 		return
 	}
-	es := err.Error()
-	if strings.Contains(es, "exponent out of range") {
+	if err.Error() == errExponentOutOfRange {
 		t.Skip(err)
 	}
 }
@@ -48,28 +46,37 @@ func newDecimal(t *testing.T, c *Context, s string) *Decimal {
 	return d
 }
 
-func TestNewFromString(t *testing.T) {
-	tests := []struct {
-		s    string
-		m    int32
-		err  bool
-		cerr bool
-	}{
-		{s: "1e200", m: 100, err: false, cerr: true},
+func TestNewFromStringContext(t *testing.T) {
+	c5 := Context{
+		Precision:   3,
+		MaxExponent: 10,
+		MinExponent: -5,
+		Rounding:    RoundHalfUp,
 	}
-	for _, tc := range tests {
-		c := BaseContext
-		c.MaxExponent = tc.m
-		_, err := NewFromString(tc.s)
-		haserr := err != nil
-		if haserr != tc.err {
-			t.Fatalf("expected error %v, got %v", tc.err, err)
-		}
-		_, err = c.NewFromString(tc.s)
-		haserr = err != nil
-		if haserr != tc.cerr {
-			t.Fatalf("expected error %v, got %v", tc.cerr, err)
-		}
+	c5r := c5
+	c5r.Rounding = RoundCeiling
+	tests := []struct {
+		s string
+		c Context
+		r string
+	}{
+		{s: "1e-10", c: c5, r: "0"},
+		{s: "12e-10", c: c5, r: "0"},
+		{s: "123e-10", c: c5, r: "0"},
+		{s: "1234e-10", c: c5, r: "1E-7"},
+		{s: "1e-10", c: c5r, r: "1E-7"},
+		{s: "12e-10", c: c5r, r: "1E-7"},
+		{s: "123e-10", c: c5r, r: "1E-7"},
+		{s: "1234e-10", c: c5r, r: "2E-7"},
+	}
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("%d:%s", i, tc.s), func(t *testing.T) {
+			d, _ := tc.c.NewFromString(tc.s)
+			r := d.String()
+			if r != tc.r {
+				t.Fatalf("expected %s, got %s", tc.r, r)
+			}
+		})
 	}
 }
 
