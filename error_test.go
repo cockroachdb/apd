@@ -29,6 +29,7 @@ func TestErrDecimal(t *testing.T) {
 	ed.Pow(a, a, a)
 	ed.QuoInteger(a, a, a)
 	ed.Rem(a, a, a)
+	ed.Round(a, a)
 }
 
 func TestNewErrDecimal(t *testing.T) {

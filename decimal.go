@@ -74,7 +74,7 @@ func NewFromString(s string) (*Decimal, error) {
 		Coeff: *i,
 	}
 	res := d.setExponent(&BaseContext, exps...)
-	return d, res.GoError()
+	return d, res.GoError(BaseContext.Traps)
 }
 
 // NewFromString creates a new decimal from s. The returned Decimal has its
@@ -88,17 +88,17 @@ func (c *Context) NewFromString(s string) (*Decimal, error) {
 	d := &Decimal{
 		Coeff: *i,
 	}
-	if err := d.setExponent(c, exps...).GoError(); err != nil {
-		return d, err
-	}
-	err = c.Round(d, d).GoError()
-	return d, err
+	res := d.setExponent(c, exps...)
+	res |= c.Round(d, d)
+	c.Flags |= res
+	return d, res.GoError(c.Traps)
 }
 
 func (d *Decimal) String() string {
 	return d.ToSci()
 }
 
+// ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
 	s := d.Coeff.String()
 	if s == "0" {
@@ -170,26 +170,21 @@ func (d *Decimal) Int64() (int64, error) {
 	return v, nil
 }
 
-var (
-	errExponentOutOfRange        = "exponent out of range"
-	errSqrtNegative              = errors.New("square root of negative number")
-	errIntegerDivisionImpossible = errors.New("integer division impossible")
-	errDivideByZero              = errors.New("divide by zero")
-	errPowZeroNegative           = errors.New("zero raised to a negative power is undefined")
-	errPowNegNonInteger          = errors.New("a negative number raised to a non-integer power yields a complex result")
+const (
+	errExponentOutOfRange = "exponent out of range"
 )
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
 // of xs must fit within an int32. An error occurs if the sum is outside of
 // the MaxExponent or MinExponent range.
-func (d *Decimal) setExponent(c *Context, xs ...int64) Result {
+func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	var sum int64
 	for _, x := range xs {
 		if x > MaxExponent {
-			return SystemOverflow
+			return SystemOverflow | Overflow
 		}
 		if x < MinExponent {
-			return SystemUnderflow
+			return SystemUnderflow | Underflow
 		}
 		sum += x
 	}
@@ -199,14 +194,14 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Result {
 	adj := sum + d.numDigits() - 1
 	// Make sure it is less than the system limits.
 	if adj > MaxExponent {
-		return SystemOverflow
+		return SystemOverflow | Overflow
 	}
 	if adj < MinExponent {
-		return SystemUnderflow
+		return SystemUnderflow | Underflow
 	}
 	v := int32(adj)
 
-	var res Result
+	var res Condition
 	// d is subnormal.
 	if v < c.MinExponent {
 		res |= Subnormal
@@ -236,6 +231,7 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Result {
 	}
 
 	d.Exponent = r
+	c.Flags |= res
 	return res
 }
 
@@ -269,7 +265,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
 	if s > MaxExponent {
-		return nil, nil, 0, errors.Errorf(errExponentOutOfRange, s)
+		return nil, nil, 0, errors.New(errExponentOutOfRange)
 	}
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)

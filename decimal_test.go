@@ -273,12 +273,10 @@ func TestQuoErr(t *testing.T) {
 		err  string
 	}{
 		{x: "1", y: "1", p: 0, err: "Quo requires a Context with > 0 Precision"},
-		{x: "1", y: "0", p: 1, err: "divide by zero"},
+		{x: "1", y: "0", p: 1, err: "Division by zero"},
 	}
 	for _, tc := range tests {
-		c := Context{
-			Precision: tc.p,
-		}
+		c := testCtx.WithPrecision(tc.p)
 		x := newDecimal(t, testCtx, tc.x)
 		y := newDecimal(t, testCtx, tc.y)
 		d := new(Decimal)
@@ -289,5 +287,21 @@ func TestQuoErr(t *testing.T) {
 		if err.Error() != tc.err {
 			t.Fatalf("expected %s, got %s", tc.err, err)
 		}
+	}
+}
+
+func TestConditionString(t *testing.T) {
+	tests := map[Condition]string{
+		Overflow:             "Overflow",
+		Overflow | Underflow: "Overflow, Underflow",
+		Subnormal | Inexact:  "Inexact, Subnormal",
+	}
+	for c, s := range tests {
+		t.Run(s, func(t *testing.T) {
+			cs := c.String()
+			if cs != s {
+				t.Errorf("expected %s; got %s", s, cs)
+			}
+		})
 	}
 }

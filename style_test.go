@@ -77,6 +77,7 @@ func TestStyle(t *testing.T) {
 			stream.Xargs("misspell", "-i", strings.Join([]string{
 				"arithemtic",
 				"funtion",
+				"Infinit",
 			}, ",")),
 		), func(s string) {
 			t.Errorf(s)

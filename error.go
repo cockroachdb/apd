@@ -29,9 +29,16 @@ type ErrDecimal struct {
 	Ctx *Context
 }
 
-// Err returns the first error encountered.
+// Err returns the first error encountered or the context's trap error
+// if present.
 func (e *ErrDecimal) Err() error {
-	return e.err
+	if e.err != nil {
+		return e.err
+	}
+	if e.Ctx != nil {
+		return e.Ctx.Flags.GoError(e.Ctx.Traps)
+	}
+	return nil
 }
 
 // Abs performs e.Ctx.Abs(d, x) and returns d.
@@ -158,7 +165,9 @@ func (e *ErrDecimal) Round(d, x *Decimal) *Decimal {
 	if e.Err() != nil {
 		return d
 	}
-	e.err = e.Ctx.Round(d, x).GoError()
+	res := e.Ctx.Round(d, x)
+	e.Ctx.Flags |= res
+	e.err = res.GoError(e.Ctx.Traps)
 	return d
 }
 

@@ -291,6 +291,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				MaxExponent: int32(tc.MaxExponent),
 				MinExponent: int32(tc.MinExponent),
 				Rounding:    mode,
+				Traps:       Subnormal | DefaultTraps,
 			}
 			for i, o := range tc.Operands {
 				d, err := c.NewFromString(o)
@@ -370,6 +371,60 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					t.Fatalf("operand %d changed from %s to %s", i, o, operands[i])
 				}
 			}
+			if !GDAignoreFlags[tc.ID] {
+				var rcond Condition
+				for _, cond := range tc.Conditions {
+					switch cond {
+					case "Underflow":
+						rcond |= Underflow
+					case "Inexact":
+						rcond |= Inexact
+					case "Overflow":
+						rcond |= Overflow
+					case "Subnormal":
+						rcond |= Subnormal
+					case "Division_undefined":
+						rcond |= DivisionUndefined
+					case "Division_by_zero":
+						rcond |= DivisionByZero
+					case "Division_impossible":
+						rcond |= DivisionImpossible
+					case "Invalid_operation":
+						rcond |= InvalidOperation
+
+					case "Rounded":
+						rcond |= Rounded
+					case "Lost_digits":
+						// TODO(mjibson): implement this
+						//rcond |= LostDigits
+					case "Clamped", "Invalid_context":
+						// ignore
+
+					default:
+						t.Fatalf("unknown condition: %s", cond)
+					}
+				}
+
+				// TODO(mjibson): after upscaling, operations need to remove the 0s added
+				// after the operation is done. Since this isn't happening, things are being
+				// rounded when they shouldn't because the coefficient has so many trailing 0s.
+				// Manually remove Rounded flag from context until the TODO is fixed.
+				c.Flags &= ^Rounded
+				rcond &= ^Rounded
+
+				switch strings.ToLower(tc.Operation) {
+				case "log10", "power":
+					// TODO(mjibson): Under certain conditions these are exact, but we don't
+					// correctly mark them. Ignore these flags for now.
+					rcond &= ^Inexact
+					c.Flags &= ^Inexact
+				}
+
+				if rcond != c.Flags {
+					t.Errorf("expected flags %q (%d); got flags %q (%d)", rcond, rcond, c.Flags, c.Flags)
+				}
+			}
+
 			if tc.Result == "?" {
 				if err != nil {
 					return
@@ -408,8 +463,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 						return
 					}
 				}
-				t.Logf("result: %s", d)
-				t.Fatalf("got: %#v", d)
+				t.Fatalf("unexpected: %s (%#v)", d, d)
 			}
 		})
 		if !succeed {
@@ -601,9 +655,61 @@ var GDAignore = map[string]bool{
 	"ln765": true,
 	"ln766": true,
 
+	// Invalid context errors, OK to skip.
+	"ln901": true,
+
+	// Very large exponents we don't support yet
+	"pow063": true,
+	"pow064": true,
+	"pow065": true,
+	"pow066": true,
+	"pow118": true,
+	"pow119": true,
+	"pow120": true,
+	"pow126": true,
+	"pow127": true,
+	"pow181": true,
+	"pow182": true,
+	"pow183": true,
+	"pow184": true,
+	"pow186": true,
+	"pow187": true,
+	"pow189": true,
+	"pow190": true,
+
 	// TODO(mjibson): fix tests below
 
 	// incorrect rounding
 	"rpo213": true,
 	"rpo412": true,
+
+	// very high precision
+	"pow253": true,
+	"pow254": true,
+
+	// x**y with very large y
+	"pow260": true,
+	"pow261": true,
+	"pow270": true,
+	"pow271": true,
+	"pow310": true,
+	"pow311": true,
+	"pow320": true,
+	"pow321": true,
+	"pow330": true,
+	"pow331": true,
+	"pow340": true,
+	"pow341": true,
+
+	// timeout
+	"pow220": true,
+}
+
+var GDAignoreFlags = map[string]bool{
+	// unflagged overflow
+	"exp705": true,
+
+	// unflagged underflow
+	"exp755": true,
+	"exp760": true,
 }

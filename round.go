@@ -19,7 +19,7 @@ import "math/big"
 // Round sets d to rounded x. The result is stored in d and returned. If
 // d has zero Precision, no modification of x is done. If d has no Rounding
 // specified, RoundHalfUp is used.
-func (c *Context) Round(d, x *Decimal) Result {
+func (c *Context) Round(d, x *Decimal) Condition {
 	if c.Precision == 0 {
 		d.Set(x)
 		return d.setExponent(c, int64(d.Exponent))
@@ -34,7 +34,7 @@ func (c *Context) Round(d, x *Decimal) Result {
 }
 
 // Rounder sets d to rounded x.
-type Rounder func(c *Context, d, x *Decimal) Result
+type Rounder func(c *Context, d, x *Decimal) Condition
 
 var (
 	// RoundDown rounds toward 0; truncate.
@@ -72,14 +72,13 @@ func roundAddOne(b *big.Int, diff *int64) {
 	}
 }
 
-func roundDown(c *Context, d, x *Decimal) Result {
+func roundDown(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		return false
 	})
 }
 
-func roundHalfUp(c *Context, d, x *Decimal) Result {
-	//fmt.Println("ROUND HALF UP")
+func roundHalfUp(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		m.Abs(m)
 		m.Mul(m, bigTwo)
@@ -87,7 +86,7 @@ func roundHalfUp(c *Context, d, x *Decimal) Result {
 	})
 }
 
-func roundHalfEven(c *Context, d, x *Decimal) Result {
+func roundHalfEven(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		m.Abs(m)
 		m.Mul(m, bigTwo)
@@ -100,7 +99,7 @@ func roundHalfEven(c *Context, d, x *Decimal) Result {
 	})
 }
 
-func roundHalfDown(c *Context, d, x *Decimal) Result {
+func roundHalfDown(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		m.Abs(m)
 		m.Mul(m, bigTwo)
@@ -108,29 +107,31 @@ func roundHalfDown(c *Context, d, x *Decimal) Result {
 	})
 }
 
-func roundUp(c *Context, d, x *Decimal) Result {
+func roundUp(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		return m.Sign() != 0
 	})
 }
 
-func roundFloor(c *Context, d, x *Decimal) Result {
+func roundFloor(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		return m.Sign() != 0 && y.Sign() < 0
 	})
 }
 
-func roundCeiling(c *Context, d, x *Decimal) Result {
+func roundCeiling(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		return m.Sign() != 0 && y.Sign() >= 0
 	})
 }
 
-func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Result {
+func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Condition {
 	d.Set(x)
 	nd := x.numDigits()
-	var res Result
+	var res Condition
 	if diff := nd - int64(c.Precision); diff > 0 {
+		tmp := new(Decimal).Set(x)
+		//fmt.Println("ROUNDING", tmp.Coeff.String(), "E", tmp.Exponent, "DIFF", diff, "ND", nd, "P", c.Precision)
 		res |= Rounded
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
@@ -141,9 +142,12 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Result 
 		}
 		d.Coeff.Set(y)
 		res |= d.setExponent(c, int64(d.Exponent), diff)
-		if cmp, _ := d.Cmp(x); cmp != 0 {
+		if cmp, _ := d.Cmp(tmp); cmp != 0 {
 			res |= Inexact
 		}
+	} else {
+		//fmt.Println("NOT ROUNDING", tmp.Coeff.String(), "E", tmp.Exponent)
 	}
+	c.Flags |= res
 	return res
 }

@@ -35,7 +35,20 @@ type Context struct {
 	// MinExponent is similar to MaxExponent, but for the smallest effective
 	// exponent.
 	MinExponent int32
+
+	// Flags is the conditions set during operations since Flags was last cleared.
+	Flags Condition
+	// Traps is the conditions which will trigger an error result if the
+	// corresponding Flag condition occurred.
+	Traps Condition
 }
+
+const (
+	defaultIgnoreTraps = Inexact | Rounded
+	// DefaultTraps is the default trap set used by BaseContext. It traps all
+	// flags except Inexact and Rounded.
+	DefaultTraps = ^Condition(0) & ^defaultIgnoreTraps
+)
 
 // BaseContext is a useful default Context.
 var BaseContext = Context{
@@ -44,6 +57,8 @@ var BaseContext = Context{
 	// MaxExponent and MinExponent are set to the packages's limits.
 	MaxExponent: MaxExponent,
 	MinExponent: MinExponent,
+	// Default error conditions.
+	Traps: DefaultTraps,
 }
 
 // WithPrecision returns a copy of c but with the specified precision.
@@ -61,7 +76,7 @@ func (c *Context) Add(d, x, y *Decimal) error {
 	}
 	d.Coeff.Add(a, b)
 	d.Exponent = s
-	return c.Round(d, d).GoError()
+	return c.Round(d, d).GoError(c.Traps)
 }
 
 // Sub sets d to the difference x-y.
@@ -72,21 +87,21 @@ func (c *Context) Sub(d, x, y *Decimal) error {
 	}
 	d.Coeff.Sub(a, b)
 	d.Exponent = s
-	return c.Round(d, d).GoError()
+	return c.Round(d, d).GoError(c.Traps)
 }
 
 // Abs sets d to |x| (the absolute value of x).
 func (c *Context) Abs(d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Abs(&d.Coeff)
-	return c.Round(d, d).GoError()
+	return c.Round(d, d).GoError(c.Traps)
 }
 
 // Neg sets z to -x.
 func (c *Context) Neg(d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Neg(&d.Coeff)
-	return c.Round(d, d).GoError()
+	return c.Round(d, d).GoError(c.Traps)
 }
 
 // Mul sets d to the product x*y.
@@ -97,7 +112,7 @@ func (c *Context) Mul(d, x, y *Decimal) error {
 	}
 	d.Coeff.Mul(a, b)
 	d.Exponent = s * 2
-	return c.Round(d, d).GoError()
+	return c.Round(d, d).GoError(c.Traps)
 }
 
 // Quo sets d to the quotient x/y for y != 0. c's Precision must be > 0.
@@ -109,7 +124,15 @@ func (c *Context) Quo(d, x, y *Decimal) error {
 	}
 
 	if y.Coeff.Sign() == 0 {
-		return errDivideByZero
+		// TODO(mjibson): correctly set Inf and NaN here.
+		var res Condition
+		if x.Coeff.Sign() == 0 {
+			res |= DivisionUndefined
+		} else {
+			res |= DivisionByZero
+		}
+		c.Flags |= res
+		return res.GoError(c.Traps)
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
@@ -124,17 +147,25 @@ func (c *Context) Quo(d, x, y *Decimal) error {
 	e := new(big.Int).Exp(bigTen, f, nil)
 	f.Mul(a, e)
 	d.Coeff.Quo(f, b)
-	if err := d.setExponent(c, -int64(nc.Precision)).GoError(); err != nil {
-		return err
-	}
-	return c.Round(d, d).GoError()
+	res := d.setExponent(c, -int64(nc.Precision))
+	res |= c.Round(d, d)
+	return res.GoError(c.Traps)
 }
 
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
 // cannot fit in d.Precision digits, an error is returned.
 func (c *Context) QuoInteger(d, x, y *Decimal) error {
+	var res Condition
 	if y.Coeff.Sign() == 0 {
-		return errDivideByZero
+		// TODO(mjibson): correctly set Inf and NaN here (since this is Integer
+		// division, may be different or not apply like in Quo).
+		if x.Coeff.Sign() == 0 {
+			res |= DivisionUndefined
+		} else {
+			res |= DivisionByZero
+		}
+		c.Flags |= res
+		return res.GoError(c.Traps)
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
@@ -142,17 +173,27 @@ func (c *Context) QuoInteger(d, x, y *Decimal) error {
 	}
 	d.Coeff.Quo(a, b)
 	if d.numDigits() > int64(c.Precision) {
-		return errIntegerDivisionImpossible
+		res |= DivisionImpossible
 	}
 	d.Exponent = 0
-	return err
+	c.Flags |= res
+	return res.GoError(c.Traps)
 }
 
 // Rem sets d to the remainder part of the quotient x/y. If
 // the integer part cannot fit in d.Precision digits, an error is returned.
 func (c *Context) Rem(d, x, y *Decimal) error {
+	var res Condition
 	if y.Coeff.Sign() == 0 {
-		return errDivideByZero
+		// TODO(mjibson): correctly set Inf and NaN here (since this is Remainder
+		// division, may be different or not apply like in Quo).
+		if x.Coeff.Sign() == 0 {
+			res |= DivisionUndefined
+		} else {
+			res |= InvalidOperation
+		}
+		c.Flags |= res
+		return res.GoError(c.Traps)
 	}
 	a, b, s, err := upscale(x, y)
 	if err != nil {
@@ -161,10 +202,12 @@ func (c *Context) Rem(d, x, y *Decimal) error {
 	tmp := new(big.Int)
 	tmp.QuoRem(a, b, &d.Coeff)
 	if numDigits(tmp) > int64(c.Precision) {
-		return errIntegerDivisionImpossible
+		res |= DivisionImpossible
 	}
 	d.Exponent = s
-	return c.Round(d, d).GoError()
+	res |= c.Round(d, d)
+	c.Flags |= res
+	return res.GoError(c.Traps)
 }
 
 // Sqrt sets d to the square root of x.
@@ -176,7 +219,9 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 	// Validate the sign of x.
 	switch x.Coeff.Sign() {
 	case -1:
-		return errSqrtNegative
+		res := InvalidOperation
+		c.Flags |= res
+		return res.GoError(c.Traps)
 	case 0:
 		d.Coeff.SetInt64(0)
 		d.Exponent = 0
@@ -209,15 +254,27 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 	if err := ed.Err(); err != nil {
 		return err
 	}
-	return c.Round(d, z).GoError()
+	return c.Round(d, z).GoError(c.Traps)
 }
 
 // Ln sets d to the natural log of x.
 func (c *Context) Ln(d, x *Decimal) error {
-	// Validate the sign of x.
 	if x.Sign() <= 0 {
-		return errors.Errorf("natural log of non-positive value: %s", x)
+		res := InvalidOperation
+		c.Flags |= res
+		return res.GoError(c.Traps)
 	}
+
+	if c, err := x.Cmp(decimalOne); err != nil {
+		return errors.Wrap(err, "Cmp")
+	} else if c == 0 {
+		d.Set(decimalZero)
+		return nil
+	}
+
+	// TODO(mjibson): Currently this ignores the Inexact trap failure here
+	// because it always occurs. Should that happen?
+	c.Flags |= Inexact
 
 	// Attempt to make our precision high enough so that intermediate calculations
 	// will produce enough data to have a correct output at the end. The constants
@@ -304,23 +361,44 @@ func (c *Context) Ln(d, x *Decimal) error {
 		return err
 	}
 
-	// Round to the desired scale.
-	return c.Round(d, z).GoError()
+	// TODO(mjibson): force RoundHalfEven here.
+	return c.Round(d, z).GoError(c.Traps)
 }
 
 // Log10 sets d to the base 10 log of x.
 func (c *Context) Log10(d, x *Decimal) error {
+	if x.Sign() <= 0 {
+		res := InvalidOperation
+		c.Flags |= res
+		return res.GoError(c.Traps)
+	}
+
+	// TODO(mjibson): Currently this ignores the Inexact trap failure here
+	// because it always occurs. Should that happen?
+	// TODO(mjibson): This is exact under some conditions.
+	c.Flags |= Inexact
+
 	nc := BaseContext.WithPrecision(c.Precision * 2)
 	z := new(Decimal)
 	err := nc.Ln(z, x)
 	if err != nil {
 		return errors.Wrap(err, "ln")
 	}
+	// TODO(mjibson): force RoundHalfEven here.
 	return c.Quo(d, z, decimalLog10)
 }
 
 // Exp sets d = e**n.
 func (c *Context) Exp(d, n *Decimal) error {
+	if n.Coeff.Sign() == 0 {
+		d.Set(decimalOne)
+		return nil
+	}
+
+	// TODO(mjibson): Currently this ignores the Inexact trap failure here
+	// because it always occurs. Should that happen?
+	c.Flags |= Inexact
+
 	// We are computing (e^n) by splitting n into an integer and a float (e.g
 	// 3.1 ==> x = 3, y = 0.1), this allows us to write e^n = e^(x+y) = e^x * e^y
 
@@ -337,7 +415,12 @@ func (c *Context) Exp(d, n *Decimal) error {
 
 	z := new(Decimal)
 	nc := BaseContext.WithPrecision(c.Precision * 2)
-	if err := nc.integerPower(z, decimalE, &integ.Coeff); err != nil {
+	err := nc.integerPower(z, decimalE, &integ.Coeff)
+	// TODO(mjibson): figure out a more consistent way to transfer flags from
+	// inner contexts.
+	// These flags can occur here, so transfer that to the parent context.
+	c.Flags |= nc.Flags & (Overflow | Underflow | Subnormal)
+	if err != nil {
 		return errors.Wrap(err, "IntegerPower")
 	}
 	return c.smallExp(d, z, frac)
@@ -362,7 +445,7 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 	tmp.Set(x)
 	for loop := nc.newLoop("exp", z, 1); ; {
 		if err := ed.Err(); err != nil {
-			return err
+			break
 		}
 		if done, err := loop.done(z); err != nil {
 			return err
@@ -377,7 +460,8 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 	if err := ed.Err(); err != nil {
 		return err
 	}
-	return c.Round(d, z).GoError()
+	// TODO(mjibson): force RoundHalfEven here.
+	return c.Round(d, z).GoError(c.Traps)
 }
 
 // integerPower sets d = x**y.
@@ -390,11 +474,10 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 		b.Abs(b)
 	}
 
-	nc := BaseContext.WithPrecision(c.Precision * 2)
 	n, z := new(Decimal), d
 	n.Set(x)
 	z.Set(decimalOne)
-	ed := NewErrDecimal(&nc)
+	ed := NewErrDecimal(c)
 	for b.Sign() > 0 {
 		if b.Bit(0) == 1 {
 			ed.Mul(z, z, n)
@@ -403,6 +486,10 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 
 		ed.Mul(n, n, n)
 		if err := ed.Err(); err != nil {
+			// In the negative case, convert overflow to underflow.
+			if neg {
+				c.Flags = c.Flags.negateOverflowFlags()
+			}
 			return err
 		}
 	}
@@ -412,10 +499,10 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 		if e < 0 {
 			e = -e
 		}
-		qc := nc.WithPrecision((uint32(z.numDigits()) + uint32(e)) * 2)
+		qc := c.WithPrecision((uint32(z.numDigits()) + uint32(e)) * 2)
 		ed.Ctx = &qc
 		ed.Quo(z, decimalOne, z)
-		ed.Ctx = &nc
+		ed.Ctx = c
 	}
 	return ed.Err()
 }
@@ -426,19 +513,14 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	if p, err := y.Cmp(decimalOne); err != nil {
 		return err
 	} else if p == 0 {
-		return c.Round(d, x).GoError()
+		return c.Round(d, x).GoError(c.Traps)
 	}
 	// 1 ** x == 1
 	if p, err := x.Cmp(decimalOne); err != nil {
 		return err
 	} else if p == 0 {
-		return c.Round(d, x).GoError()
+		return c.Round(d, x).GoError(c.Traps)
 	}
-
-	// maxPrecision is the largest number of decimal digits (sum of number of
-	// digits before and after the decimal point) before an errArgumentTooLarge
-	// is returned for any computation.
-	const maxPrecision = 2000
 
 	// Check if y is of type int.
 	tmp := new(Decimal)
@@ -447,11 +529,13 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	}
 	integ, frac := new(Decimal), new(Decimal)
 	tmp.Modf(integ, frac)
-	isInt := frac.Sign() == 0
+	yIsInt := frac.Sign() == 0
 
 	xs := x.Sign()
+	ys := y.Sign()
+
 	if xs == 0 {
-		switch y.Sign() {
+		switch ys {
 		case 0:
 			d.Set(decimalOne)
 			return nil
@@ -459,15 +543,27 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 			d.Set(decimalZero)
 			return nil
 		default: // -1
-			// undefined for y < 0
-			return errors.Wrapf(errPowZeroNegative, "%s", y)
+			res := InvalidOperation
+			c.Flags |= res
+			return res.GoError(c.Traps)
+
 		}
 	}
+	if ys == 0 {
+		d.Set(decimalOne)
+		return nil
+	}
 
-	neg := xs < 0
+	if (xs == 0 && ys == 0) || (xs < 0 && !yIsInt) {
+		res := InvalidOperation
+		c.Flags |= res
+		return res.GoError(c.Traps)
+	}
 
-	if !isInt && neg {
-		return errors.Wrapf(errPowNegNonInteger, "%s**%s", x, y)
+	// TODO(mjibson): Currently this ignores the Inexact trap failure here
+	// because it always occurs. Should that happen?
+	if !yIsInt {
+		c.Flags |= Inexact
 	}
 
 	// Exponent Precision Explanation (RaduBerinde):
@@ -494,11 +590,29 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	// numDigits += s
 	numDigits += int64(c.Precision)
 	numDigits += 2
+	nc := BaseContext.WithPrecision(uint32(numDigits))
+
+	// maxPrecision is the largest number of decimal digits (sum of number
+	// of digits before and after the decimal point) before an Overflow flag
+	// is raised.
+	const maxPrecision = 2000
 
 	if numDigits < 0 || numDigits > maxPrecision {
-		return errors.New(errExponentOutOfRange)
+		nc.Precision = c.Precision
+		res := Overflow
+		abs := new(Decimal)
+		if err := nc.Abs(abs, x); err != nil {
+			return errors.Wrap(err, "Abs")
+		}
+		if cmp, err := abs.Cmp(decimalOne); err != nil {
+			return errors.Wrap(err, "Cmp")
+		} else if cmp < 0 {
+			// Underflow if |x| < 1.
+			res = res.negateOverflowFlags()
+		}
+		c.Flags |= res
+		return res.GoError(c.Traps)
 	}
-	nc := BaseContext.WithPrecision(uint32(numDigits))
 	ed.Ctx = &nc
 
 	ed.Abs(tmp, x)
@@ -506,12 +620,24 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	ed.Mul(tmp, tmp, y)
 	ed.Exp(tmp, tmp)
 
-	if neg && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
+	if xs < 0 && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
 		ed.Neg(tmp, tmp)
 	}
 
 	if err := ed.Err(); err != nil {
 		return err
 	}
-	return c.Round(d, tmp).GoError()
+	return c.Round(d, tmp).GoError(c.Traps)
+}
+
+func (c Condition) negateOverflowFlags() Condition {
+	if c.Overflow() {
+		c |= Underflow | Subnormal
+		c &= ^Overflow
+	}
+	if c.SystemOverflow() {
+		c |= SystemUnderflow
+		c &= ^SystemOverflow
+	}
+	return c
 }
