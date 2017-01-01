@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Decimal is in arbitrary-precision decimal. Its value is:
+// Decimal is an arbitrary-precision decimal. Its value is:
 //
 //     Coeff * 10 ^ Exponent
 //
@@ -94,6 +94,7 @@ func (c *Context) NewFromString(s string) (*Decimal, error) {
 	return d, res.GoError(c.Traps)
 }
 
+// String is a wrapper of ToSci.
 func (d *Decimal) String() string {
 	return d.ToSci()
 }

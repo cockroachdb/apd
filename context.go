@@ -97,7 +97,7 @@ func (c *Context) Abs(d, x *Decimal) error {
 	return c.Round(d, d).GoError(c.Traps)
 }
 
-// Neg sets z to -x.
+// Neg sets d to -x.
 func (c *Context) Neg(d, x *Decimal) error {
 	d.Set(x)
 	d.Coeff.Neg(&d.Coeff)
