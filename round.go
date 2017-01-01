@@ -131,7 +131,6 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Conditi
 	var res Condition
 	if diff := nd - int64(c.Precision); diff > 0 {
 		tmp := new(Decimal).Set(x)
-		//fmt.Println("ROUNDING", tmp.Coeff.String(), "E", tmp.Exponent, "DIFF", diff, "ND", nd, "P", c.Precision)
 		res |= Rounded
 		y := big.NewInt(diff)
 		e := new(big.Int).Exp(bigTen, y, nil)
@@ -145,8 +144,6 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Conditi
 		if cmp, _ := d.Cmp(tmp); cmp != 0 {
 			res |= Inexact
 		}
-	} else {
-		//fmt.Println("NOT ROUNDING", tmp.Coeff.String(), "E", tmp.Exponent)
 	}
 	c.Flags |= res
 	return res
