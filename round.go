@@ -127,7 +127,7 @@ func roundCeiling(c *Context, d, x *Decimal) Condition {
 
 func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Condition {
 	d.Set(x)
-	nd := x.numDigits()
+	nd := x.NumDigits()
 	var res Condition
 	if diff := nd - int64(c.Precision); diff > 0 {
 		tmp := new(Decimal).Set(x)

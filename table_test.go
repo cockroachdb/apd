@@ -34,7 +34,7 @@ func TestNumDigits(t *testing.T) {
 			bs := buf.String()
 			t.Run(bs, func(t *testing.T) {
 				d := newDecimal(t, testCtx, bs)
-				n := d.numDigits()
+				n := d.NumDigits()
 				e := int64(buf.Len() + offset)
 				if n != e {
 					t.Fatalf("%s ('%c'): expected %d, got %d", bs, c, e, n)
@@ -86,7 +86,7 @@ func TestDigitsLookupTable(t *testing.T) {
 		a.Mul(a, b)
 
 		d := &Decimal{Coeff: *a}
-		tableDigits := d.numDigits()
+		tableDigits := d.NumDigits()
 		if actualDigits := int64(len(a.String())); actualDigits != tableDigits {
 			t.Errorf("expected %d digits for %v, found %d", tableDigits, a, actualDigits)
 		}

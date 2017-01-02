@@ -58,12 +58,8 @@ func lookupBits(bitLen int) (tableVal, bool) {
 	return tableVal{}, false
 }
 
-// numDigits returns the number of decimal digits that make up
-// big.Int value. The function first attempts to look this digit
-// count up in the digitsLookupTable. If the value is not there,
-// it defaults to constructing a string value for the big.Int and
-// using this to determine the number of digits.
-func (d *Decimal) numDigits() int64 {
+// NumDigits returns the number of decimal digits of d.Coeff.
+func (d *Decimal) NumDigits() int64 {
 	return numDigits(&d.Coeff)
 }
 

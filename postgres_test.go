@@ -81,7 +81,7 @@ func TestPostgres(t *testing.T) {
 						errch <- errors.Errorf("%s: %s", s, err)
 					}
 					res[i] = d.String()
-					digits[i] = d.numDigits()
+					digits[i] = d.NumDigits()
 				}
 				for i, r := range res {
 					c := BaseContext.WithPrecision(uint32(digits[i]))

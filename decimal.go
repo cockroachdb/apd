@@ -192,7 +192,7 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	r := int32(sum)
 
 	// adj is the adjusted exponent: exponent + clength - 1
-	adj := sum + d.numDigits() - 1
+	adj := sum + d.NumDigits() - 1
 	// Make sure it is less than the system limits.
 	if adj > MaxExponent {
 		return SystemOverflow | Overflow
@@ -314,7 +314,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 		integ.Set(d)
 		return
 	}
-	nd := d.numDigits()
+	nd := d.NumDigits()
 	exp := -int64(d.Exponent)
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {

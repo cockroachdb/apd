@@ -172,7 +172,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) error {
 		return errors.Wrap(err, "QuoInteger")
 	}
 	d.Coeff.Quo(a, b)
-	if d.numDigits() > int64(c.Precision) {
+	if d.NumDigits() > int64(c.Precision) {
 		res |= DivisionImpossible
 	}
 	d.Exponent = 0
@@ -434,7 +434,7 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 	if e < 0 {
 		e = -e
 	}
-	nc := BaseContext.WithPrecision((uint32(x.numDigits()) + uint32(e)))
+	nc := BaseContext.WithPrecision((uint32(x.NumDigits()) + uint32(e)))
 	if p := c.Precision * 2; nc.Precision < p {
 		nc.Precision = p
 	}
@@ -499,7 +499,7 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 		if e < 0 {
 			e = -e
 		}
-		qc := c.WithPrecision((uint32(z.numDigits()) + uint32(e)) * 2)
+		qc := c.WithPrecision((uint32(z.NumDigits()) + uint32(e)) * 2)
 		ed.Ctx = &qc
 		ed.Quo(z, decimalOne, z)
 		ed.Ctx = c
@@ -581,7 +581,7 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 
 	x.Modf(tmp, frac)
 	// numDigits = <the number of digits before decimal point in x>
-	numDigits := tmp.numDigits()
+	numDigits := tmp.NumDigits()
 
 	var ed ErrDecimal
 
