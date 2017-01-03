@@ -60,10 +60,11 @@ func lookupBits(bitLen int) (tableVal, bool) {
 
 // NumDigits returns the number of decimal digits of d.Coeff.
 func (d *Decimal) NumDigits() int64 {
-	return numDigits(&d.Coeff)
+	return NumDigits(&d.Coeff)
 }
 
-func numDigits(b *big.Int) int64 {
+// NumDigits returns the number of decimal digits of b.
+func NumDigits(b *big.Int) int64 {
 	bl := b.BitLen()
 	if bl == 0 {
 		return 1

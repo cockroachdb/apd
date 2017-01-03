@@ -201,7 +201,7 @@ func (c *Context) Rem(d, x, y *Decimal) error {
 	}
 	tmp := new(big.Int)
 	tmp.QuoRem(a, b, &d.Coeff)
-	if numDigits(tmp) > int64(c.Precision) {
+	if NumDigits(tmp) > int64(c.Precision) {
 		res |= DivisionImpossible
 	}
 	d.Exponent = s

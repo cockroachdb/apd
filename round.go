@@ -59,13 +59,13 @@ var (
 
 // roundAddOne adds 1 to abs(b).
 func roundAddOne(b *big.Int, diff *int64) {
-	nd := numDigits(b)
+	nd := NumDigits(b)
 	if b.Sign() >= 0 {
 		b.Add(b, bigOne)
 	} else {
 		b.Sub(b, bigOne)
 	}
-	nd2 := numDigits(b)
+	nd2 := NumDigits(b)
 	if nd2 > nd {
 		b.Div(b, bigTen)
 		*diff++
