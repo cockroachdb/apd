@@ -77,6 +77,18 @@ func NewFromString(s string) (*Decimal, error) {
 	return d, res.GoError(BaseContext.Traps)
 }
 
+// SetString set's d to s and returns d. It has no restrictions on exponents
+// or precision.
+func (d *Decimal) SetString(s string) (*Decimal, error) {
+	i, exps, err := newFromString(s)
+	if err != nil {
+		return d, err
+	}
+	d.Coeff = *i
+	res := d.setExponent(&BaseContext, exps...)
+	return d, res.GoError(BaseContext.Traps)
+}
+
 // NewFromString creates a new decimal from s. The returned Decimal has its
 // exponents restricted by the context and its value rounded if it contains more
 // digits than the context's precision.
@@ -148,6 +160,12 @@ func (d *Decimal) SetCoefficient(x int64) *Decimal {
 	return d
 }
 
+// SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
+// hold the exact value of f.
+func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
+	return d.SetString(strconv.FormatFloat(f, 'E', -1, 64))
+}
+
 // Int64 returns the int64 representation of x. If x cannot be represented in an int64, an error is returned.
 func (d *Decimal) Int64() (int64, error) {
 	integ, frac := new(Decimal), new(Decimal)
@@ -170,6 +188,12 @@ func (d *Decimal) Int64() (int64, error) {
 		v *= 10
 	}
 	return v, nil
+}
+
+// Float64 returns the float64 representation of x. This conversion may lose
+// data (see strconv.ParseFloat for caveats).
+func (d *Decimal) Float64() (float64, error) {
+	return strconv.ParseFloat(d.String(), 64)
 }
 
 const (

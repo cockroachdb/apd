@@ -16,6 +16,7 @@ package apd
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 )
@@ -301,6 +302,32 @@ func TestConditionString(t *testing.T) {
 			cs := c.String()
 			if cs != s {
 				t.Errorf("expected %s; got %s", s, cs)
+			}
+		})
+	}
+}
+
+func TestFloat64(t *testing.T) {
+	tests := []float64{
+		0,
+		1,
+		-1,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		math.MaxFloat64,
+		math.SmallestNonzeroFloat64,
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprint(tc), func(t *testing.T) {
+			d := new(Decimal)
+			d.SetFloat64(tc)
+			f, err := d.Float64()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc != f {
+				t.Fatalf("expected %v, got %v", tc, f)
 			}
 		})
 	}
