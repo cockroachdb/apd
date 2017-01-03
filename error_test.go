@@ -38,7 +38,7 @@ func TestNewErrDecimal(t *testing.T) {
 		MaxExponent: 2,
 	}
 	nc := c.WithPrecision(c.Precision * 2)
-	ed := NewErrDecimal(&nc)
+	ed := NewErrDecimal(nc)
 	if ed.Ctx.Precision != 10 {
 		t.Fatalf("expected %d, got %d", 10, ed.Ctx.Precision)
 	}

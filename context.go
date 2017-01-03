@@ -62,10 +62,10 @@ var BaseContext = Context{
 }
 
 // WithPrecision returns a copy of c but with the specified precision.
-func (c *Context) WithPrecision(p uint32) Context {
+func (c *Context) WithPrecision(p uint32) *Context {
 	r := *c
 	r.Precision = p
-	return r
+	return &r
 }
 
 // Add sets d to the sum x+y.
@@ -231,7 +231,7 @@ func (c *Context) Sqrt(d, x *Decimal) error {
 	// Use half as the initial estimate.
 	z := new(Decimal)
 	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
-	ed := NewErrDecimal(&nc)
+	ed := NewErrDecimal(nc)
 	ed.Mul(z, x, decimalHalf)
 
 	// Iterate.
@@ -292,7 +292,7 @@ func (c *Context) Ln(d, x *Decimal) error {
 	xr := new(Decimal)
 
 	fact := New(2, 0)
-	ed := NewErrDecimal(&nc)
+	ed := NewErrDecimal(nc)
 
 	// Use the Taylor series approximation:
 	//
@@ -438,7 +438,7 @@ func (c *Context) smallExp(d, x, y *Decimal) error {
 	if p := c.Precision * 2; nc.Precision < p {
 		nc.Precision = p
 	}
-	ed := NewErrDecimal(&nc)
+	ed := NewErrDecimal(nc)
 	z := d
 	tmp := new(Decimal)
 	z.Set(x)
@@ -500,7 +500,7 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) error {
 			e = -e
 		}
 		qc := c.WithPrecision((uint32(z.NumDigits()) + uint32(e)) * 2)
-		ed.Ctx = &qc
+		ed.Ctx = qc
 		ed.Quo(z, decimalOne, z)
 		ed.Ctx = c
 	}
@@ -613,7 +613,7 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 		c.Flags |= res
 		return res.GoError(c.Traps)
 	}
-	ed.Ctx = &nc
+	ed.Ctx = nc
 
 	ed.Abs(tmp, x)
 	ed.Ln(tmp, tmp)
