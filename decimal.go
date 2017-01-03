@@ -134,7 +134,7 @@ func (d *Decimal) ToSci() string {
 	return s
 }
 
-// Set sets d's coefficient and exponent from x.
+// Set sets d's Coefficient and Exponent from x and returns d.
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
