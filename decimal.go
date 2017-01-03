@@ -141,8 +141,9 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 	return d
 }
 
-// SetInt64 sets d.'s Coefficient value to x. The exponent is not changed.
-func (d *Decimal) SetInt64(x int64) *Decimal {
+// SetCoefficient sets d's Coefficient value to x and returns d. The Exponent
+// is not changed.
+func (d *Decimal) SetCoefficient(x int64) *Decimal {
 	d.Coeff.SetInt64(x)
 	return d
 }
@@ -310,7 +311,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	// No fractional part.
 	if d.Exponent > 0 {
 		frac.Exponent = 0
-		frac.SetInt64(0)
+		frac.SetCoefficient(0)
 		integ.Set(d)
 		return
 	}
@@ -319,7 +320,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {
 		integ.Exponent = 0
-		integ.SetInt64(0)
+		integ.SetCoefficient(0)
 		frac.Set(d)
 		return
 	}

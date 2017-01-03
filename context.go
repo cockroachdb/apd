@@ -338,7 +338,7 @@ func (c *Context) Ln(d, x *Decimal) error {
 	}
 	for loop := nc.newLoop("log", z, 40); ; {
 		// tmp1 = n, the i'th odd power: 3, 5, 7, 9, etc.
-		tmp1.SetInt64(int64(loop.i)*2 + 3)
+		tmp1.SetCoefficient(int64(loop.i)*2 + 3)
 		// numerator = r^n
 		ed.Mul(numerator, numerator, elem)
 		// tmp2 = r^n / n

@@ -322,7 +322,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				case "compare":
 					var c int
 					c, err = operands[0].Cmp(operands[1])
-					d.SetInt64(int64(c))
+					d.SetCoefficient(int64(c))
 				case "divide":
 					err = c.Quo(d, operands[0], operands[1])
 				case "divideint":
