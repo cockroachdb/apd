@@ -142,3 +142,17 @@ func (r Condition) String() string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// negateOverflowFlags converts Overflow and SystemOverflow flags into their
+// equivalent Underflows.
+func (c Condition) negateOverflowFlags() Condition {
+	if c.Overflow() {
+		c |= Underflow | Subnormal
+		c &= ^Overflow
+	}
+	if c.SystemOverflow() {
+		c |= SystemUnderflow
+		c &= ^SystemOverflow
+	}
+	return c
+}

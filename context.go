@@ -629,15 +629,3 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	}
 	return c.Round(d, tmp).GoError(c.Traps)
 }
-
-func (c Condition) negateOverflowFlags() Condition {
-	if c.Overflow() {
-		c |= Underflow | Subnormal
-		c &= ^Overflow
-	}
-	if c.SystemOverflow() {
-		c |= SystemUnderflow
-		c &= ^SystemOverflow
-	}
-	return c
-}
