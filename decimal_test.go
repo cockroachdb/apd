@@ -366,3 +366,37 @@ func TestCeil(t *testing.T) {
 		})
 	}
 }
+
+func TestFloor(t *testing.T) {
+	tests := map[float64]int64{
+		0:    0,
+		-0.1: -1,
+		0.1:  0,
+		-0.9: -1,
+		0.9:  0,
+		-1:   -1,
+		1:    1,
+		-1.1: -2,
+		1.1:  1,
+	}
+
+	for f, r := range tests {
+		t.Run(fmt.Sprint(f), func(t *testing.T) {
+			d, err := new(Decimal).SetFloat64(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = testCtx.Floor(d, d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			i, err := d.Int64()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if i != r {
+				t.Fatalf("got %v, expected %v", i, r)
+			}
+		})
+	}
+}

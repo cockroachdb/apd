@@ -94,6 +94,11 @@ func (e *ErrDecimal) Exp(d, x *Decimal) *Decimal {
 	return e.op2(d, x, e.Ctx.Exp)
 }
 
+// Floor performs e.Ctx.Floor(d, x) and returns d.
+func (e *ErrDecimal) Floor(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.Floor)
+}
+
 // Int64 returns 0 if err is set. Otherwise returns d.Int64().
 func (e *ErrDecimal) Int64(d *Decimal) int64 {
 	if e.Err() != nil {

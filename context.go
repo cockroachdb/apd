@@ -683,3 +683,13 @@ func (c *Context) Ceil(d, x *Decimal) (Condition, error) {
 	}
 	return 0, nil
 }
+
+// Floor sets d to the largest integer <= x.
+func (c *Context) Floor(d, x *Decimal) (Condition, error) {
+	frac := new(Decimal)
+	x.Modf(d, frac)
+	if frac.Sign() < 0 {
+		return c.Sub(d, d, decimalOne)
+	}
+	return 0, nil
+}
