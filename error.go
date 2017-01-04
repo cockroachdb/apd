@@ -124,6 +124,11 @@ func (e *ErrDecimal) Pow(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Pow)
 }
 
+// Quantize performs e.Ctx.Quantize(d, v, x) and returns d.
+func (e *ErrDecimal) Quantize(d, v, x *Decimal) *Decimal {
+	return e.op3(d, v, x, e.Ctx.Quantize)
+}
+
 // Quo performs e.Ctx.Quo(d, x, y) and returns d.
 func (e *ErrDecimal) Quo(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Quo)
@@ -152,4 +157,9 @@ func (e *ErrDecimal) Sqrt(d, x *Decimal) *Decimal {
 // Sub performs e.Ctx.Sub(d, x, y) and returns d.
 func (e *ErrDecimal) Sub(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Sub)
+}
+
+// ToIntegral performs e.Ctx.ToIntegral(d, x) and returns d.
+func (e *ErrDecimal) ToIntegral(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.ToIntegral)
 }

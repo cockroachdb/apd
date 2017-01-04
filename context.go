@@ -618,9 +618,9 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	return res.GoError(c.Traps)
 }
 
-// Quantize sets d to the value of v with e's Exponent.
-func (c *Context) Quantize(d, v, e *Decimal) (Condition, error) {
-	res := c.quantize(d, v, e)
+// Quantize sets d to the value of v with x's Exponent.
+func (c *Context) Quantize(d, v, x *Decimal) (Condition, error) {
+	res := c.quantize(d, v, x)
 	if nd := d.NumDigits(); nd > int64(c.Precision) {
 		res |= InvalidOperation
 	}
