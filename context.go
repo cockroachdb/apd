@@ -620,6 +620,14 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 // Quantize sets d to the value of v with e's Exponent.
 func (c *Context) Quantize(d, v, e *Decimal) (Condition, error) {
+	res := c.quantize(d, v, e)
+	if nd := d.NumDigits(); nd > int64(c.Precision) {
+		res |= InvalidOperation
+	}
+	return res.GoError(c.Traps)
+}
+
+func (c *Context) quantize(d, v, e *Decimal) Condition {
 	d.Coeff.Set(&v.Coeff)
 	diff := e.Exponent - v.Exponent
 	var res Condition
@@ -649,9 +657,19 @@ func (c *Context) Quantize(d, v, e *Decimal) (Condition, error) {
 			}
 		}
 	}
-	if nd := d.NumDigits(); nd > int64(c.Precision) {
-		res = InvalidOperation
-	}
 	d.Exponent = e.Exponent + offset
+	return res
+}
+
+func (c *Context) toIntegral(d, x *Decimal) Condition {
+	res := c.quantize(d, x, decimalOne)
+	// TODO(mjibson): trim here, once trim is in
+	return res
+}
+
+// ToIntegral sets d to integral value of x. Inexact and Rounded flags are ignored and removed.
+func (c *Context) ToIntegral(d, x *Decimal) (Condition, error) {
+	res := c.toIntegral(d, x)
+	res &= ^(Inexact | Rounded)
 	return res.GoError(c.Traps)
 }

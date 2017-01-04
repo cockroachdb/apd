@@ -202,6 +202,7 @@ func TestGDA(t *testing.T) {
 		"rounding0",
 		"squareroot0",
 		"subtract0",
+		"tointegral0",
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%10s%8s%8s%8s%8s%8s%8s\n", "name", "total", "success", "fail", "ignore", "skip", "missing")
@@ -352,6 +353,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					res, err = c.Sqrt(d, operands[0])
 				case "subtract":
 					res, err = c.Sub(d, operands[0], operands[1])
+				case "tointegral":
+					res, err = c.ToIntegral(d, operands[0])
 				case "tosci":
 					s = operands[0].ToSci()
 				default:
