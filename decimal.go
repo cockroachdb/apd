@@ -160,6 +160,12 @@ func (d *Decimal) SetCoefficient(x int64) *Decimal {
 	return d
 }
 
+// SetExponent sets d's Exponent value to x and returns d.
+func (d *Decimal) SetExponent(x int32) *Decimal {
+	d.Exponent = x
+	return d
+}
+
 // SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
 // hold the exact value of f.
 func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
