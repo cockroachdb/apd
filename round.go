@@ -19,7 +19,11 @@ import "math/big"
 // Round sets d to rounded x. The result is stored in d and returned. If
 // d has zero Precision, no modification of x is done. If d has no Rounding
 // specified, RoundHalfUp is used.
-func (c *Context) Round(d, x *Decimal) Condition {
+func (c *Context) Round(d, x *Decimal) (Condition, error) {
+	return c.round(d, x).GoError(c.Traps)
+}
+
+func (c *Context) round(d, x *Decimal) Condition {
 	if c.Precision == 0 {
 		d.Set(x)
 		return d.setExponent(c, int64(d.Exponent))
@@ -130,7 +134,6 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Conditi
 			res |= Inexact
 		}
 	}
-	c.Flags |= res
 	return res
 }
 

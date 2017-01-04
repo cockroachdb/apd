@@ -294,8 +294,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				Rounding:    mode,
 				Traps:       Subnormal | DefaultTraps,
 			}
+			var res, opres Condition
 			for i, o := range tc.Operands {
-				d, err := c.NewFromString(o)
+				d, ores, err := c.NewFromString(o)
 				if err != nil {
 					testExponentError(t, err)
 					if tc.Result == "?" {
@@ -304,6 +305,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					t.Fatalf("operand %d: %s: %+v", i, o, err)
 				}
 				operands[i] = d
+				opres |= ores
 			}
 			var s string
 			d := new(Decimal)
@@ -317,39 +319,39 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			go func() {
 				switch strings.ToLower(tc.Operation) {
 				case "abs":
-					err = c.Abs(d, operands[0])
+					res, err = c.Abs(d, operands[0])
 				case "add":
-					err = c.Add(d, operands[0], operands[1])
+					res, err = c.Add(d, operands[0], operands[1])
 				case "compare":
 					var c int
 					c, err = operands[0].Cmp(operands[1])
 					d.SetCoefficient(int64(c))
 				case "divide":
-					err = c.Quo(d, operands[0], operands[1])
+					res, err = c.Quo(d, operands[0], operands[1])
 				case "divideint":
-					err = c.QuoInteger(d, operands[0], operands[1])
+					res, err = c.QuoInteger(d, operands[0], operands[1])
 				case "exp":
-					err = c.Exp(d, operands[0])
+					res, err = c.Exp(d, operands[0])
 				case "ln":
-					err = c.Ln(d, operands[0])
+					res, err = c.Ln(d, operands[0])
 				case "log10":
-					err = c.Log10(d, operands[0])
+					res, err = c.Log10(d, operands[0])
 				case "minus":
-					err = c.Neg(d, operands[0])
+					res, err = c.Neg(d, operands[0])
 				case "multiply":
-					err = c.Mul(d, operands[0], operands[1])
+					res, err = c.Mul(d, operands[0], operands[1])
 				case "plus":
-					err = c.Add(d, operands[0], decimalZero)
+					res, err = c.Add(d, operands[0], decimalZero)
 				case "power":
-					err = c.Pow(d, operands[0], operands[1])
+					res, err = c.Pow(d, operands[0], operands[1])
 				case "quantize":
-					err = c.Quantize(d, operands[0], operands[1])
+					res, err = c.Quantize(d, operands[0], operands[1])
 				case "remainder":
-					err = c.Rem(d, operands[0], operands[1])
+					res, err = c.Rem(d, operands[0], operands[1])
 				case "squareroot":
-					err = c.Sqrt(d, operands[0])
+					res, err = c.Sqrt(d, operands[0])
 				case "subtract":
-					err = c.Sub(d, operands[0], operands[1])
+					res, err = c.Sub(d, operands[0], operands[1])
 				case "tosci":
 					s = operands[0].ToSci()
 				default:
@@ -408,11 +410,14 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					}
 				}
 
+				// Add in the operand flags.
+				res |= opres
+
 				// TODO(mjibson): after upscaling, operations need to remove the 0s added
 				// after the operation is done. Since this isn't happening, things are being
 				// rounded when they shouldn't because the coefficient has so many trailing 0s.
 				// Manually remove Rounded flag from context until the TODO is fixed.
-				c.Flags &= ^Rounded
+				res &= ^Rounded
 				rcond &= ^Rounded
 
 				switch strings.ToLower(tc.Operation) {
@@ -420,11 +425,15 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					// TODO(mjibson): Under certain conditions these are exact, but we don't
 					// correctly mark them. Ignore these flags for now.
 					rcond &= ^Inexact
-					c.Flags &= ^Inexact
+					res &= ^Inexact
 				}
 
-				if rcond != c.Flags {
-					t.Errorf("expected flags %q (%d); got flags %q (%d)", rcond, rcond, c.Flags, c.Flags)
+				// Don't worry about these flags; they are handled by GoError.
+				res &= ^SystemOverflow
+				res &= ^SystemUnderflow
+
+				if rcond != res {
+					t.Errorf("expected flags %q (%d); got flags %q (%d)", rcond, rcond, res, res)
 				}
 			}
 

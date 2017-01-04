@@ -39,7 +39,7 @@ func testExponentError(t *testing.T, err error) {
 }
 
 func newDecimal(t *testing.T, c *Context, s string) *Decimal {
-	d, err := c.NewFromString(s)
+	d, _, err := c.NewFromString(s)
 	testExponentError(t, err)
 	if err != nil {
 		t.Fatalf("%s: %+v", s, err)
@@ -72,7 +72,7 @@ func TestNewFromStringContext(t *testing.T) {
 	}
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("%d:%s", i, tc.s), func(t *testing.T) {
-			d, _ := tc.c.NewFromString(tc.s)
+			d, _, _ := tc.c.NewFromString(tc.s)
 			r := d.String()
 			if r != tc.r {
 				t.Fatalf("expected %s, got %s", tc.r, r)
@@ -128,7 +128,7 @@ func TestAdd(t *testing.T) {
 			x := newDecimal(t, testCtx, tc.x)
 			y := newDecimal(t, testCtx, tc.y)
 			d := new(Decimal)
-			err := testCtx.Add(d, x, y)
+			_, err := testCtx.Add(d, x, y)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -217,7 +217,7 @@ func TestModf(t *testing.T) {
 				t.Fatalf("frac: expected: %s, got: %s", tc.f, frac)
 			}
 			a := new(Decimal)
-			if err := testCtx.Add(a, integ, frac); err != nil {
+			if _, err := testCtx.Add(a, integ, frac); err != nil {
 				t.Fatal(err)
 			}
 			if c, err := a.Cmp(x); err != nil {
@@ -281,7 +281,7 @@ func TestQuoErr(t *testing.T) {
 		x := newDecimal(t, testCtx, tc.x)
 		y := newDecimal(t, testCtx, tc.y)
 		d := new(Decimal)
-		err := c.Quo(d, x, y)
+		_, err := c.Quo(d, x, y)
 		if err == nil {
 			t.Fatal("expected error")
 		}

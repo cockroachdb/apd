@@ -73,8 +73,8 @@ func NewFromString(s string) (*Decimal, error) {
 	d := &Decimal{
 		Coeff: *i,
 	}
-	res := d.setExponent(&BaseContext, exps...)
-	return d, res.GoError(BaseContext.Traps)
+	_, err = d.setExponent(&BaseContext, exps...).GoError(BaseContext.Traps)
+	return d, err
 }
 
 // SetString set's d to s and returns d. It has no restrictions on exponents
@@ -85,25 +85,25 @@ func (d *Decimal) SetString(s string) (*Decimal, error) {
 		return d, err
 	}
 	d.Coeff = *i
-	res := d.setExponent(&BaseContext, exps...)
-	return d, res.GoError(BaseContext.Traps)
+	_, err = d.setExponent(&BaseContext, exps...).GoError(BaseContext.Traps)
+	return d, err
 }
 
 // NewFromString creates a new decimal from s. The returned Decimal has its
 // exponents restricted by the context and its value rounded if it contains more
 // digits than the context's precision.
-func (c *Context) NewFromString(s string) (*Decimal, error) {
+func (c *Context) NewFromString(s string) (*Decimal, Condition, error) {
 	i, exps, err := newFromString(s)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	d := &Decimal{
 		Coeff: *i,
 	}
 	res := d.setExponent(c, exps...)
-	res |= c.Round(d, d)
-	c.Flags |= res
-	return d, res.GoError(c.Traps)
+	res |= c.round(d, d)
+	_, err = res.GoError(c.Traps)
+	return d, res, err
 }
 
 // String is a wrapper of ToSci.
@@ -257,7 +257,6 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	}
 
 	d.Exponent = r
-	c.Flags |= res
 	return res
 }
 

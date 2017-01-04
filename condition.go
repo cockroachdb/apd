@@ -90,18 +90,18 @@ func (r Condition) DivisionImpossible() bool { return r&DivisionImpossible != 0 
 // InvalidOperation returns true if the InvalidOperation flag is set.
 func (r Condition) InvalidOperation() bool { return r&InvalidOperation != 0 }
 
-// GoError converts r to an error based on the given traps.
-func (r Condition) GoError(traps Condition) error {
+// GoError converts r to an error based on the given traps and returns r.
+func (r Condition) GoError(traps Condition) (Condition, error) {
 	const (
 		systemErrors = SystemOverflow | SystemUnderflow
 	)
+	var err error
 	if r&systemErrors != 0 {
-		return errors.New(errExponentOutOfRange)
+		err = errors.New(errExponentOutOfRange)
+	} else if t := r & traps; t != 0 {
+		err = errors.New(t.String())
 	}
-	if r&traps == 0 {
-		return nil
-	}
-	return errors.New(r.String())
+	return r, err
 }
 
 func (r Condition) String() string {
@@ -110,10 +110,11 @@ func (r Condition) String() string {
 		if r&i == 0 {
 			continue
 		}
+		r ^= i
 		var s string
 		switch i {
 		case SystemOverflow, SystemUnderflow:
-			// ignore
+			continue
 		case Overflow:
 			s = "Overflow"
 		case Underflow:
@@ -138,7 +139,6 @@ func (r Condition) String() string {
 			panic(errors.Errorf("unknown condition %d", i))
 		}
 		names = append(names, s)
-		r ^= i
 	}
 	return strings.Join(names, ", ")
 }
