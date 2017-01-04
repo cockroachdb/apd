@@ -673,3 +673,13 @@ func (c *Context) ToIntegral(d, x *Decimal) (Condition, error) {
 	res &= ^(Inexact | Rounded)
 	return res.GoError(c.Traps)
 }
+
+// Ceil sets d to the smallest integer >= x.
+func (c *Context) Ceil(d, x *Decimal) (Condition, error) {
+	frac := new(Decimal)
+	x.Modf(d, frac)
+	if frac.Sign() > 0 {
+		return c.Add(d, d, decimalOne)
+	}
+	return 0, nil
+}

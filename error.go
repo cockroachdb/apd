@@ -74,6 +74,11 @@ func (e *ErrDecimal) Add(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Add)
 }
 
+// Ceil performs e.Ctx.Ceil(d, x) and returns d.
+func (e *ErrDecimal) Ceil(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.Ceil)
+}
+
 // Cmp returns 0 if err is set. Otherwise returns e.Ctx.Cmp(a, b).
 func (e *ErrDecimal) Cmp(a, b *Decimal) int {
 	if e.Err() != nil {
