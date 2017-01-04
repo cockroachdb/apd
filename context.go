@@ -100,8 +100,7 @@ func (c *Context) Abs(d, x *Decimal) (Condition, error) {
 
 // Neg sets d to -x.
 func (c *Context) Neg(d, x *Decimal) (Condition, error) {
-	d.Set(x)
-	d.Coeff.Neg(&d.Coeff)
+	d.Neg(x)
 	return c.Round(d, d)
 }
 
