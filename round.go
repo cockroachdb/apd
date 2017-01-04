@@ -57,21 +57,6 @@ var (
 	RoundUp Rounder = roundUp
 )
 
-// roundAddOne adds 1 to abs(b).
-func roundAddOne(b *big.Int, diff *int64) {
-	nd := NumDigits(b)
-	if b.Sign() >= 0 {
-		b.Add(b, bigOne)
-	} else {
-		b.Sub(b, bigOne)
-	}
-	nd2 := NumDigits(b)
-	if nd2 > nd {
-		b.Div(b, bigTen)
-		*diff++
-	}
-}
-
 func roundDown(c *Context, d, x *Decimal) Condition {
 	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
 		return false
@@ -147,4 +132,19 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Conditi
 	}
 	c.Flags |= res
 	return res
+}
+
+// roundAddOne adds 1 to abs(b).
+func roundAddOne(b *big.Int, diff *int64) {
+	nd := NumDigits(b)
+	if b.Sign() >= 0 {
+		b.Add(b, bigOne)
+	} else {
+		b.Sub(b, bigOne)
+	}
+	nd2 := NumDigits(b)
+	if nd2 > nd {
+		b.Quo(b, bigTen)
+		*diff++
+	}
 }
