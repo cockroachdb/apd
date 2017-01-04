@@ -57,7 +57,7 @@ var (
 	RoundFloor Rounder = roundFloor
 	// RoundHalfDown rounds up if the digits are > 0.5.
 	RoundHalfDown Rounder = roundHalfDown
-	// RoundUp rounds up if the digits > 0.
+	// RoundUp rounds away from 0.
 	RoundUp Rounder = roundUp
 )
 
