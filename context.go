@@ -629,3 +629,42 @@ func (c *Context) Pow(d, x, y *Decimal) error {
 	}
 	return c.Round(d, tmp).GoError(c.Traps)
 }
+
+// Quantize sets d to the value of v with e's Exponent.
+func (c *Context) Quantize(d, v, e *Decimal) error {
+	d.Coeff.Set(&v.Coeff)
+	diff := e.Exponent - v.Exponent
+	var res Condition
+	var offset int32
+	if diff < 0 {
+		y := big.NewInt(-int64(diff))
+		e := new(big.Int).Exp(bigTen, y, nil)
+		d.Coeff.Mul(&d.Coeff, e)
+	} else if diff > 0 {
+		p := int32(d.NumDigits()) - diff
+		if p < 0 {
+			if d.Sign() != 0 {
+				d.Coeff.SetInt64(0)
+				res = Inexact | Rounded
+			}
+		} else {
+			nc := c.WithPrecision(uint32(p))
+			neg := d.Sign() < 0
+			// Avoid the c.Precision == 0 check.
+			res = nc.Rounding(nc, d, d)
+			offset = d.Exponent - diff
+			// TODO(mjibson): There may be a bug in roundAddOne or roundFunc that
+			// unexpectedly removes a negative sign when converting from -9 to -10. This
+			// check is needed until it is fixed.
+			if neg && d.Sign() > 0 {
+				d.Coeff.Neg(&d.Coeff)
+			}
+		}
+	}
+	if nd := d.NumDigits(); nd > int64(c.Precision) {
+		res = InvalidOperation
+	}
+	d.Exponent = e.Exponent + offset
+	c.Flags |= res
+	return res.GoError(c.Traps)
+}

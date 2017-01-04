@@ -197,6 +197,7 @@ func TestGDA(t *testing.T) {
 		"multiply0",
 		"plus0",
 		"power0",
+		"quantize0",
 		"remainder0",
 		"rounding0",
 		"squareroot0",
@@ -300,7 +301,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					if tc.Result == "?" {
 						return
 					}
-					t.Fatalf("%+v", err)
+					t.Fatalf("operand %d: %s: %+v", i, o, err)
 				}
 				operands[i] = d
 			}
@@ -341,6 +342,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					err = c.Add(d, operands[0], decimalZero)
 				case "power":
 					err = c.Pow(d, operands[0], operands[1])
+				case "quantize":
+					err = c.Quantize(d, operands[0], operands[1])
 				case "remainder":
 					err = c.Rem(d, operands[0], operands[1])
 				case "squareroot":
@@ -646,14 +649,18 @@ var GDAignore = map[string]bool{
 	"log1167": true,
 
 	// GDA thinks these aren't subnormal, but python does
-	"ln759": true,
-	"ln760": true,
-	"ln761": true,
-	"ln762": true,
-	"ln763": true,
-	"ln764": true,
-	"ln765": true,
-	"ln766": true,
+	"ln759":  true,
+	"ln760":  true,
+	"ln761":  true,
+	"ln762":  true,
+	"ln763":  true,
+	"ln764":  true,
+	"ln765":  true,
+	"ln766":  true,
+	"qua545": true,
+	"qua547": true,
+	"qua548": true,
+	"qua549": true,
 
 	// Invalid context errors, OK to skip.
 	"ln901": true,
@@ -676,6 +683,7 @@ var GDAignore = map[string]bool{
 	"pow187": true,
 	"pow189": true,
 	"pow190": true,
+	"qua531": true,
 
 	// TODO(mjibson): fix tests below
 
