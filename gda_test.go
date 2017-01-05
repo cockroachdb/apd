@@ -66,6 +66,15 @@ func (tc TestCase) HasNull() bool {
 	return false
 }
 
+func (tc TestCase) SkipPrecision() bool {
+	switch tc.Operation {
+	case "tosci", "toeng", "apply":
+		return false
+	default:
+		return true
+	}
+}
+
 func ParseDecTest(r io.Reader) ([]TestCase, error) {
 	scanner := bufio.NewScanner(r)
 
@@ -297,6 +306,10 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			}
 			var res, opres Condition
 			for i, o := range tc.Operands {
+				ctx := c
+				if tc.SkipPrecision() {
+					ctx = ctx.WithPrecision(0)
+				}
 				d, ores, err := c.NewFromString(o)
 				if err != nil {
 					testExponentError(t, err)
