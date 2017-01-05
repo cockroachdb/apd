@@ -78,7 +78,7 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 
 	for scanner.Scan() {
 		text := scanner.Text()
-		line := strings.Fields(text)
+		line := strings.Fields(strings.ToLower(text))
 		for i, t := range line {
 			if strings.HasPrefix(t, "--") {
 				line = line[:i]
@@ -92,7 +92,7 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 			if len(line) != 2 {
 				return nil, fmt.Errorf("expected 2 tokens, got %q", text)
 			}
-			switch directive := line[0]; strings.ToLower(directive[:len(directive)-1]) {
+			switch directive := line[0]; directive[:len(directive)-1] {
 			case "precision":
 				tc.Precision, err = strconv.Atoi(line[1])
 				if err != nil {
@@ -140,7 +140,7 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 			if tc.Operands == nil || len(line) < 1 {
 				return nil, fmt.Errorf("bad test case line: %q", text)
 			}
-			tc.Result = cleanNumber(line[0])
+			tc.Result = strings.ToUpper(cleanNumber(line[0]))
 			tc.Conditions = line[1:]
 			res = append(res, tc)
 		}
@@ -274,7 +274,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				t.Skip("has null")
 			}
 			switch tc.Operation {
-			case "toEng":
+			case "toeng":
 				t.Skip("unsupported")
 			}
 			if !*flagNoParallel && !*flagFailFast && !*flagIgnore {
@@ -318,7 +318,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			done := make(chan error, 1)
 			var err error
 			go func() {
-				switch strings.ToLower(tc.Operation) {
+				switch tc.Operation {
 				case "abs":
 					res, err = c.Abs(d, operands[0])
 				case "add":
@@ -383,29 +383,29 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				var rcond Condition
 				for _, cond := range tc.Conditions {
 					switch cond {
-					case "Underflow":
+					case "underflow":
 						rcond |= Underflow
-					case "Inexact":
+					case "inexact":
 						rcond |= Inexact
-					case "Overflow":
+					case "overflow":
 						rcond |= Overflow
-					case "Subnormal":
+					case "subnormal":
 						rcond |= Subnormal
-					case "Division_undefined":
+					case "division_undefined":
 						rcond |= DivisionUndefined
-					case "Division_by_zero":
+					case "division_by_zero":
 						rcond |= DivisionByZero
-					case "Division_impossible":
+					case "division_impossible":
 						rcond |= DivisionImpossible
-					case "Invalid_operation":
+					case "invalid_operation":
 						rcond |= InvalidOperation
 
-					case "Rounded":
+					case "rounded":
 						rcond |= Rounded
-					case "Lost_digits":
+					case "lost_digits":
 						// TODO(mjibson): implement this
 						//rcond |= LostDigits
-					case "Clamped", "Invalid_context":
+					case "clamped", "invalid_context":
 						// ignore
 
 					default:
@@ -423,7 +423,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				res &= ^Rounded
 				rcond &= ^Rounded
 
-				switch strings.ToLower(tc.Operation) {
+				switch tc.Operation {
 				case "log10", "power":
 					// TODO(mjibson): Under certain conditions these are exact, but we don't
 					// correctly mark them. Ignore these flags for now.
@@ -460,7 +460,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				}
 				t.Fatalf("%+v", err)
 			}
-			switch strings.ToLower(tc.Operation) {
+			switch tc.Operation {
 			case "tosci", "toeng":
 				if s != tc.Result {
 					t.Fatalf("expected %s, got %s", tc.Result, s)
@@ -515,7 +515,7 @@ c.Emin=%d
 print %s`
 
 	var op string
-	switch strings.ToLower(tc.Operation) {
+	switch tc.Operation {
 	case "abs":
 		op = "abs"
 	case "add":

@@ -274,7 +274,7 @@ func TestQuoErr(t *testing.T) {
 		err  string
 	}{
 		{x: "1", y: "1", p: 0, err: "Quo requires a Context with > 0 Precision"},
-		{x: "1", y: "0", p: 1, err: "Division by zero"},
+		{x: "1", y: "0", p: 1, err: "division by zero"},
 	}
 	for _, tc := range tests {
 		c := testCtx.WithPrecision(tc.p)
@@ -293,9 +293,9 @@ func TestQuoErr(t *testing.T) {
 
 func TestConditionString(t *testing.T) {
 	tests := map[Condition]string{
-		Overflow:             "Overflow",
-		Overflow | Underflow: "Overflow, Underflow",
-		Subnormal | Inexact:  "Inexact, Subnormal",
+		Overflow:             "overflow",
+		Overflow | Underflow: "overflow, underflow",
+		Subnormal | Inexact:  "inexact, subnormal",
 	}
 	for c, s := range tests {
 		t.Run(s, func(t *testing.T) {

@@ -116,25 +116,25 @@ func (r Condition) String() string {
 		case SystemOverflow, SystemUnderflow:
 			continue
 		case Overflow:
-			s = "Overflow"
+			s = "overflow"
 		case Underflow:
-			s = "Underflow"
+			s = "underflow"
 		case Inexact:
-			s = "Inexact"
+			s = "inexact"
 		case Subnormal:
-			s = "Subnormal"
+			s = "subnormal"
 		case Rounded:
-			s = "Rounded"
+			s = "rounded"
 		case DivisionUndefined:
-			s = "Division undefined"
+			s = "division undefined"
 		case DivisionByZero:
-			s = "Division by zero"
+			s = "division by zero"
 		case DivisionImpossible:
-			s = "Division impossible"
+			s = "division impossible"
 		case InvalidOperation:
-			s = "Invalid operation"
+			s = "invalid operation"
 		//case LostDigits:
-		//s = "Lost digits"
+		//s = "lost digits"
 		default:
 			panic(errors.Errorf("unknown condition %d", i))
 		}
