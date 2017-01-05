@@ -79,16 +79,6 @@ func (e *ErrDecimal) Ceil(d, x *Decimal) *Decimal {
 	return e.op2(d, x, e.Ctx.Ceil)
 }
 
-// Cmp returns 0 if err is set. Otherwise returns e.Ctx.Cmp(a, b).
-func (e *ErrDecimal) Cmp(a, b *Decimal) int {
-	if e.Err() != nil {
-		return 0
-	}
-	var c int
-	c, e.err = a.Cmp(b)
-	return c
-}
-
 // Exp performs e.Ctx.Exp(d, x) and returns d.
 func (e *ErrDecimal) Exp(d, x *Decimal) *Decimal {
 	return e.op2(d, x, e.Ctx.Exp)

@@ -258,9 +258,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		return res.GoError(c.Traps)
 	}
 
-	if c, err := x.Cmp(decimalOne); err != nil {
-		return 0, errors.Wrap(err, "Cmp")
-	} else if c == 0 {
+	if x.Cmp(decimalOne) == 0 {
 		d.Set(decimalZero)
 		return 0, nil
 	}
@@ -294,7 +292,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	// Thus, successively square-root x until it is in that region. Keep track
 	// of how many square-rootings were done using fact and multiply at the end.
 	xr.Set(x)
-	for ed.Cmp(xr, decimalZeroPtNine) < 0 || ed.Cmp(xr, decimalOnePtOne) > 0 {
+	for xr.Cmp(decimalZeroPtNine) < 0 || xr.Cmp(decimalOnePtOne) > 0 {
 		nc.Precision += p
 		ed.Sqrt(xr, xr)
 		ed.Mul(fact, fact, decimalTwo)
@@ -502,15 +500,11 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 // Pow sets d = x**y.
 func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	// x ** 1 == x
-	if p, err := y.Cmp(decimalOne); err != nil {
-		return 0, err
-	} else if p == 0 {
+	if y.Cmp(decimalOne) == 0 {
 		return c.Round(d, x)
 	}
 	// 1 ** x == 1
-	if p, err := x.Cmp(decimalOne); err != nil {
-		return 0, err
-	} else if p == 0 {
+	if x.Cmp(decimalOne) == 0 {
 		return c.Round(d, x)
 	}
 
@@ -588,9 +582,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 		if _, err := nc.Abs(abs, x); err != nil {
 			return 0, errors.Wrap(err, "Abs")
 		}
-		if cmp, err := abs.Cmp(decimalOne); err != nil {
-			return 0, errors.Wrap(err, "Cmp")
-		} else if cmp < 0 {
+		if abs.Cmp(decimalOne) < 0 {
 			// Underflow if |x| < 1.
 			res = res.negateOverflowFlags()
 		}

@@ -73,9 +73,7 @@ func (l *loop) done(z *Decimal) (bool, error) {
 	case -1:
 		l.c.Neg(l.delta, l.delta)
 	}
-	if c, err := l.delta.Cmp(l.stallThresh); err != nil {
-		return false, err
-	} else if c < 0 {
+	if l.delta.Cmp(l.stallThresh) < 0 {
 		l.stallCount++
 		if l.stallCount > 2 {
 			return true, nil

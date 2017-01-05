@@ -199,10 +199,10 @@ func (d *Decimal) Int64() (int64, error) {
 		return 0, errors.Errorf("%s: has fractional part", d)
 	}
 	var ed ErrDecimal
-	if c := ed.Cmp(integ, New(math.MaxInt64, 0)); c > 0 {
+	if integ.Cmp(New(math.MaxInt64, 0)) > 0 {
 		return 0, errors.Errorf("%s: greater than max int64", d)
 	}
-	if c := ed.Cmp(integ, New(math.MinInt64, 0)); c < 0 {
+	if integ.Cmp(New(math.MinInt64, 0)) < 0 {
 		return 0, errors.Errorf("%s: less than min int64", d)
 	}
 	if err := ed.Err(); err != nil {
@@ -333,12 +333,57 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 //    0 if d == x
 //   +1 if d >  x
 //
-func (d *Decimal) Cmp(x *Decimal) (int, error) {
-	a, b, _, err := upscale(d, x)
-	if err != nil {
-		return 0, errors.Wrap(err, "Cmp")
+func (d *Decimal) Cmp(x *Decimal) int {
+	// First compare signs.
+	ds := d.Sign()
+	xs := x.Sign()
+	if ds < xs {
+		return -1
+	} else if ds > xs {
+		return 1
+	} else if ds == 0 && xs == 0 {
+		return 0
 	}
-	return a.Cmp(b), nil
+
+	// Next compare adjusted exponents.
+	dn := d.NumDigits() + int64(d.Exponent)
+	xn := x.NumDigits() + int64(x.Exponent)
+	if dn < xn {
+		// Swap in the negative case.
+		if ds < 0 {
+			return 1
+		}
+		return -1
+	} else if dn > xn {
+		if ds < 0 {
+			return -1
+		}
+		return 1
+	}
+
+	// Now have to use aligned big.Ints. This function previously used upscale to
+	// align in all cases, but that requires an error in the return value. upscale
+	// does that so that it can fail if it needs to take the Exp of too-large a
+	// number, which is very slow. The only way for that to happen here is for d
+	// and x's coefficients to be of hugely differing values. That is practically
+	// more difficult, so we are assuming the user is already comfortable with
+	// slowness in those operations.
+
+	// Convert to int64 to guarantee the following arithmetic will succeed.
+	diff := int64(d.Exponent) - int64(x.Exponent)
+	if diff < 0 {
+		diff = -diff
+	}
+	y := big.NewInt(diff)
+	e := new(big.Int).Exp(bigTen, y, nil)
+	db := new(big.Int).Set(&d.Coeff)
+	xb := new(big.Int).Set(&x.Coeff)
+	if d.Exponent > x.Exponent {
+		db.Mul(db, e)
+	} else {
+		xb.Mul(xb, e)
+	}
+	return db.Cmp(xb)
 }
 
 // Sign returns:

@@ -338,7 +338,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					res, err = c.Add(d, operands[0], operands[1])
 				case "compare":
 					var c int
-					c, err = operands[0].Cmp(operands[1])
+					c = operands[0].Cmp(operands[1])
 					d.SetCoefficient(int64(c))
 				case "divide":
 					res, err = c.Quo(d, operands[0], operands[1])
@@ -386,9 +386,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			// Verify the operands didn't change.
 			for i, o := range tc.Operands {
 				v := newDecimal(t, c, o)
-				if c, err := v.Cmp(operands[i]); err != nil {
-					t.Fatal(err)
-				} else if c != 0 {
+				if v.Cmp(operands[i]) != 0 {
 					t.Fatalf("operand %d changed from %s to %s", i, o, operands[i])
 				}
 			}
@@ -481,11 +479,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 				return
 			}
 			r := newDecimal(t, testCtx, tc.Result)
-			p, err := d.Cmp(r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if p != 0 {
+			if d.Cmp(r) != 0 {
 				if *flagPython {
 					if tc.CheckPython(t, d) {
 						return
@@ -575,10 +569,7 @@ print %s`
 	}
 	so := strings.TrimSpace(string(out))
 	r := newDecimal(t, testCtx, so)
-	c, err := d.Cmp(r)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c := d.Cmp(r)
 	if c != 0 {
 		t.Errorf("python's result: %s", so)
 	} else {

@@ -130,7 +130,7 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Conditi
 		}
 		d.Coeff.Set(y)
 		res |= d.setExponent(c, int64(d.Exponent), diff)
-		if cmp, _ := d.Cmp(tmp); cmp != 0 {
+		if d.Cmp(tmp) != 0 {
 			res |= Inexact
 		}
 	}

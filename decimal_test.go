@@ -158,10 +158,7 @@ func TestCmp(t *testing.T) {
 		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {
 			x := newDecimal(t, testCtx, tc.x)
 			y := newDecimal(t, testCtx, tc.y)
-			c, err := x.Cmp(y)
-			if err != nil {
-				t.Fatal(err)
-			}
+			c := x.Cmp(y)
 			if c != tc.c {
 				t.Fatalf("expected: %d, got: %d", tc.c, c)
 			}
@@ -220,9 +217,7 @@ func TestModf(t *testing.T) {
 			if _, err := testCtx.Add(a, integ, frac); err != nil {
 				t.Fatal(err)
 			}
-			if c, err := a.Cmp(x); err != nil {
-				t.Fatal(err)
-			} else if c != 0 {
+			if a.Cmp(x) != 0 {
 				t.Fatalf("%s != %s", a, x)
 			}
 			if integ.Exponent < 0 {
