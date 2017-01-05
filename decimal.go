@@ -146,6 +146,25 @@ func (d *Decimal) ToSci() string {
 	return s
 }
 
+// ToStandard converts d to a standard notation string (i.e., no exponent
+// part). This can result in long strings given large exponents.
+func (d *Decimal) ToStandard() string {
+	s := d.Coeff.String()
+	if d.Exponent < 0 {
+		if left := -int(d.Exponent) - len(s); left > 0 {
+			s = "0." + strings.Repeat("0", left) + s
+		} else if left < 0 {
+			offset := -left
+			s = s[:offset] + "." + s[offset:]
+		} else {
+			s = "0." + s
+		}
+	} else if d.Exponent > 0 {
+		s += strings.Repeat("0", int(d.Exponent))
+	}
+	return s
+}
+
 // Set sets d's Coefficient and Exponent from x and returns d.
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	d.Coeff.Set(&x.Coeff)

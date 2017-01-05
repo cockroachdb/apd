@@ -400,3 +400,26 @@ func TestFloor(t *testing.T) {
 		})
 	}
 }
+
+func TestToStandard(t *testing.T) {
+	tests := map[string]string{
+		"0":          "0",
+		"0.0":        "0.0",
+		"0E2":        "000",
+		"0E-2":       "0.00",
+		"123.456E10": "1234560000000",
+	}
+
+	for c, r := range tests {
+		t.Run(c, func(t *testing.T) {
+			d, err := NewFromString(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := d.ToStandard()
+			if s != r {
+				t.Fatalf("got %v, expected %v", s, r)
+			}
+		})
+	}
+}
