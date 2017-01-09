@@ -119,6 +119,12 @@ func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Conditi
 	nd := x.NumDigits()
 	var res Condition
 	if diff := nd - int64(c.Precision); diff > 0 {
+		if diff > MaxExponent {
+			return SystemOverflow | Overflow
+		}
+		if diff < MinExponent {
+			return SystemUnderflow | Underflow
+		}
 		tmp := new(Decimal).Set(x)
 		res |= Rounded
 		y := big.NewInt(diff)

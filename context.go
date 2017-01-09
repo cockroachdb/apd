@@ -142,8 +142,10 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// numerator to accurately round with the given precision.
 	// TODO(mjibson): determine a better algorithm for this instead of p*2+8.
 	nc := BaseContext.WithPrecision(c.Precision*2 + 8)
-	f := big.NewInt(int64(nc.Precision))
-	e := new(big.Int).Exp(bigTen, f, nil)
+	f, e, err := exp10(int64(nc.Precision))
+	if err != nil {
+		return 0, nil
+	}
 	f.Mul(a, e)
 	d.Coeff.Quo(f, b)
 	res := d.setExponent(c, -int64(nc.Precision))
@@ -480,8 +482,10 @@ func (c *Context) Exp(d, n *Decimal) (Condition, error) {
 	n.Modf(integ, frac)
 
 	if integ.Exponent > 0 {
-		y := big.NewInt(int64(integ.Exponent))
-		e := new(big.Int).Exp(bigTen, y, nil)
+		_, e, err := exp10(int64(integ.Exponent))
+		if err != nil {
+			return 0, err
+		}
 		integ.Coeff.Mul(&integ.Coeff, e)
 		integ.Exponent = 0
 	}
@@ -710,6 +714,9 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 	var res Condition
 	var offset int32
 	if diff < 0 {
+		if diff < MinExponent {
+			return SystemUnderflow | Underflow
+		}
 		y := big.NewInt(-int64(diff))
 		e := new(big.Int).Exp(bigTen, y, nil)
 		d.Coeff.Mul(&d.Coeff, e)
@@ -769,4 +776,13 @@ func (c *Context) Floor(d, x *Decimal) (Condition, error) {
 		return c.Sub(d, d, decimalOne)
 	}
 	return 0, nil
+}
+
+// exp10 returns x, 1*10^x. An error is returned if x is too large.
+func exp10(x int64) (f, exp *big.Int, err error) {
+	if x > MaxExponent || x < MinExponent {
+		return nil, nil, errors.New(errExponentOutOfRange)
+	}
+	f = big.NewInt(x)
+	return f, new(big.Int).Exp(bigTen, f, nil), nil
 }
