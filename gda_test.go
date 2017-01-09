@@ -197,6 +197,7 @@ func TestGDA(t *testing.T) {
 		"add0",
 		"base0",
 		"compare0",
+		"cuberoot-apd",
 		"divide0",
 		"divideint0",
 		"exp0",
@@ -340,6 +341,8 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 					var c int
 					c = operands[0].Cmp(operands[1])
 					d.SetCoefficient(int64(c))
+				case "cuberoot":
+					res, err = c.Cbrt(d, operands[0])
 				case "divide":
 					res, err = c.Quo(d, operands[0], operands[1])
 				case "divideint":

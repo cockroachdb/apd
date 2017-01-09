@@ -251,6 +251,92 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	return c.Round(d, z)
 }
 
+// Cbrt sets d to the cube root of x.
+func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
+	// The cube root calculation is implemented using Newton-Raphson
+	// method. We start with an initial estimate for cbrt(d), and
+	// then iterate:
+	//     x_{n+1} = 1/3 * ( 2 * x_n + (d / x_n / x_n) ).
+
+	// Validate the sign of x.
+	switch x.Coeff.Sign() {
+	case -1:
+		res := InvalidOperation
+		return res.GoError(c.Traps)
+	case 0:
+		d.Coeff.SetInt64(0)
+		d.Exponent = 0
+		return 0, nil
+	}
+
+	z := new(Decimal).Set(x)
+	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
+	ed := NewErrDecimal(nc)
+	exp8 := 0
+
+	// Follow Ken Turkowski paper:
+	// https://people.freebsd.org/~lstewart/references/apple_tr_kt32_cuberoot.pdf
+	//
+	// Computing the cube root of any number is reduced to computing
+	// the cube root of a number between 0.125 and 1. After the next loops,
+	// x = z * 8^exp8 will hold.
+	for z.Cmp(decimalOneEighth) < 0 {
+		exp8--
+		ed.Mul(z, z, decimalEight)
+	}
+
+	for z.Cmp(decimalOne) > 0 {
+		exp8++
+		ed.Mul(z, z, decimalOneEighth)
+	}
+
+	// Use this polynomial to approximate the cube root between 0.125 and 1.
+	// z = (-0.46946116 * z + 1.072302) * z + 0.3812513
+	// It will serve as an initial estimate, hence the precision of this
+	// computation may only impact performance, not correctness.
+	z0 := new(Decimal).Set(z)
+	ed.Mul(z, z, decimalCbrtC1)
+	ed.Add(z, z, decimalCbrtC2)
+	ed.Mul(z, z, z0)
+	ed.Add(z, z, decimalCbrtC3)
+
+	for ; exp8 < 0; exp8++ {
+		ed.Mul(z, z, decimalHalf)
+	}
+
+	for ; exp8 > 0; exp8-- {
+		ed.Mul(z, z, decimalTwo)
+	}
+
+	z0.Set(z)
+
+	// Loop until convergence.
+	for loop := nc.newLoop("cbrt", z, 1); ; {
+		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
+		z.Set(z0)
+		ed.Mul(z, z, z0)
+		ed.Quo(z, x, z)
+		ed.Add(z, z, z0)
+		ed.Add(z, z, z0)
+		ed.Quo(z, z, decimalThree)
+
+		if err := ed.Err(); err != nil {
+			return 0, err
+		}
+		if done, err := loop.done(z); err != nil {
+			return 0, err
+		} else if done {
+			break
+		}
+		z0.Set(z)
+	}
+
+	if err := ed.Err(); err != nil {
+		return 0, err
+	}
+	return c.Round(d, z)
+}
+
 // Ln sets d to the natural log of x.
 func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	if x.Sign() <= 0 {
