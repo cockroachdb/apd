@@ -191,34 +191,36 @@ func TestParseDecTest(t *testing.T) {
 	}
 }
 
+var GDAfiles = []string{
+	"abs0",
+	"add0",
+	"base0",
+	"compare0",
+	"cuberoot-apd",
+	"divide0",
+	"divideint0",
+	"exp0",
+	"ln0",
+	"log100",
+	"minus0",
+	"multiply0",
+	"plus0",
+	"power0",
+	"quantize0",
+	"remainder0",
+	"rounding0",
+	"squareroot0",
+	"subtract0",
+	"tointegral0",
+}
+
 func TestGDA(t *testing.T) {
-	files := []string{
-		"abs0",
-		"add0",
-		"base0",
-		"compare0",
-		"cuberoot-apd",
-		"divide0",
-		"divideint0",
-		"exp0",
-		"ln0",
-		"log100",
-		"minus0",
-		"multiply0",
-		"plus0",
-		"power0",
-		"quantize0",
-		"remainder0",
-		"rounding0",
-		"squareroot0",
-		"subtract0",
-		"tointegral0",
-	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%10s%8s%8s%8s%8s%8s%8s\n", "name", "total", "success", "fail", "ignore", "skip", "missing")
-	for _, fname := range files {
+	for _, fname := range GDAfiles {
 		succeed := t.Run(fname, func(t *testing.T) {
-			ignored, skipped, success, fail, total := gdaTest(t, fname)
+			path, tcs := readGDA(t, fname)
+			ignored, skipped, success, fail, total := gdaTest(t, path, tcs)
 			missing := total - ignored - skipped - success - fail
 			if *flagSummary {
 				fmt.Fprintf(&buf, "%10s%8d%8d%8d%8d%8d%8d\n",
@@ -244,7 +246,92 @@ func TestGDA(t *testing.T) {
 	}
 }
 
-func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
+func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condition, err error) {
+	switch tc.Operation {
+	case "abs":
+		res, err = c.Abs(d, x)
+	case "add":
+		res, err = c.Add(d, x, y)
+	case "cuberoot":
+		res, err = c.Cbrt(d, x)
+	case "divide":
+		res, err = c.Quo(d, x, y)
+	case "divideint":
+		res, err = c.QuoInteger(d, x, y)
+	case "exp":
+		res, err = c.Exp(d, x)
+	case "ln":
+		res, err = c.Ln(d, x)
+	case "log10":
+		res, err = c.Log10(d, x)
+	case "minus":
+		res, err = c.Neg(d, x)
+	case "multiply":
+		res, err = c.Mul(d, x, y)
+	case "plus":
+		res, err = c.Add(d, x, decimalZero)
+	case "power":
+		res, err = c.Pow(d, x, y)
+	case "quantize":
+		res, err = c.Quantize(d, x, y)
+	case "remainder":
+		res, err = c.Rem(d, x, y)
+	case "squareroot":
+		res, err = c.Sqrt(d, x)
+	case "subtract":
+		res, err = c.Sub(d, x, y)
+	case "tointegral":
+		res, err = c.ToIntegral(d, x)
+	default:
+		done <- fmt.Errorf("unknown operation: %s", tc.Operation)
+	}
+	return
+}
+
+func BenchmarkGDA(b *testing.B) {
+	for _, fname := range GDAfiles {
+		b.Run(fname, func(b *testing.B) {
+			_, tcs := readGDA(b, fname)
+			res := new(Decimal)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+			Loop:
+				for _, tc := range tcs {
+					b.StopTimer()
+					if GDAignore[tc.ID] || tc.Result == "?" || tc.HasNull() {
+						continue
+					}
+					operands := make([]*Decimal, 2)
+					for i, o := range tc.Operands {
+						d, err := NewFromString(o)
+						if err != nil {
+							continue Loop
+						}
+						operands[i] = d
+					}
+					mode, ok := rounders[tc.Rounding]
+					if !ok || mode == nil {
+						b.Fatalf("unsupported rounding mode %s", tc.Rounding)
+					}
+					c := &Context{
+						Precision:   uint32(tc.Precision),
+						MaxExponent: int32(tc.MaxExponent),
+						MinExponent: int32(tc.MinExponent),
+						Rounding:    mode,
+						Traps:       Subnormal | DefaultTraps,
+					}
+					b.StartTimer()
+					_, err := tc.Run(c, nil, res, operands[0], operands[1])
+					if err != nil {
+						b.Fatalf("%s: %s", tc.ID, err)
+					}
+				}
+			}
+		})
+	}
+}
+
+func readGDA(t testing.TB, name string) (string, []TestCase) {
 	path := filepath.Join(testDir, name+".decTest")
 	f, err := os.Open(path)
 	if err != nil {
@@ -255,6 +342,10 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return path, tcs
+}
+
+func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int) {
 	var lock sync.Mutex
 	var ignored, skipped, success, fail, total int
 	for _, tc := range tcs {
@@ -297,7 +388,7 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			if !ok || mode == nil {
 				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
 			}
-			operands := make([]*Decimal, len(tc.Operands))
+			operands := make([]*Decimal, 2)
 			c := &Context{
 				Precision:   uint32(tc.Precision),
 				MaxExponent: int32(tc.MaxExponent),
@@ -333,48 +424,14 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 			var err error
 			go func() {
 				switch tc.Operation {
-				case "abs":
-					res, err = c.Abs(d, operands[0])
-				case "add":
-					res, err = c.Add(d, operands[0], operands[1])
 				case "compare":
 					var c int
 					c = operands[0].Cmp(operands[1])
 					d.SetCoefficient(int64(c))
-				case "cuberoot":
-					res, err = c.Cbrt(d, operands[0])
-				case "divide":
-					res, err = c.Quo(d, operands[0], operands[1])
-				case "divideint":
-					res, err = c.QuoInteger(d, operands[0], operands[1])
-				case "exp":
-					res, err = c.Exp(d, operands[0])
-				case "ln":
-					res, err = c.Ln(d, operands[0])
-				case "log10":
-					res, err = c.Log10(d, operands[0])
-				case "minus":
-					res, err = c.Neg(d, operands[0])
-				case "multiply":
-					res, err = c.Mul(d, operands[0], operands[1])
-				case "plus":
-					res, err = c.Add(d, operands[0], decimalZero)
-				case "power":
-					res, err = c.Pow(d, operands[0], operands[1])
-				case "quantize":
-					res, err = c.Quantize(d, operands[0], operands[1])
-				case "remainder":
-					res, err = c.Rem(d, operands[0], operands[1])
-				case "squareroot":
-					res, err = c.Sqrt(d, operands[0])
-				case "subtract":
-					res, err = c.Sub(d, operands[0], operands[1])
-				case "tointegral":
-					res, err = c.ToIntegral(d, operands[0])
 				case "tosci":
 					s = operands[0].ToSci()
 				default:
-					done <- fmt.Errorf("unknown operation: %s", tc.Operation)
+					res, err = tc.Run(c, done, d, operands[0], operands[1])
 				}
 				done <- nil
 			}()
@@ -429,6 +486,9 @@ func gdaTest(t *testing.T, name string) (int, int, int, int, int) {
 
 				// Add in the operand flags.
 				res |= opres
+
+				t.Logf("want flags (%d): %s", rcond, rcond)
+				t.Logf("have flags (%d): %s", res, res)
 
 				// TODO(mjibson): after upscaling, operations need to remove the 0s added
 				// after the operation is done. Since this isn't happening, things are being
