@@ -15,7 +15,7 @@
 // +build postgres
 
 // Run a test against Postgres (or CockroachDB) servers:
-// go test -run Postgres -tags postgres -postgres 'user=postgres sslmode=disable;postgresql://root@localhost:26257?sslmode=disable'
+// go test -run Postgres -tags postgres -postgres 'user=postgres sslmode=disable;postgresql://root@localhost:26277?sslmode=disable'
 
 package apd
 
@@ -67,7 +67,9 @@ func TestPostgres(t *testing.T) {
 				defer func() { <-slots }()
 				f := Float64(rnd)
 				ds := fmt.Sprint(f)
-				q := fmt.Sprintf("SELECT ln(%s::decimal)::text;", ds)
+				y := Float64(rnd)
+				dy := fmt.Sprint(y)
+				q := fmt.Sprintf("SELECT (%s::decimal / %s::decimal)::text;", ds, dy)
 				res := make([]string, len(conns))
 				digits := make([]int64, len(conns))
 				for i, db := range conns {
@@ -80,7 +82,7 @@ func TestPostgres(t *testing.T) {
 					if err != nil {
 						errch <- errors.Errorf("%s: %s", s, err)
 					}
-					res[i] = d.String()
+					res[i] = d.ToStandard()
 					digits[i] = d.NumDigits()
 				}
 				for i, r := range res {
@@ -89,10 +91,14 @@ func TestPostgres(t *testing.T) {
 					if err != nil {
 						errch <- errors.Errorf("%s: %s", ds, err)
 					}
-					if err := c.Ln(d, d); err != nil {
+					y, err := NewFromString(dy)
+					if err != nil {
+						errch <- errors.Errorf("%s: %s", dy, err)
+					}
+					if _, err := c.Quo(d, d, y); err != nil {
 						errch <- errors.Errorf("%s: %s", d, err)
 					}
-					rs := d.String()
+					rs := d.ToStandard()
 					sd := sameDigits(rs, r)
 					info := errors.Errorf("%s\n\tdigits: %v, sd: %v\n\t%v (apd)\n\t%v (%s)\n", q, digits[i], sd, rs, r, cs[i])
 					if rs != r {
