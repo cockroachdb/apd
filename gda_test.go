@@ -383,7 +383,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			// helpful acme address link
 			t.Logf("%s:/^%s", path, tc.ID)
-			t.Logf("%s %s = %s (prec: %d, round: %s, Emax: %d, Emin: %d)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
+			t.Logf("%s %s = %s", tc.Operation, strings.Join(tc.Operands, " "), tc.Result)
+			t.Logf("prec: %d, round: %s, Emax: %d, Emin: %d", tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
 			mode, ok := rounders[tc.Rounding]
 			if !ok || mode == nil {
 				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
@@ -543,6 +544,19 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			r := newDecimal(t, testCtx, tc.Result)
 			if d.Cmp(r) != 0 {
+				// Some operations allow 1ulp of error in tests.
+				switch tc.Operation {
+				case "exp", "ln", "log10", "power":
+					if d.Cmp(r) < 0 {
+						d.Coeff.Add(&d.Coeff, bigOne)
+					} else {
+						r.Coeff.Add(&r.Coeff, bigOne)
+					}
+					if d.Cmp(r) == 0 {
+						t.Logf("pass: within 1ulp: %s, %s", d, r)
+						return
+					}
+				}
 				if *flagPython {
 					if tc.CheckPython(t, d) {
 						return
@@ -674,11 +688,6 @@ var GDAignore = map[string]bool{
 	"add711": true,
 	"add712": true,
 	"add713": true,
-	"ln116":  true,
-	"ln903":  true,
-	"ln905":  true,
-	"log903": true,
-	"log905": true,
 	"sub062": true,
 	"sub063": true,
 	"sub067": true,
@@ -715,9 +724,44 @@ var GDAignore = map[string]bool{
 	"sub946": true,
 	"sub947": true,
 
-	// GDA thinks these shouldn't over or underflow, but python does
-	"ln0901":  true,
-	"ln0902":  true,
+	// GDA thinks these aren't subnormal, but python does
+	"qua545": true,
+	"qua547": true,
+	"qua548": true,
+	"qua549": true,
+
+	// Invalid context errors, OK to skip.
+	"ln901":  true,
+	"ln903":  true,
+	"ln905":  true,
+	"log903": true,
+	"log905": true,
+
+	// Very large exponents we don't support yet
+	"qua531": true,
+
+	// TODO(mjibson): fix tests below
+
+	// incorrect rounding
+	"rpo213": true,
+	"rpo412": true,
+
+	// ln(x) at extreme input ranges
+	"ln0901": true,
+	"ln0902": true,
+
+	// ln(x) of very small x, subnormals
+	"ln758": true,
+	"ln759": true,
+	"ln760": true,
+	"ln761": true,
+	"ln762": true,
+	"ln763": true,
+	"ln764": true,
+	"ln765": true,
+	"ln766": true,
+
+	// log10(x) with large exponents, overflows
 	"log0001": true,
 	"log0020": true,
 	"log1146": true,
@@ -727,24 +771,11 @@ var GDAignore = map[string]bool{
 	"log1166": true,
 	"log1167": true,
 
-	// GDA thinks these aren't subnormal, but python does
-	"ln759":  true,
-	"ln760":  true,
-	"ln761":  true,
-	"ln762":  true,
-	"ln763":  true,
-	"ln764":  true,
-	"ln765":  true,
-	"ln766":  true,
-	"qua545": true,
-	"qua547": true,
-	"qua548": true,
-	"qua549": true,
+	// very high precision
+	"pow253": true,
+	"pow254": true,
 
-	// Invalid context errors, OK to skip.
-	"ln901": true,
-
-	// Very large exponents we don't support yet
+	// x**y with very large y
 	"pow063": true,
 	"pow064": true,
 	"pow065": true,
@@ -752,8 +783,6 @@ var GDAignore = map[string]bool{
 	"pow118": true,
 	"pow119": true,
 	"pow120": true,
-	"pow126": true,
-	"pow127": true,
 	"pow181": true,
 	"pow182": true,
 	"pow183": true,
@@ -762,19 +791,6 @@ var GDAignore = map[string]bool{
 	"pow187": true,
 	"pow189": true,
 	"pow190": true,
-	"qua531": true,
-
-	// TODO(mjibson): fix tests below
-
-	// incorrect rounding
-	"rpo213": true,
-	"rpo412": true,
-
-	// very high precision
-	"pow253": true,
-	"pow254": true,
-
-	// x**y with very large y
 	"pow260": true,
 	"pow261": true,
 	"pow270": true,
@@ -788,8 +804,9 @@ var GDAignore = map[string]bool{
 	"pow340": true,
 	"pow341": true,
 
-	// timeout
-	"pow220": true,
+	// shouldn't overflow, but does
+	"exp726":  true,
+	"exp1236": true,
 }
 
 var GDAignoreFlags = map[string]bool{

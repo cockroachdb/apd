@@ -431,3 +431,10 @@ func (d *Decimal) Neg(x *Decimal) *Decimal {
 	d.Coeff.Neg(&d.Coeff)
 	return d
 }
+
+// Abs sets d to |x| and returns d.
+func (d *Decimal) Abs(x *Decimal) *Decimal {
+	d.Set(x)
+	d.Coeff.Abs(&d.Coeff)
+	return d
+}

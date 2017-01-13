@@ -268,7 +268,7 @@ func TestQuoErr(t *testing.T) {
 		p    uint32
 		err  string
 	}{
-		{x: "1", y: "1", p: 0, err: "Quo requires a Context with > 0 Precision"},
+		{x: "1", y: "1", p: 0, err: errZeroPrecision},
 		{x: "1", y: "0", p: 1, err: "division by zero"},
 	}
 	for _, tc := range tests {
