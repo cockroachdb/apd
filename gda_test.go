@@ -499,7 +499,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				rcond &= ^Rounded
 
 				switch tc.Operation {
-				case "log10", "power", "squareroot":
+				case "log10", "power":
 					// TODO(mjibson): Under certain conditions these are exact, but we don't
 					// correctly mark them. Ignore these flags for now.
 					// squareroot sometimes marks things exact when GDA says they should be
@@ -550,7 +550,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				switch tc.Operation {
 				// TODO(mjibson): squareroot isn't supposed to allow 1ulp, but apparently
 				// our implementation has some rounding errors.
-				case "exp", "ln", "log10", "power", "squareroot":
+				case "exp", "ln", "log10", "power":
 					if d.Cmp(r) < 0 {
 						d.Coeff.Add(&d.Coeff, bigOne)
 					} else {

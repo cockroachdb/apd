@@ -307,7 +307,12 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 
 	p := uint32(3)
 	tmp := new(Decimal)
-	for maxp := c.Precision + 2; p != maxp; {
+	// The algorithm in the paper says to use c.Precision + 2. 7 instead of 2
+	// here allows all of the non-extended tests to pass without allowing 1ulp
+	// of error or ignoring the Inexact flag, similary to the Quo precision
+	// increase. This does mean that there are probably some inputs for which
+	// Sqrt is 1ulp off or will incorrectly mark things as Inexact or exact.
+	for maxp := c.Precision + 7; p != maxp; {
 		p = 2*p - 2
 		if p > maxp {
 			p = maxp
