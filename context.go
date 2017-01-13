@@ -272,11 +272,10 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 
 // Sqrt sets d to the square root of x.
 func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
-	// The square root calculation is implemented using Newton's Method.
-	// We start with an initial estimate for sqrt(d), and then iterate:
-	//     x_{n+1} = 1/2 * ( x_n + (d / x_n) ).
+	// See: Properly Rounded Variable Precision Square Root by T. E. Hull
+	// and A. Abrham (ACM Transactions on Mathematical Software, Vol 11 #3,
+	// pp229–237, ACM, September 1985)
 
-	// Validate the sign of x.
 	switch x.Coeff.Sign() {
 	case -1:
 		res := InvalidOperation
@@ -287,33 +286,68 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
-	// Use half as the initial estimate.
-	z := new(Decimal)
-	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
+	f := new(Decimal).Set(x)
+	nd := x.NumDigits()
+	e := nd + int64(x.Exponent)
+	f.Exponent = int32(-nd)
+	approx := new(Decimal)
+	nc := c.WithPrecision(c.Precision)
 	ed := NewErrDecimal(nc)
-	ed.Mul(z, x, decimalHalf)
+	if e%2 == 0 {
+		approx.SetCoefficient(819).SetExponent(-3)
+		ed.Mul(approx, approx, f)
+		ed.Add(approx, approx, New(259, -3))
+	} else {
+		f.Exponent--
+		e++
+		approx.SetCoefficient(259).SetExponent(-2)
+		ed.Mul(approx, approx, f)
+		ed.Add(approx, approx, New(819, -4))
+	}
 
-	// Iterate.
+	p := uint32(3)
 	tmp := new(Decimal)
-	for loop := nc.newLoop("sqrt", z, 1); ; {
-		ed.Quo(tmp, x, z)           // t = d / x_n
-		ed.Add(tmp, tmp, z)         // t = x_n + (d / x_n)
-		ed.Mul(z, tmp, decimalHalf) // x_{n+1} = 0.5 * t
-
-		if err := ed.Err(); err != nil {
-			return 0, err
+	for maxp := c.Precision + 2; p != maxp; {
+		p = 2*p - 2
+		if p > maxp {
+			p = maxp
 		}
-		if done, err := loop.done(z); err != nil {
-			return 0, err
-		} else if done {
-			break
+		nc.Precision = p
+		// tmp = f / approx
+		ed.Quo(tmp, f, approx)
+		// tmp = approx + f / approx
+		ed.Add(tmp, tmp, approx)
+		// approx = 0.5 * (approx + f / approx)
+		ed.Mul(approx, tmp, decimalHalf)
+	}
+	p = c.Precision
+	nc.Precision = p + 2
+	dp := int32(p)
+	approxsubhalf := new(Decimal)
+	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
+	nc.Rounding = RoundUp
+	ed.Mul(approxsubhalf, approxsubhalf, approxsubhalf)
+	if approxsubhalf.Cmp(f) > 0 {
+		ed.Sub(approx, approx, New(1, -dp))
+	} else {
+		approxaddhalf := new(Decimal)
+		ed.Add(approxaddhalf, approx, New(5, -1-dp))
+		nc.Rounding = RoundDown
+		ed.Mul(approxaddhalf, approxaddhalf, approxaddhalf)
+		if approxaddhalf.Cmp(f) < 0 {
+			ed.Add(approx, approx, New(1, -dp))
 		}
 	}
 
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
-	return c.Round(d, z)
+
+	d.Set(approx)
+	d.Exponent += int32(e / 2)
+	nc.Precision = c.Precision
+	nc.Rounding = RoundHalfEven
+	return nc.Round(d, d)
 }
 
 // Cbrt sets d to the cube root of x.
