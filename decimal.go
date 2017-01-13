@@ -425,7 +425,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	frac.Exponent = d.Exponent
 }
 
-// Neg sets d to -d and returns d.
+// Neg sets d to -x and returns d.
 func (d *Decimal) Neg(x *Decimal) *Decimal {
 	d.Set(x)
 	d.Coeff.Neg(&d.Coeff)
