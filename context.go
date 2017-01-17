@@ -115,13 +115,10 @@ func (c *Context) Neg(d, x *Decimal) (Condition, error) {
 
 // Mul sets d to the product x*y.
 func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return 0, errors.Wrap(err, "Mul")
-	}
-	d.Coeff.Mul(a, b)
-	d.Exponent = s * 2
-	return c.Round(d, d)
+	d.Coeff.Mul(&x.Coeff, &y.Coeff)
+	res := d.setExponent(c, int64(x.Exponent), int64(y.Exponent))
+	res |= c.round(d, d)
+	return res.GoError(c.Traps)
 }
 
 // Quo sets d to the quotient x/y for y != 0. c's Precision must be > 0.
