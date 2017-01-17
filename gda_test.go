@@ -668,6 +668,7 @@ print %s`
 	}
 
 	script := fmt.Sprintf(tmpl, tc.Precision, strings.ToUpper(tc.Rounding), tc.MaxExponent, tc.MinExponent, line)
+	t.Logf("python script: %s", strings.Replace(script, "\n", "; ", -1))
 	out, err := exec.Command("python", "-c", script).CombinedOutput()
 	if err != nil {
 		t.Fatalf("%s: %s", err, out)
