@@ -276,8 +276,8 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 // Sqrt sets d to the square root of x.
 func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// See: Properly Rounded Variable Precision Square Root by T. E. Hull
-	// and A. Abrham (ACM Transactions on Mathematical Software, Vol 11 #3,
-	// pp229–237, ACM, September 1985)
+	// and A. Abrham, ACM Transactions on Mathematical Software, Vol 11 #3,
+	// pp229–237, ACM, September 1985.
 
 	switch x.Coeff.Sign() {
 	case -1:
@@ -446,9 +446,9 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 
 // Ln sets d to the natural log of x.
 func (c *Context) Ln(d, x *Decimal) (Condition, error) {
-	// See: On the Use of Iteration Methods for Approximating the Natural Logarithm
-	// by James F. Epperson (The American Mathematical Monthly, Vol. 96, No. 9
-	// (Nov., 1989), pp. 831-835)
+	// See: On the Use of Iteration Methods for Approximating the Natural
+	// Logarithm, James F. Epperson, The American Mathematical Monthly, Vol. 96,
+	// No. 9, November 1989, pp. 831-835.
 
 	if x.Sign() <= 0 {
 		res := InvalidOperation
@@ -598,7 +598,8 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 
 // Exp sets d = e**x.
 func (c *Context) Exp(d, x *Decimal) (Condition, error) {
-	// See: http://dl.acm.org/citation.cfm?id=6498
+	// See: Variable Precision Exponential Function, T. E. Hull and A. Abrham, ACM
+	// Transactions on Mathematical Software, Vol 12 #2, pp79-91, ACM, June 1986.
 
 	if x.Coeff.Sign() == 0 {
 		d.Set(decimalOne)
@@ -690,9 +691,9 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 }
 
 // integerPower sets d = x**y.
-// For integers we use exponentiation by squaring.
-// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring
 func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
+	// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring.
+
 	b := new(big.Int).Set(y)
 	neg := b.Sign() < 0
 	if neg {
