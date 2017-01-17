@@ -42,10 +42,16 @@ type Context struct {
 }
 
 const (
-	defaultIgnoreTraps = Inexact | Rounded
 	// DefaultTraps is the default trap set used by BaseContext. It traps all
 	// flags except Inexact and Rounded.
-	DefaultTraps = ^Condition(0) & ^defaultIgnoreTraps
+	DefaultTraps = SystemOverflow | SystemUnderflow |
+		Overflow |
+		Underflow |
+		Subnormal |
+		DivisionUndefined |
+		DivisionByZero |
+		DivisionImpossible |
+		InvalidOperation
 
 	errZeroPrecision = "Context may not have 0 Precision for this operation"
 )
