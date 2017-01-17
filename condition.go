@@ -21,7 +21,7 @@ import (
 )
 
 // Condition holds condition flags.
-type Condition int32
+type Condition uint32
 
 const (
 	// SystemOverflow is raised when an exponent is greater than MaxExponent.
