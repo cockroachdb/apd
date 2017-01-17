@@ -39,6 +39,7 @@ var (
 	flagFailFast   = flag.Bool("fast", false, "stop work after first error; disables parallel testing")
 	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors; disables parallel testing")
 	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
+	flagTime       = flag.Duration("time", 0, "interval at which to print long-running functions; 0 disables")
 )
 
 type TestCase struct {
@@ -351,6 +352,21 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 	for _, tc := range tcs {
 		tc := tc
 		succeed := t.Run(tc.ID, func(t *testing.T) {
+			if *flagTime > 0 {
+				timeDone := make(chan struct{}, 1)
+				go func() {
+					start := time.Now()
+					for {
+						select {
+						case <-timeDone:
+							return
+						case <-time.After(*flagTime):
+							fmt.Println(tc.ID, "running for", time.Since(start))
+						}
+					}
+				}()
+				defer func() { timeDone <- struct{}{} }()
+			}
 			defer func() {
 				lock.Lock()
 				total++
