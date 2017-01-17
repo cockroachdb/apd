@@ -270,7 +270,7 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 				Coeff: *b,
 			}
 			// Ignore the Precision == 0 check by using the Rounding directly.
-			res |= nc.Rounding(nc, tmp, tmp)
+			res |= nc.Rounding.Round(nc, tmp, tmp)
 			if res.Inexact() {
 				res |= Underflow
 			}

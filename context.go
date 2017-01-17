@@ -146,6 +146,8 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	var adjust int64
 	// The result coefficient is initialized to 0.
 	quo := new(Decimal)
+	var res Condition
+	var diff int64
 	if x.Coeff.Sign() != 0 {
 		dividend := new(big.Int).Abs(&x.Coeff)
 		divisor := new(big.Int).Abs(&y.Coeff)
@@ -173,12 +175,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			adjust--
 		}
 
-		// Stage 4, as listed on the GDA site, is to save the dividend to use for
-		// rounding. Instead, we add 3 digits to the desired precision which rounding
-		// will remove. 4 was chosen because it allows all of the non-extended tests
-		// to pass, however there are probably some sets of inputs or contexts that
-		// will produce results with 1ulp of error.
-		prec := int64(c.Precision) + 4
+		prec := int64(c.Precision)
 
 		// The following steps are then repeated until the division is complete:
 		for {
@@ -193,7 +190,6 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			// If the coefficient of the dividend is now 0 and adjust is greater than
 			// or equal to 0, or if the coefficient of the result has precision digits,
 			// the division is complete.
-			// Step 4, with modifications to the precision as documented above.
 			if (dividend.Sign() == 0 && adjust >= 0) || quo.NumDigits() == prec {
 				break
 			}
@@ -204,18 +200,31 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			dividend.Mul(dividend, bigTen)
 			adjust++
 		}
+
+		// Any remainder (the final coefficient of the dividend) is recorded and
+		// taken into account for rounding.
+		if dividend.Sign() != 0 {
+			res |= Inexact | Rounded
+			dividend.Mul(dividend, bigTwo)
+			half := dividend.Cmp(divisor)
+			rounding := c.rounding()
+			if rounding(&quo.Coeff, half) {
+				roundAddOne(&quo.Coeff, &diff)
+			}
+		}
 	}
 
 	// The exponent of the result is computed by subtracting the sum of the
 	// original exponent of the divisor and the value of adjust at the end of
 	// the coefficient calculation from the original exponent of the dividend.
-	res := quo.setExponent(c, int64(x.Exponent), int64(-y.Exponent), -adjust)
+	res |= quo.setExponent(c, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 
 	// The sign of the result is the exclusive or of the signs of the operands.
 	if xn, yn := x.Sign() == -1, y.Sign() == -1; xn != yn {
 		quo.Coeff.Neg(&quo.Coeff)
 	}
-	res |= c.round(d, quo)
+
+	d.Set(quo)
 	return res.GoError(c.Traps)
 }
 
@@ -470,9 +479,8 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	}
 	p += 2
 
-	// However, we must add another 5 to make all the tests pass. Similar to
-	// the other precision adjustments, I think this means there could be some
-	// inputs that will be rounded wrong.
+	// However, we must add another 5 to make all the tests pass. I think this
+	// means there could be some inputs that will be rounded wrong.
 	p += 5
 
 	nc := c.WithPrecision(p)
@@ -842,7 +850,7 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 			nc := c.WithPrecision(uint32(p))
 			neg := d.Sign() < 0
 			// Avoid the c.Precision == 0 check.
-			res = nc.Rounding(nc, d, d)
+			res = nc.Rounding.Round(nc, d, d)
 			offset = d.Exponent - diff
 			// TODO(mjibson): There may be a bug in roundAddOne or roundFunc that
 			// unexpectedly removes a negative sign when converting from -9 to -10. This

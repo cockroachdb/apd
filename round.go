@@ -16,9 +16,8 @@ package apd
 
 import "math/big"
 
-// Round sets d to rounded x. The result is stored in d and returned. If
-// d has zero Precision, no modification of x is done. If d has no Rounding
-// specified, RoundHalfUp is used.
+// Round sets d to rounded x. If d has zero Precision, no rounding will
+// occur. If d has no Rounding specified, RoundHalfUp is used.
 func (c *Context) Round(d, x *Decimal) (Condition, error) {
 	return c.round(d, x).GoError(c.Traps)
 }
@@ -28,17 +27,70 @@ func (c *Context) round(d, x *Decimal) Condition {
 		d.Set(x)
 		return d.setExponent(c, int64(d.Exponent))
 	}
-	rounder := c.Rounding
-	if rounder == nil {
-		rounder = roundHalfUp
-	}
-	res := rounder(c, d, x)
+	rounder := c.rounding()
+	res := rounder.Round(c, d, x)
 	res |= d.setExponent(c, int64(d.Exponent))
 	return res
 }
 
-// Rounder sets d to rounded x.
-type Rounder func(c *Context, d, x *Decimal) Condition
+func (c *Context) rounding() Rounder {
+	if c.Rounding == nil {
+		return roundHalfUp
+	}
+	return c.Rounding
+}
+
+// Rounder defines a function that returns true if 1 should be added to the
+// absolute value of a number being rounded. result is the result to which
+// the 1 would be added. half is -1 if the discarded digits are < 0.5, 0 if =
+// 0.5, or 1 if > 0.5.
+type Rounder func(result *big.Int, half int) bool
+
+// Round sets d to rounded x.
+func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
+	d.Set(x)
+	nd := x.NumDigits()
+	var res Condition
+	if diff := nd - int64(c.Precision); diff > 0 {
+		if diff > MaxExponent {
+			return SystemOverflow | Overflow
+		}
+		if diff < MinExponent {
+			return SystemUnderflow | Underflow
+		}
+		res |= Rounded
+		y := big.NewInt(diff)
+		e := new(big.Int).Exp(bigTen, y, nil)
+		m := new(big.Int)
+		y.QuoRem(&d.Coeff, e, m)
+		if m.Sign() != 0 {
+			res |= Inexact
+			m.Abs(m)
+			discard := &Decimal{Coeff: *m, Exponent: int32(-diff)}
+			if r(y, discard.Cmp(decimalHalf)) {
+				roundAddOne(y, &diff)
+			}
+		}
+		d.Coeff = *y
+		res |= d.setExponent(c, int64(d.Exponent), diff)
+	}
+	return res
+}
+
+// roundAddOne adds 1 to abs(b).
+func roundAddOne(b *big.Int, diff *int64) {
+	nd := NumDigits(b)
+	if b.Sign() >= 0 {
+		b.Add(b, bigOne)
+	} else {
+		b.Sub(b, bigOne)
+	}
+	nd2 := NumDigits(b)
+	if nd2 > nd {
+		b.Quo(b, bigTen)
+		*diff++
+	}
+}
 
 var (
 	// RoundDown rounds toward 0; truncate.
@@ -61,99 +113,36 @@ var (
 	RoundUp Rounder = roundUp
 )
 
-func roundDown(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
+func roundDown(result *big.Int, half int) bool {
+	return false
+}
+
+func roundUp(result *big.Int, half int) bool {
+	return true
+}
+
+func roundHalfUp(result *big.Int, half int) bool {
+	return half >= 0
+}
+
+func roundHalfEven(result *big.Int, half int) bool {
+	if half > 0 {
+		return true
+	}
+	if half < 0 {
 		return false
-	})
-}
-
-func roundHalfUp(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
-		m.Abs(m)
-		m.Mul(m, bigTwo)
-		return m.Cmp(e) >= 0
-	})
-}
-
-func roundHalfEven(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
-		m.Abs(m)
-		m.Mul(m, bigTwo)
-		if c := m.Cmp(e); c > 0 {
-			return true
-		} else if c == 0 && y.Bit(0) == 1 {
-			return true
-		}
-		return false
-	})
-}
-
-func roundHalfDown(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
-		m.Abs(m)
-		m.Mul(m, bigTwo)
-		return m.Cmp(e) > 0
-	})
-}
-
-func roundUp(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
-		return m.Sign() != 0
-	})
-}
-
-func roundFloor(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
-		return m.Sign() != 0 && y.Sign() < 0
-	})
-}
-
-func roundCeiling(c *Context, d, x *Decimal) Condition {
-	return roundFunc(c, d, x, func(m, y, e *big.Int) bool {
-		return m.Sign() != 0 && y.Sign() >= 0
-	})
-}
-
-func roundFunc(c *Context, d, x *Decimal, f func(m, y, e *big.Int) bool) Condition {
-	d.Set(x)
-	nd := x.NumDigits()
-	var res Condition
-	if diff := nd - int64(c.Precision); diff > 0 {
-		if diff > MaxExponent {
-			return SystemOverflow | Overflow
-		}
-		if diff < MinExponent {
-			return SystemUnderflow | Underflow
-		}
-		tmp := new(Decimal).Set(x)
-		res |= Rounded
-		y := big.NewInt(diff)
-		e := new(big.Int).Exp(bigTen, y, nil)
-		m := new(big.Int)
-		y.QuoRem(&d.Coeff, e, m)
-		if f(m, y, e) {
-			roundAddOne(y, &diff)
-		}
-		d.Coeff.Set(y)
-		res |= d.setExponent(c, int64(d.Exponent), diff)
-		if d.Cmp(tmp) != 0 {
-			res |= Inexact
-		}
 	}
-	return res
+	return result.Bit(0) == 1
 }
 
-// roundAddOne adds 1 to abs(b).
-func roundAddOne(b *big.Int, diff *int64) {
-	nd := NumDigits(b)
-	if b.Sign() >= 0 {
-		b.Add(b, bigOne)
-	} else {
-		b.Sub(b, bigOne)
-	}
-	nd2 := NumDigits(b)
-	if nd2 > nd {
-		b.Quo(b, bigTen)
-		*diff++
-	}
+func roundHalfDown(result *big.Int, half int) bool {
+	return half > 0
+}
+
+func roundFloor(result *big.Int, half int) bool {
+	return result.Sign() < 0
+}
+
+func roundCeiling(result *big.Int, half int) bool {
+	return result.Sign() >= 0
 }
