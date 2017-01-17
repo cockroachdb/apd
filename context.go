@@ -779,51 +779,16 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 		return res.GoError(c.Traps)
 	}
 
-	// Exponent Precision Explanation (RaduBerinde):
-	// Say we compute the Log with a scale of k. That means that the result we
-	// get is:
-	//   ln x +/- 10^-k
-	// This leads to an error of y * 10^-k in the exponent, which leads to a
-	// multiplicative error of e^(y*10^-k) in the result. For small values of u,
-	// e^u can be approximated by 1 + u, so for large k that error is around 1
-	// + y*10^-k. So the additive error will be x^y * y * 10^-k, and we want
-	// this to be less than 10^-s. This approximately means that k has to be
-	// s + the number of digits before the decimal point in x^y (where s =
-	// d.Precision). Which roughly is
-	//   s + <the number of digits before decimal point in x> * y
-
-	x.Modf(tmp, frac)
-	// numDigits = <the number of digits before decimal point in x>
-	numDigits := tmp.NumDigits()
-
-	var ed ErrDecimal
-
-	// numDigits *= y
-	numDigits *= ed.Int64(integ)
-	// numDigits += s
-	numDigits += int64(c.Precision)
-	numDigits += 2
-	nc := BaseContext.WithPrecision(uint32(numDigits))
-
-	// maxPrecision is the largest number of decimal digits (sum of number
-	// of digits before and after the decimal point) before an Overflow flag
-	// is raised.
-	const maxPrecision = 2000
-
-	if numDigits < 0 || numDigits > maxPrecision {
-		nc.Precision = c.Precision
-		res := Overflow
-		abs := new(Decimal)
-		if _, err := nc.Abs(abs, x); err != nil {
-			return 0, errors.Wrap(err, "Abs")
-		}
-		if abs.Cmp(decimalOne) < 0 {
-			// Underflow if |x| < 1.
-			res = res.negateOverflowFlags()
-		}
-		return res.GoError(c.Traps)
+	// decNumber sets the precision to be max(x digits + exponent, c.Precision)
+	// + 4. 6 is used as the exponent digits.
+	p := c.Precision
+	if nd := uint32(x.NumDigits()) + 6; p < nd {
+		p = nd
 	}
-	ed.Ctx = nc
+	p += 4
+
+	nc := BaseContext.WithPrecision(p)
+	ed := NewErrDecimal(nc)
 
 	ed.Abs(tmp, x)
 	ed.Ln(tmp, tmp)
@@ -835,7 +800,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 
 	if err := ed.Err(); err != nil {
-		return 0, err
+		return ed.Flags, err
 	}
 	res := c.round(d, tmp)
 	if !yIsInt {

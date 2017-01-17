@@ -781,7 +781,13 @@ var GDAignore = map[string]bool{
 	"log1309": true,
 	"log1310": true,
 
+	// The Vienna case
+	"pow220": true,
+
 	// very high precision
+	"pow250": true,
+	"pow251": true,
+	"pow252": true,
 	"pow253": true,
 	"pow254": true,
 
