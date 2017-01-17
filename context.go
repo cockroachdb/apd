@@ -175,10 +175,10 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 
 		// Stage 4, as listed on the GDA site, is to save the dividend to use for
 		// rounding. Instead, we add 3 digits to the desired precision which rounding
-		// will remove. 3 was chosen because it allows all of the non-extended tests
+		// will remove. 4 was chosen because it allows all of the non-extended tests
 		// to pass, however there are probably some sets of inputs or contexts that
 		// will produce results with 1ulp of error.
-		prec := int64(c.Precision) + 3
+		prec := int64(c.Precision) + 4
 
 		// The following steps are then repeated until the division is complete:
 		for {

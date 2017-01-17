@@ -209,6 +209,7 @@ var GDAfiles = []string{
 	"power0",
 	"quantize0",
 	"randoms0",
+	"randombound320",
 	"remainder0",
 	"rounding0",
 	"squareroot0",
@@ -529,8 +530,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				res &= ^SystemOverflow
 				res &= ^SystemUnderflow
 
-				if strings.HasPrefix(tc.ID, "rpow") && (res.Overflow() || res.Underflow()) {
-					t.Skip("rpow overflow")
+				if (res.Overflow() || res.Underflow()) && (strings.HasPrefix(tc.ID, "rpow") ||
+					strings.HasPrefix(tc.ID, "powr")) {
+					t.Skip("overflow")
 				}
 
 				if rcond != res {
