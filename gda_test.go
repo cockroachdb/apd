@@ -566,7 +566,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 						return
 					}
 				}
-				t.Fatalf("unexpected: %s (%#v)", d, d)
+				t.Logf("want: %s", tc.Result)
+				t.Fatalf("got: %s (%#v)", d, d)
 			}
 		})
 		if !succeed {
