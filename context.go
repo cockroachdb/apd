@@ -449,6 +449,10 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 
 // Ln sets d to the natural log of x.
 func (c *Context) Ln(d, x *Decimal) (Condition, error) {
+	// See: On the Use of Iteration Methods for Approximating the Natural Logarithm
+	// by James F. Epperson (The American Mathematical Monthly, Vol. 96, No. 9
+	// (Nov., 1989), pp. 831-835)
+
 	if x.Sign() <= 0 {
 		res := InvalidOperation
 		return res.GoError(c.Traps)
@@ -459,75 +463,78 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
-	// Attempt to make our precision high enough so that intermediate calculations
-	// will produce enough data to have a correct output at the end. The constants
-	// here were found experimentally and are sufficient to pass many of the
-	// GDA tests, however this may still fail to produce accurate results for
-	// some inputs.
-	// TODO(mjibson): figure out an algorithm that can correctly determine this
-	// for all inputs.
+	// decNumber's decLnOp uses max(c.Precision, x.NumDigits, 7) + 2.
 	p := c.Precision
-	if p < 15 {
-		p = 15
+	if p < 7 {
+		p = 7
 	}
-	p *= 4
-	nc := BaseContext.WithPrecision(p)
-	xr := new(Decimal)
+	if nd := uint32(x.NumDigits()); p < nd {
+		p = nd
+	}
+	p += 2
 
-	fact := New(2, 0)
+	// However, we must add another 5 to make all the tests pass. Similar to
+	// the other precision adjustments, I think this means there could be some
+	// inputs that will be rounded wrong.
+	p += 5
+
+	nc := c.WithPrecision(p)
+	nc.Rounding = RoundHalfEven
 	ed := NewErrDecimal(nc)
-
-	// Use the Taylor series approximation:
-	//
-	//   r = (x - 1) / (x + 1)
-	//   ln(x) = 2 * [ r + r^3 / 3 + r^5 / 5 + ... ]
-
-	// The taylor series of ln(x) converges much faster if 0.9 < x < 1.1. We
-	// can use the logarithmic identity:
-	// log_b (sqrt(x)) = log_b (x) / 2
-	// Thus, successively square-root x until it is in that region. Keep track
-	// of how many square-rootings were done using fact and multiply at the end.
-	xr.Set(x)
-	for xr.Cmp(decimalZeroPtNine) < 0 || xr.Cmp(decimalOnePtOne) > 0 {
-		ed.Sqrt(xr, xr)
-		ed.Mul(fact, fact, decimalTwo)
-	}
-	if err := ed.Err(); err != nil {
-		return 0, err
-	}
 
 	tmp1 := new(Decimal)
 	tmp2 := new(Decimal)
-	elem := new(Decimal)
-	numerator := new(Decimal)
-	z := new(Decimal)
+	tmp3 := new(Decimal)
+	tmp4 := new(Decimal)
 
-	// tmp1 = x + 1
-	ed.Add(tmp1, xr, decimalOne)
-	// tmp2 = x - 1
-	ed.Sub(tmp2, xr, decimalOne)
-	// elem = r = (x - 1) / (x + 1)
-	ed.Quo(elem, tmp2, tmp1)
-	// z will be the result. Initialize to elem.
-	z.Set(elem)
-	numerator.Set(elem)
-	// elem = r^2 = ((x - 1) / (x + 1)) ^ 2
-	// Used since the series uses only odd powers of z.
-	ed.Mul(elem, elem, elem)
-	tmp1.Exponent = 0
-	if err := ed.Err(); err != nil {
-		return 0, err
+	z := new(Decimal).Set(x)
+
+	// Reduce input range to [1/2, 1].
+	m := new(Decimal)
+	for z.Cmp(decimalHalf) < 0 {
+		ed.Sub(m, m, decimalOne)
+		ed.Mul(z, z, decimalTwo)
 	}
-	for loop := nc.newLoop("log", z, 40); ; {
-		// tmp1 = n, the i'th odd power: 3, 5, 7, 9, etc.
-		tmp1.SetCoefficient(int64(loop.i)*2 + 3)
-		// numerator = r^n
-		ed.Mul(numerator, numerator, elem)
-		// tmp2 = r^n / n
-		ed.Quo(tmp2, numerator, tmp1)
-		// z += r^n / n
-		ed.Add(z, z, tmp2)
-		if done, err := loop.done(z); err != nil {
+	for z.Cmp(decimalOne) > 0 {
+		ed.Add(m, m, decimalOne)
+		ed.Mul(z, z, decimalHalf)
+	}
+
+	// Compute the initial estimate using the Hermite interpolation.
+
+	// tmp1 = z - 1/2
+	ed.Sub(tmp1, z, decimalHalf)
+	// tmp1 = C (z - 1/2)
+	ed.Mul(tmp1, tmp1, decimalLnHermiteC)
+	// tmp1 = B + C (z - 1/2)
+	ed.Add(tmp1, tmp1, decimalLnHermiteB)
+	// tmp2 = z - 1
+	ed.Sub(tmp2, z, decimalOne)
+	// tmp1 = (z - 1) (B + C (z - 1/2)
+	ed.Mul(tmp1, tmp1, tmp2)
+	// tmp1 = A + (z - 1) (B + C (z - 1/2))
+	ed.Add(tmp1, tmp1, decimalOne)
+	// tmp1 = (z - 1) (A + (z - 1) (B + C (z - 1/2)))
+	ed.Mul(tmp1, tmp1, tmp2)
+
+	// Use Halley's Iteration.
+	for loop := nc.newLoop("ln", x, 1); ; {
+		// tmp1 = a_n (either from initial estimate or last iteration)
+
+		// tmp2 = exp(a_n)
+		ed.Exp(tmp2, tmp1)
+		// tmp3 = exp(a_n) - z
+		ed.Sub(tmp3, tmp2, z)
+		// tmp4 = exp(a_n) + z
+		ed.Add(tmp4, tmp2, z)
+		// tmp2 = (exp(a_n) - z) / (exp(a_n) + z)
+		ed.Quo(tmp2, tmp3, tmp4)
+		// tmp2 = 2 * (exp(a_n) - z) / (exp(a_n) + z)
+		ed.Mul(tmp2, tmp2, decimalTwo)
+		// tmp2 = a_n+1 = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
+		ed.Sub(tmp2, tmp1, tmp2)
+
+		if done, err := loop.done(tmp2); err != nil {
 			return 0, err
 		} else if done {
 			break
@@ -535,16 +542,20 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		if err := ed.Err(); err != nil {
 			return 0, err
 		}
+
+		tmp1.Set(tmp2)
 	}
 
-	// Undo input range reduction.
-	ed.Mul(z, z, fact)
+	// tmp2 = m * ln(2)
+	// Disable Subnormal because decimalLog2 is so long.
+	nc.Traps ^= Subnormal
+	ed.Mul(tmp2, m, decimalLog2)
+	ed.Add(tmp1, tmp1, tmp2)
+
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
-
-	// TODO(mjibson): force RoundHalfEven here.
-	res := c.round(d, z)
+	res := c.round(d, tmp1)
 	res |= Inexact
 	return res.GoError(c.Traps)
 }
@@ -564,14 +575,23 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 	// TODO(mjibson): This is exact under some conditions.
 	res := Inexact
 
-	nc := BaseContext.WithPrecision(c.Precision + 2)
+	// decNumber's decLnOp uses max(c.Precision, x.NumDigits + t) + 3, where t
+	// is the number of digits in the exponent. However, they hardcode t to just 6.
+	p := c.Precision
+	if nd := uint32(x.NumDigits() + 6); p < nd {
+		p = nd
+	}
+	p += 3
+
+	nc := BaseContext.WithPrecision(p)
+	nc.Rounding = RoundHalfEven
 	z := new(Decimal)
 	_, err := nc.Ln(z, x)
 	if err != nil {
 		return 0, errors.Wrap(err, "ln")
 	}
-	// TODO(mjibson): force RoundHalfEven here.
-	qr, err := c.Quo(d, z, decimalLog10)
+	nc.Precision = c.Precision
+	qr, err := nc.Quo(d, z, decimalLog10)
 	if err != nil {
 		return 0, err
 	}
