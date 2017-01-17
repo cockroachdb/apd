@@ -37,7 +37,7 @@ var (
 	flagPython     = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
 	flagSummary    = flag.Bool("summary", false, "print a summary")
 	flagFailFast   = flag.Bool("fast", false, "stop work after first error; disables parallel testing")
-	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors; disables parallel testing")
+	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors")
 	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
 	flagTime       = flag.Duration("time", 0, "interval at which to print long-running functions; 0 disables")
 )
@@ -395,7 +395,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			case "toeng":
 				t.Skip("unsupported")
 			}
-			if !*flagNoParallel && !*flagFailFast && !*flagIgnore {
+			if !*flagNoParallel && !*flagFailFast {
 				t.Parallel()
 			}
 			// helpful acme address link
