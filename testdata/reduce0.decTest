@@ -1,0 +1,146 @@
+------------------------------------------------------------------------
+-- reduce0.decTest -- remove trailing zeros                           --
+-- Copyright (c) Mike Cowlishaw,  1981, 2010.  All rights reserved.   --
+-- Parts copyright (c) IBM Corporation, 1981, 2008.                   --
+------------------------------------------------------------------------
+-- Please see the document "General Decimal Arithmetic Testcases"     --
+-- at http://speleotrove.com/decimal for the description of           --
+-- these testcases.                                                   --
+--                                                                    --
+-- These testcases are experimental ('beta' versions), and they       --
+-- may contain errors.  They are offered on an as-is basis.  In       --
+-- particular, achieving the same results as the tests here is not    --
+-- a guarantee that an implementation complies with any Standard      --
+-- or specification.  The tests are not exhaustive.                   --
+--                                                                    --
+-- Please send comments, suggestions, and corrections to the author:  --
+--   Mike Cowlishaw, mfc@speleotrove.com                              --
+------------------------------------------------------------------------
+
+version: 2.62
+
+extended:    0
+precision:   9
+rounding:    half_up
+maxExponent: 999
+minexponent: -999
+
+red001 reduce '1'      -> '1'
+red002 reduce '-1'     -> '-1'
+red003 reduce '1.00'   -> '1'
+red004 reduce '-1.00'  -> '-1'
+red005 reduce '0'      -> '0'
+red006 reduce '0.00'   -> '0'
+red007 reduce '00.0'   -> '0'
+red008 reduce '00.00'  -> '0'
+red009 reduce '00'     -> '0'
+
+red010 reduce '-2'     -> '-2'
+red011 reduce '2'      -> '2'
+red012 reduce '-2.00'  -> '-2'
+red013 reduce '2.00'   -> '2'
+red014 reduce '-0'     -> '0'
+red015 reduce '-0.00'  -> '0'
+red016 reduce '-00.0'  -> '0'
+red017 reduce '-00.00' -> '0'
+red018 reduce '-00'    -> '0'
+red019 reduce '0E+5'   -> '0'
+red020 reduce '-0E+1'  -> '0'
+
+red030 reduce '+0.1'            -> '0.1'
+red031 reduce '-0.1'            -> '-0.1'
+red032 reduce '+0.01'           -> '0.01'
+red033 reduce '-0.01'           -> '-0.01'
+red034 reduce '+0.001'          -> '0.001'
+red035 reduce '-0.001'          -> '-0.001'
+red036 reduce '+0.000001'       -> '0.000001'
+red037 reduce '-0.000001'       -> '-0.000001'
+red038 reduce '+0.000000000001' -> '1E-12'
+red039 reduce '-0.000000000001' -> '-1E-12'
+
+red041 reduce 1.1        -> 1.1
+red042 reduce 1.10       -> 1.1
+red043 reduce 1.100      -> 1.1
+red044 reduce 1.110      -> 1.11
+red045 reduce -1.1       -> -1.1
+red046 reduce -1.10      -> -1.1
+red047 reduce -1.100     -> -1.1
+red048 reduce -1.110     -> -1.11
+red049 reduce 9.9        -> 9.9
+red050 reduce 9.90       -> 9.9
+red051 reduce 9.900      -> 9.9
+red052 reduce 9.990      -> 9.99
+red053 reduce -9.9       -> -9.9
+red054 reduce -9.90      -> -9.9
+red055 reduce -9.900     -> -9.9
+red056 reduce -9.990     -> -9.99
+
+-- some trailing fractional zeros with zeros in units
+red060 reduce  10.0        -> 1E+1
+red061 reduce  10.00       -> 1E+1
+red062 reduce  100.0       -> 1E+2
+red063 reduce  100.00      -> 1E+2
+red064 reduce  1.1000E+3   -> 1.1E+3
+red065 reduce  1.10000E+3  -> 1.1E+3
+red066 reduce -10.0        -> -1E+1
+red067 reduce -10.00       -> -1E+1
+red068 reduce -100.0       -> -1E+2
+red069 reduce -100.00      -> -1E+2
+red070 reduce -1.1000E+3   -> -1.1E+3
+red071 reduce -1.10000E+3  -> -1.1E+3
+
+-- some insignificant trailing zeros with positive exponent
+red080 reduce  10E+1       -> 1E+2
+red081 reduce  100E+1      -> 1E+3
+red082 reduce  1.0E+2      -> 1E+2
+red083 reduce  1.0E+3      -> 1E+3
+red084 reduce  1.1E+3      -> 1.1E+3
+red085 reduce  1.00E+3     -> 1E+3
+red086 reduce  1.10E+3     -> 1.1E+3
+red087 reduce -10E+1       -> -1E+2
+red088 reduce -100E+1      -> -1E+3
+red089 reduce -1.0E+2      -> -1E+2
+red090 reduce -1.0E+3      -> -1E+3
+red091 reduce -1.1E+3      -> -1.1E+3
+red092 reduce -1.00E+3     -> -1E+3
+red093 reduce -1.10E+3     -> -1.1E+3
+
+-- some significant trailing zeros, were we to be trimming
+red100 reduce  11          -> 11
+red101 reduce  10          -> 1E+1
+red102 reduce  10.         -> 1E+1
+red103 reduce  1.1E+1      -> 11
+red104 reduce  1.0E+1      -> 1E+1
+red105 reduce  1.10E+2     -> 1.1E+2
+red106 reduce  1.00E+2     -> 1E+2
+red107 reduce  1.100E+3    -> 1.1E+3
+red108 reduce  1.000E+3    -> 1E+3
+red109 reduce  1.000000E+6 -> 1E+6
+red110 reduce -11          -> -11
+red111 reduce -10          -> -1E+1
+red112 reduce -10.         -> -1E+1
+red113 reduce -1.1E+1      -> -11
+red114 reduce -1.0E+1      -> -1E+1
+red115 reduce -1.10E+2     -> -1.1E+2
+red116 reduce -1.00E+2     -> -1E+2
+red117 reduce -1.100E+3    -> -1.1E+3
+red118 reduce -1.000E+3    -> -1E+3
+red119 reduce -1.00000E+5  -> -1E+5
+red120 reduce -1.000000E+6 -> -1E+6
+red121 reduce -10.00000E+6 -> -1E+7
+red122 reduce -100.0000E+6 -> -1E+8
+red123 reduce -1000.000E+6 -> -1E+9
+red124 reduce -10000.00E+6 -> -1E+10
+red125 reduce -100000.0E+6 -> -1E+11
+red126 reduce -1000000.E+6 -> -1E+12
+
+-- examples from decArith
+red140 reduce '2.1'     ->  '2.1'
+red141 reduce '-2.0'    ->  '-2'
+red142 reduce '1.200'   ->  '1.2'
+red143 reduce '-120'    ->  '-1.2E+2'
+red144 reduce '120.00'  ->  '1.2E+2'
+red145 reduce '0.00'    ->  '0'
+
+-- Null test
+red900 reduce  # -> ? Invalid_operation

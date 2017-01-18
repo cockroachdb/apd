@@ -438,3 +438,28 @@ func (d *Decimal) Abs(x *Decimal) *Decimal {
 	d.Coeff.Abs(&d.Coeff)
 	return d
 }
+
+// Reduce sets d to x with all trailing zeros removed and returns d.
+func (d *Decimal) Reduce(x *Decimal) *Decimal {
+	if x.Sign() == 0 {
+		d.SetCoefficient(0)
+		d.Exponent = 0
+		return d
+	}
+	d.Set(x)
+
+	// Divide by 10 in a loop. In benchmarks this is 20% faster than converting
+	// to a string and trimming the 0s from the end.
+	z := new(big.Int).Set(&d.Coeff)
+	r := new(big.Int)
+	for {
+		z.QuoRem(&d.Coeff, bigTen, r)
+		if r.Sign() == 0 {
+			d.Coeff.Set(z)
+			d.Exponent++
+		} else {
+			break
+		}
+	}
+	return d
+}
