@@ -2,13 +2,9 @@
 
 apd is an arbitrary-precision decimal package for Go.
 
-## **WARNING**
-
-This library should not be used in production. It is under development, may change, and is not tested in a real environment.
-
 ## Documentation
 
-https://godoc.org/github.com/mjibson/apd
+https://godoc.org/github.com/cockroachdb/apd
 
 ## Goals
 
