@@ -338,7 +338,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		ed.Mul(approx, tmp, decimalHalf)
 	}
 	p = c.Precision
-	nc.Precision = p + 2
+	nc.Precision = p
 	dp := int32(p)
 	approxsubhalf := new(Decimal)
 	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
