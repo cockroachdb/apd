@@ -497,7 +497,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 						rcond |= Rounded
 					case "lost_digits":
 						// TODO(mjibson): implement this
-						//rcond |= LostDigits
 					case "clamped", "invalid_context":
 						// ignore
 

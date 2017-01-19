@@ -48,7 +48,6 @@ const (
 	DivisionImpossible
 	// InvalidOperation is raised during an invalid operation.
 	InvalidOperation
-	//LostDigits
 )
 
 // Any returns true if any flag is true.
@@ -74,9 +73,6 @@ func (r Condition) Subnormal() bool { return r&Subnormal != 0 }
 
 // Rounded returns true if the Rounded flag is set.
 func (r Condition) Rounded() bool { return r&Rounded != 0 }
-
-// LostDigits returns true if the LostDigits flag is set.
-//func (r Condition) LostDigits() bool { return r&LostDigits != 0 }
 
 // DivisionUndefined returns true if the DivisionUndefined flag is set.
 func (r Condition) DivisionUndefined() bool { return r&DivisionUndefined != 0 }
@@ -133,8 +129,6 @@ func (r Condition) String() string {
 			s = "division impossible"
 		case InvalidOperation:
 			s = "invalid operation"
-		//case LostDigits:
-		//s = "lost digits"
 		default:
 			panic(errors.Errorf("unknown condition %d", i))
 		}
