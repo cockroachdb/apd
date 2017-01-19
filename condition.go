@@ -41,6 +41,7 @@ const (
 	Rounded
 	// DivisionUndefined is raised when both division operands are 0.
 	DivisionUndefined
+	// REVIEW: s/divisior/divisor/
 	// DivisionByZero is raised when the divisior is zero.
 	DivisionByZero
 	// DivisionImpossible is raised when integer division cannot be exactly
@@ -86,6 +87,7 @@ func (r Condition) DivisionImpossible() bool { return r&DivisionImpossible != 0 
 // InvalidOperation returns true if the InvalidOperation flag is set.
 func (r Condition) InvalidOperation() bool { return r&InvalidOperation != 0 }
 
+// REVIEW: Could you define what you mean by "traps" here a bit more?
 // GoError converts r to an error based on the given traps and returns r.
 func (r Condition) GoError(traps Condition) (Condition, error) {
 	const (
@@ -100,6 +102,7 @@ func (r Condition) GoError(traps Condition) (Condition, error) {
 	return r, err
 }
 
+// REVIEW: should this return something when r == 0?
 func (r Condition) String() string {
 	var names []string
 	for i := Condition(1); r != 0; i <<= 1 {
@@ -141,6 +144,7 @@ func (r Condition) String() string {
 // equivalent Underflows.
 func (c Condition) negateOverflowFlags() Condition {
 	if c.Overflow() {
+		// REVIEW: why Subnormal? Leave a comment
 		c |= Underflow | Subnormal
 		c &= ^Overflow
 	}

@@ -35,6 +35,9 @@ type Decimal struct {
 }
 
 // New creates a new decimal with the given coefficient and exponent.
+//
+// REVIEW: I wonder if a Make function would also be useful. Ideally you wouldn't
+// always need to allocate the outer struct onto the heap.
 func New(coeff int64, exponent int32) *Decimal {
 	return &Decimal{
 		Coeff:    *big.NewInt(coeff),
@@ -42,6 +45,7 @@ func New(coeff int64, exponent int32) *Decimal {
 	}
 }
 
+// REVIEW: I don't think this is appropriately named. It's not creating anything.
 func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
@@ -56,6 +60,8 @@ func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 		exps = append(exps, -exp)
 		s = s[:i] + s[i+1:]
 	}
+	// REVIEW: It's unfortunate that we need to allocate this and then dereference it.
+	// If you created the *Decimal first and passed it in here, you could avoid that.
 	i, ok := new(big.Int).SetString(s, 10)
 	if !ok {
 		return nil, nil, errors.Errorf("parse mantissa: %s", s)
@@ -65,7 +71,10 @@ func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 
 // NewFromString creates a new decimal from s. It has no restrictions on
 // exponents or precision.
+//
+// REVIEW: Do we ever test error conditions here? I can imagine a number.
 func NewFromString(s string) (*Decimal, error) {
+	// REVIEW: why is this different from BaseContext.NewFromString(s)?
 	i, exps, err := newFromString(s)
 	if err != nil {
 		return nil, err
@@ -74,6 +83,7 @@ func NewFromString(s string) (*Decimal, error) {
 		Coeff: *i,
 	}
 	_, err = d.setExponent(&BaseContext, exps...).GoError(BaseContext.Traps)
+	// REVIEW: here and below. Should we return a non-nil *Decimal when an error is seen?
 	return d, err
 }
 
@@ -107,9 +117,17 @@ func (c *Context) NewFromString(s string) (*Decimal, Condition, error) {
 }
 
 // String is a wrapper of ToSci.
+// REVIEW: why?
+// REVIEW: Please please please support an Append(buf []byte) []byte method to avoid
+//   allocations! That was one of my biggest issues with other libraries when dealing with
+//   encoding/decoding code. In general, a major design consideration here should be making
+//   sure we have no (or minimal) allocation fast-paths for encoding/decoding. See util/encoding/decimal.go.
+// REVIEW: Do we want to support a fancy Format function like https://golang.org/src/math/big/ftoa.go?s=10338:10386#L378?
 func (d *Decimal) String() string {
 	return d.ToSci()
 }
+
+// REVIEW LIMIT FOR NOW
 
 // ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
@@ -222,6 +240,8 @@ func (d *Decimal) Float64() (float64, error) {
 }
 
 const (
+	// REVIEW: s/errExponentOutOfRange/errExponentOutOfRangeStr/ since this
+	// inst actually the error you're returning.
 	errExponentOutOfRange = "exponent out of range"
 )
 

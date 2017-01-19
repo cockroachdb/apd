@@ -22,6 +22,10 @@ import (
 )
 
 // Context maintains options for Decimal operations.
+//
+// REVIEW: can this be used concurrently? If not, we may be able to cache a few
+// temporary allocations used in different routines (e.g. dividend and divisor).
+// If so, say so.
 type Context struct {
 	// Precision is the number of places to round during rounding.
 	Precision uint32
@@ -44,6 +48,8 @@ type Context struct {
 const (
 	// DefaultTraps is the default trap set used by BaseContext. It traps all
 	// flags except Inexact and Rounded.
+	//
+	// REVIEW: nit, why two on one line here?
 	DefaultTraps = SystemOverflow | SystemUnderflow |
 		Overflow |
 		Underflow |
@@ -53,10 +59,13 @@ const (
 		DivisionImpossible |
 		InvalidOperation
 
+	// REVIEW: same error string naming questions
 	errZeroPrecision = "Context may not have 0 Precision for this operation"
 )
 
 // BaseContext is a useful default Context.
+//
+// REVIEW: comment that it should not be mutated.
 var BaseContext = Context{
 	// Disable rounding.
 	Precision: 0,
@@ -74,11 +83,15 @@ func (c *Context) WithPrecision(p uint32) *Context {
 	return &r
 }
 
+// REVIEW: this deserves a comment.
 func (c *Context) goError(flags Condition) (Condition, error) {
 	return flags.GoError(c.Traps)
 }
 
 // Add sets d to the sum x+y.
+//
+// REVIEW: do these work if d == x, d == y, x == y, or d == x == y?
+// Same question for all. Should be documented.
 func (c *Context) Add(d, x, y *Decimal) (Condition, error) {
 	a, b, s, err := upscale(x, y)
 	if err != nil {
@@ -122,7 +135,10 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 }
 
 // Quo sets d to the quotient x/y for y != 0. c's Precision must be > 0.
+// REVIEW: s/c's Precision/c.Precision/
 func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
+	// REVIEW: should we return an error for Precision < 0
+	// REVIEW: Seems like a good case for a switch statement (disjoint cases)
 	if c.Precision == 0 {
 		// 0 precision is disallowed because we compute the required number of digits
 		// during the 10**x calculation using the precision.
@@ -145,6 +161,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// An integer variable, adjust, is initialized to 0.
 	var adjust int64
 	// The result coefficient is initialized to 0.
+	// REVIEW: could we use d here to avoid an allocation if (d != nil) && (d != x) && (d != y)?
 	quo := new(Decimal)
 	var res Condition
 	var diff int64
@@ -227,6 +244,8 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	d.Set(quo)
 	return res.GoError(c.Traps)
 }
+
+// REVIEW LIMIT FOR NOW
 
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
 // cannot fit in d.Precision digits, an error is returned.
