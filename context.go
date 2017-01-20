@@ -42,8 +42,7 @@ type Context struct {
 }
 
 const (
-	// DefaultTraps is the default trap set used by BaseContext. It traps all
-	// flags except Inexact and Rounded.
+	// DefaultTraps is the default trap set used by BaseContext.
 	DefaultTraps = SystemOverflow | SystemUnderflow |
 		Overflow |
 		Underflow |

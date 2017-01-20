@@ -114,9 +114,6 @@ func (d *Decimal) String() string {
 // ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
 	s := d.Coeff.String()
-	if s == "0" {
-		return s
-	}
 	neg := d.Coeff.Sign() < 0
 	if neg {
 		s = s[1:]
@@ -241,8 +238,9 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	}
 	r := int32(sum)
 
+	nd := d.NumDigits()
 	// adj is the adjusted exponent: exponent + clength - 1
-	adj := sum + d.NumDigits() - 1
+	adj := sum + nd - 1
 	// Make sure it is less than the system limits.
 	if adj > MaxExponent {
 		return SystemOverflow | Overflow
@@ -259,23 +257,34 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 		Etiny := c.MinExponent - (int32(c.Precision) - 1)
 		// Only need to round if exponent < Etiny.
 		if r < Etiny {
-			// Round to keep any precision we can while changing the exponent to Etiny.
-			np := v - Etiny + 1
-			if np < 0 {
-				np = 0
-			}
-			nc := c.WithPrecision(uint32(np))
+			// We need to take off (r - Etiny) digits. Split up d.Coeff into integer and
+			// fractional parts and do operations similar Round. We avoid calling Round
+			// directly because it calls setExponent and modifies the result's exponent
+			// and coeff in ways that would be wrong here.
 			b := new(big.Int).Set(&d.Coeff)
 			tmp := &Decimal{
-				Coeff: *b,
+				Coeff:    *b,
+				Exponent: r - Etiny,
 			}
-			// Ignore the Precision == 0 check by using the Rounding directly.
-			res |= nc.Rounding.Round(nc, tmp, tmp)
-			if res.Inexact() {
-				res |= Underflow
+			integ, frac := new(Decimal), new(Decimal)
+			tmp.Modf(integ, frac)
+			frac.Abs(frac)
+			if c.Rounding(&integ.Coeff, frac.Cmp(decimalHalf)) {
+				if integ.Sign() >= 0 {
+					integ.Coeff.Add(&integ.Coeff, bigOne)
+				} else {
+					integ.Coeff.Sub(&integ.Coeff, bigOne)
+				}
 			}
-			d.Coeff = tmp.Coeff
+			if frac.Sign() != 0 {
+				res |= Underflow | Inexact
+				if integ.Sign() == 0 {
+					res |= Clamped
+				}
+			}
 			r = Etiny
+			d.Coeff = integ.Coeff
+			res |= Rounded
 		}
 	} else if v > c.MaxExponent {
 		res |= Overflow

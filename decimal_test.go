@@ -47,40 +47,6 @@ func newDecimal(t *testing.T, c *Context, s string) *Decimal {
 	return d
 }
 
-func TestNewFromStringContext(t *testing.T) {
-	c5 := Context{
-		Precision:   3,
-		MaxExponent: 10,
-		MinExponent: -5,
-		Rounding:    RoundHalfUp,
-	}
-	c5r := c5
-	c5r.Rounding = RoundCeiling
-	tests := []struct {
-		s string
-		c Context
-		r string
-	}{
-		{s: "1e-10", c: c5, r: "0"},
-		{s: "12e-10", c: c5, r: "0"},
-		{s: "123e-10", c: c5, r: "0"},
-		{s: "1234e-10", c: c5, r: "1E-7"},
-		{s: "1e-10", c: c5r, r: "1E-7"},
-		{s: "12e-10", c: c5r, r: "1E-7"},
-		{s: "123e-10", c: c5r, r: "1E-7"},
-		{s: "1234e-10", c: c5r, r: "2E-7"},
-	}
-	for i, tc := range tests {
-		t.Run(fmt.Sprintf("%d:%s", i, tc.s), func(t *testing.T) {
-			d, _, _ := tc.c.NewFromString(tc.s)
-			r := d.String()
-			if r != tc.r {
-				t.Fatalf("expected %s, got %s", tc.r, r)
-			}
-		})
-	}
-}
-
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal
@@ -173,7 +139,7 @@ func TestModf(t *testing.T) {
 		f string
 	}{
 		{x: "1", i: "1", f: "0"},
-		{x: "1.0", i: "1", f: "0"},
+		{x: "1.0", i: "1", f: "0.0"},
 		{x: "1.0e1", i: "10", f: "0"},
 		{x: "1.0e2", i: "1.0E+2", f: "0"},
 		{x: "1.0e-1", i: "0", f: "0.10"},
@@ -188,7 +154,7 @@ func TestModf(t *testing.T) {
 		{x: ".123456e8", i: "1.23456E+7", f: "0"},
 
 		{x: "-1", i: "-1", f: "0"},
-		{x: "-1.0", i: "-1", f: "0"},
+		{x: "-1.0", i: "-1", f: "0.0"},
 		{x: "-1.0e1", i: "-10", f: "0"},
 		{x: "-1.0e2", i: "-1.0E+2", f: "0"},
 		{x: "-1.0e-1", i: "0", f: "-0.10"},

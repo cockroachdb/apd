@@ -48,6 +48,10 @@ const (
 	DivisionImpossible
 	// InvalidOperation is raised during an invalid operation.
 	InvalidOperation
+	// Clamped is raised when the exponent of a result has been altered or
+	// constrained in order to fit the constraints of a specific concrete
+	// representation.
+	Clamped
 )
 
 // Any returns true if any flag is true.
@@ -85,6 +89,9 @@ func (r Condition) DivisionImpossible() bool { return r&DivisionImpossible != 0 
 
 // InvalidOperation returns true if the InvalidOperation flag is set.
 func (r Condition) InvalidOperation() bool { return r&InvalidOperation != 0 }
+
+// Clamped returns true if the Clamped flag is set.
+func (r Condition) Clamped() bool { return r&Clamped != 0 }
 
 // GoError converts r to an error based on the given traps and returns r.
 func (r Condition) GoError(traps Condition) (Condition, error) {
@@ -129,6 +136,8 @@ func (r Condition) String() string {
 			s = "division impossible"
 		case InvalidOperation:
 			s = "invalid operation"
+		case Clamped:
+			s = "clamped"
 		default:
 			panic(errors.Errorf("unknown condition %d", i))
 		}

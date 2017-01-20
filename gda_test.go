@@ -86,6 +86,7 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 
 	var res []TestCase
 
+Loop:
 	for scanner.Scan() {
 		text := scanner.Text()
 		line := strings.Fields(strings.ToLower(text))
@@ -143,6 +144,9 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 					tc.Operands = ops
 					line = line[i+1:]
 					break
+				}
+				if o := strings.ToLower(o); strings.Contains(o, "inf") || strings.Contains(o, "nan") {
+					continue Loop
 				}
 				o = cleanNumber(o)
 				ops = append(ops, o)
@@ -216,6 +220,9 @@ var GDAfiles = []string{
 	"squareroot0",
 	"subtract0",
 	"tointegral0",
+
+	"abs",
+	"base",
 }
 
 func TestGDA(t *testing.T) {
@@ -396,7 +403,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				t.Skip("has null")
 			}
 			switch tc.Operation {
-			case "toeng":
+			case "toeng", "apply":
 				t.Skip("unsupported")
 			}
 			if !*flagNoParallel && !*flagFailFast {
@@ -404,7 +411,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			// helpful acme address link
 			t.Logf("%s:/^%s", path, tc.ID)
-			t.Logf("%s %s = %s", tc.Operation, strings.Join(tc.Operands, " "), tc.Result)
+			t.Logf("%s %s = %s (%s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, strings.Join(tc.Conditions, " "))
 			t.Logf("prec: %d, round: %s, Emax: %d, Emin: %d", tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
 			mode, ok := rounders[tc.Rounding]
 			if !ok || mode == nil {
@@ -416,7 +423,10 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				MaxExponent: int32(tc.MaxExponent),
 				MinExponent: int32(tc.MinExponent),
 				Rounding:    mode,
-				Traps:       Subnormal | DefaultTraps,
+				Traps:       DefaultTraps,
+			}
+			if tc.Extended {
+				c.Traps &= ^(Subnormal | Underflow)
 			}
 			var res, opres Condition
 			for i, o := range tc.Operands {
@@ -426,6 +436,21 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				}
 				d, ores, err := c.NewFromString(o)
 				if err != nil {
+					switch tc.Operation {
+					case "tosci":
+						// We currently return an error instead of NaN for bad syntax.
+						if tc.Result == "NAN" {
+							return
+						}
+						// Can't do inf either, and need to support -inf.
+						if strings.Contains(tc.Result, "INFINITY") {
+							return
+						}
+						// Skip cases with exponents larger than we will parse.
+						if strings.Contains(err.Error(), "value out of range") {
+							return
+						}
+					}
 					testExponentError(t, err)
 					if tc.Result == "?" {
 						return
@@ -452,6 +477,10 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 					d.SetCoefficient(int64(c))
 				case "tosci":
 					s = operands[0].ToSci()
+					// non-extended tests don't retain exponents for 0
+					if !tc.Extended && operands[0].Sign() == 0 {
+						s = "0"
+					}
 				default:
 					res, err = tc.Run(c, done, d, operands[0], operands[1])
 				}
@@ -492,12 +521,14 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 						rcond |= DivisionImpossible
 					case "invalid_operation":
 						rcond |= InvalidOperation
-
 					case "rounded":
 						rcond |= Rounded
+					case "clamped":
+						rcond |= Clamped
+
 					case "lost_digits":
 						// TODO(mjibson): implement this
-					case "clamped", "invalid_context":
+					case "invalid_context":
 						// ignore
 
 					default:
@@ -537,6 +568,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 					t.Skip("overflow")
 				}
 
+				// Ignore Clamped on error.
+				if tc.Result == "?" {
+					rcond &= ^Clamped
+				}
+
 				if rcond != res {
 					t.Logf("got: %s (%#v)", d, d)
 					t.Logf("error: %+v", err)
@@ -567,7 +603,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			switch tc.Operation {
 			case "tosci", "toeng":
 				if s != tc.Result {
-					t.Fatalf("expected %s, got %s", tc.Result, s)
+					// Check for -0
+					r, _ := NewFromString(tc.Result)
+					if r.Sign() != 0 && s != tc.Result {
+						t.Fatalf("expected %s, got %s", tc.Result, s)
+					}
 				}
 				return
 			}
@@ -592,7 +632,10 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 					}
 				}
 				t.Logf("want: %s", tc.Result)
+				t.Logf("coeff: %s, exp: %v", d.Coeff.String(), d.Exponent)
 				t.Fatalf("got: %s (%#v)", d, d)
+			} else {
+				t.Logf("got: %s (%#v)", d, d)
 			}
 		})
 		if !succeed {
