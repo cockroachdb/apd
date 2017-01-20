@@ -575,8 +575,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			if d.Cmp(r) != 0 {
 				// Some operations allow 1ulp of error in tests.
 				switch tc.Operation {
-				// TODO(mjibson): squareroot isn't supposed to allow 1ulp, but apparently
-				// our implementation has some rounding errors.
 				case "exp", "ln", "log10", "power":
 					if d.Cmp(r) < 0 {
 						d.Coeff.Add(&d.Coeff, bigOne)
