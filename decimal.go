@@ -253,7 +253,9 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	var res Condition
 	// d is subnormal.
 	if v < c.MinExponent {
-		res |= Subnormal
+		if d.Sign() != 0 {
+			res |= Subnormal
+		}
 		Etiny := c.MinExponent - (int32(c.Precision) - 1)
 		// Only need to round if exponent < Etiny.
 		if r < Etiny {
@@ -270,7 +272,7 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 			tmp.Modf(integ, frac)
 			frac.Abs(frac)
 			if c.Rounding(&integ.Coeff, frac.Cmp(decimalHalf)) {
-				if integ.Sign() >= 0 {
+				if d.Sign() >= 0 {
 					integ.Coeff.Add(&integ.Coeff, bigOne)
 				} else {
 					integ.Coeff.Sub(&integ.Coeff, bigOne)
@@ -278,9 +280,9 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 			}
 			if frac.Sign() != 0 {
 				res |= Underflow | Inexact
-				if integ.Sign() == 0 {
-					res |= Clamped
-				}
+			}
+			if integ.Sign() == 0 {
+				res |= Clamped
 			}
 			r = Etiny
 			d.Coeff = integ.Coeff

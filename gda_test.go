@@ -223,6 +223,7 @@ var GDAfiles = []string{
 
 	"abs",
 	"base",
+	"plus",
 }
 
 func TestGDA(t *testing.T) {
