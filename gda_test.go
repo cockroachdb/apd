@@ -234,6 +234,7 @@ var GDAfiles = []string{
 	"minus",
 	"multiply",
 	"plus",
+	"remainder",
 	"rounding",
 	"subtract",
 }
