@@ -200,9 +200,12 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			adjust++
 		}
 
+		// Use the adjusted exponent to determine if we are Subnormal. If so,
+		// don't round.
+		adj := int64(x.Exponent) + int64(-y.Exponent) - adjust + quo.NumDigits() - 1
 		// Any remainder (the final coefficient of the dividend) is recorded and
 		// taken into account for rounding.
-		if dividend.Sign() != 0 {
+		if dividend.Sign() != 0 && adj >= int64(c.MinExponent) {
 			res |= Inexact | Rounded
 			dividend.Mul(dividend, bigTwo)
 			half := dividend.Cmp(divisor)
