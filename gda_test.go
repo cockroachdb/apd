@@ -89,6 +89,10 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 Loop:
 	for scanner.Scan() {
 		text := scanner.Text()
+		// TODO(mjibson): support these test cases
+		if strings.Contains(text, "#") {
+			continue
+		}
 		line := strings.Fields(strings.ToLower(text))
 		for i, t := range line {
 			if strings.HasPrefix(t, "--") {
@@ -234,6 +238,7 @@ var GDAfiles = []string{
 	"minus",
 	"multiply",
 	"plus",
+	"quantize",
 	"reduce",
 	"remainder",
 	"rounding",

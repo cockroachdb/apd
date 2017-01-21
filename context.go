@@ -826,6 +826,7 @@ func (c *Context) Quantize(d, v, x *Decimal) (Condition, error) {
 	if nd := d.NumDigits(); nd > int64(c.Precision) {
 		res |= InvalidOperation
 	}
+	res |= c.round(d, d)
 	return res.GoError(c.Traps)
 }
 
