@@ -632,7 +632,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 					}
 				}
 				t.Logf("want: %s", tc.Result)
-				t.Logf("coeff: %s, exp: %v", d.Coeff.String(), d.Exponent)
 				t.Fatalf("got: %s (%#v)", d, d)
 			} else {
 				t.Logf("got: %s (%#v)", d, d)
