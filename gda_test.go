@@ -223,6 +223,7 @@ var GDAfiles = []string{
 
 	"abs",
 	"base",
+	"minus",
 	"plus",
 }
 
