@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -78,12 +79,11 @@ func (tc TestCase) SkipPrecision() bool {
 
 func ParseDecTest(r io.Reader) ([]TestCase, error) {
 	scanner := bufio.NewScanner(r)
-
 	tc := TestCase{
 		Extended: true,
 	}
 	var err error
-
+	negZero := regexp.MustCompile(`^-0(\.0+)?(E.*)?$`)
 	var res []TestCase
 
 Loop:
@@ -155,6 +155,10 @@ Loop:
 				return nil, fmt.Errorf("bad test case line: %q", text)
 			}
 			tc.Result = strings.ToUpper(cleanNumber(line[0]))
+			// We don't currently support -0.
+			if negZero.MatchString(tc.Result) {
+				continue
+			}
 			tc.Conditions = line[1:]
 			res = append(res, tc)
 		}
@@ -222,6 +226,7 @@ var GDAfiles = []string{
 	"tointegral0",
 
 	"abs",
+	"add",
 	"base",
 	"compare",
 	"minus",
@@ -405,6 +410,14 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			if tc.HasNull() {
 				t.Skip("has null")
 			}
+			// We currently return an error instead of NaN for bad syntax.
+			if tc.Result == "NAN" {
+				t.Skip("NaN")
+			}
+			// Can't do inf either, and need to support -inf.
+			if strings.Contains(tc.Result, "INFINITY") {
+				t.Skip("Infinity")
+			}
 			switch tc.Operation {
 			case "toeng", "apply":
 				t.Skip("unsupported")
@@ -441,14 +454,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				if err != nil {
 					switch tc.Operation {
 					case "tosci":
-						// We currently return an error instead of NaN for bad syntax.
-						if tc.Result == "NAN" {
-							return
-						}
-						// Can't do inf either, and need to support -inf.
-						if strings.Contains(tc.Result, "INFINITY") {
-							return
-						}
 						// Skip cases with exponents larger than we will parse.
 						if strings.Contains(err.Error(), "value out of range") {
 							return
@@ -543,8 +548,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 					}
 				}
 
-				// Add in the operand flags.
-				res |= opres
+				switch tc.Operation {
+				case "tosci":
+					// We only care about the operand flags for the string conversion operations.
+					res |= opres
+				}
 
 				t.Logf("want flags (%d): %s", rcond, rcond)
 				t.Logf("have flags (%d): %s", res, res)
@@ -610,9 +618,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			switch tc.Operation {
 			case "tosci", "toeng":
 				if s != tc.Result {
-					// Check for -0
-					r, _ := NewFromString(tc.Result)
-					if r.Sign() != 0 && s != tc.Result {
+					if s != tc.Result {
 						t.Fatalf("expected %s, got %s", tc.Result, s)
 					}
 				}
@@ -900,6 +906,14 @@ var GDAignore = map[string]bool{
 	// shouldn't overflow, but does
 	"exp726":  true,
 	"exp1236": true,
+
+	// inexact zeros
+	"addx1633":  true,
+	"addx1634":  true,
+	"addx1638":  true,
+	"addx61633": true,
+	"addx61634": true,
+	"addx61638": true,
 }
 
 var GDAignoreFlags = map[string]bool{

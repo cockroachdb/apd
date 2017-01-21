@@ -25,11 +25,10 @@ func (c *Context) Round(d, x *Decimal) (Condition, error) {
 func (c *Context) round(d, x *Decimal) Condition {
 	if c.Precision == 0 {
 		d.Set(x)
-		return d.setExponent(c, int64(d.Exponent))
+		return d.setExponent(c, 0, int64(d.Exponent))
 	}
 	rounder := c.rounding()
 	res := rounder.Round(c, d, x)
-	res |= d.setExponent(c, int64(d.Exponent))
 	return res
 }
 
@@ -51,7 +50,18 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 	d.Set(x)
 	nd := x.NumDigits()
 	var res Condition
-	if diff := nd - int64(c.Precision); diff > 0 {
+
+	// adj is the adjusted exponent: exponent + clength - 1
+	if adj := int64(x.Exponent) + nd - 1; x.Sign() != 0 && adj < int64(c.MinExponent) {
+		// Subnormal is defined before rounding.
+		res |= Subnormal
+		// setExponent here to prevent double-rounded subnormals.
+		res |= d.setExponent(c, res, int64(d.Exponent))
+		return res
+	}
+
+	diff := nd - int64(c.Precision)
+	if diff > 0 {
 		if diff > MaxExponent {
 			return SystemOverflow | Overflow
 		}
@@ -72,8 +82,10 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			}
 		}
 		d.Coeff = *y
-		res |= d.setExponent(c, int64(d.Exponent), diff)
+	} else {
+		diff = 0
 	}
+	res |= d.setExponent(c, res, int64(d.Exponent), diff)
 	return res
 }
 

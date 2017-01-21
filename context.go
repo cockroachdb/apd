@@ -115,7 +115,7 @@ func (c *Context) Neg(d, x *Decimal) (Condition, error) {
 // Mul sets d to the product x*y.
 func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
-	res := d.setExponent(c, int64(x.Exponent), int64(y.Exponent))
+	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
 	return res.GoError(c.Traps)
 }
@@ -216,7 +216,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// The exponent of the result is computed by subtracting the sum of the
 	// original exponent of the divisor and the value of adjust at the end of
 	// the coefficient calculation from the original exponent of the dividend.
-	res |= quo.setExponent(c, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
+	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 
 	// The sign of the result is the exclusive or of the signs of the operands.
 	if xn, yn := x.Sign() == -1, y.Sign() == -1; xn != yn {

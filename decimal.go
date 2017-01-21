@@ -73,7 +73,7 @@ func NewFromString(s string) (*Decimal, error) {
 	d := &Decimal{
 		Coeff: *i,
 	}
-	_, err = d.setExponent(&BaseContext, exps...).GoError(BaseContext.Traps)
+	_, err = d.setExponent(&BaseContext, 0, exps...).GoError(BaseContext.Traps)
 	return d, err
 }
 
@@ -85,7 +85,7 @@ func (d *Decimal) SetString(s string) (*Decimal, error) {
 		return d, err
 	}
 	d.Coeff = *i
-	_, err = d.setExponent(&BaseContext, exps...).GoError(BaseContext.Traps)
+	_, err = d.setExponent(&BaseContext, 0, exps...).GoError(BaseContext.Traps)
 	return d, err
 }
 
@@ -100,7 +100,7 @@ func (c *Context) NewFromString(s string) (*Decimal, Condition, error) {
 	d := &Decimal{
 		Coeff: *i,
 	}
-	res := d.setExponent(c, exps...)
+	res := d.setExponent(c, 0, exps...)
 	res |= c.round(d, d)
 	_, err = res.GoError(c.Traps)
 	return d, res, err
@@ -224,8 +224,10 @@ const (
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
 // of xs must fit within an int32. An error occurs if the sum is outside of
-// the MaxExponent or MinExponent range.
-func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
+// the MaxExponent or MinExponent range. res is any Condition previously set
+// for this operation, which can cause Underflow to be set if, for example,
+// Inexact is already set.
+func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition {
 	var sum int64
 	for _, x := range xs {
 		if x > MaxExponent {
@@ -250,7 +252,6 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	}
 	v := int32(adj)
 
-	var res Condition
 	// d is subnormal.
 	if v < c.MinExponent {
 		if d.Sign() != 0 {
@@ -271,15 +272,15 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 			integ, frac := new(Decimal), new(Decimal)
 			tmp.Modf(integ, frac)
 			frac.Abs(frac)
-			if c.Rounding(&integ.Coeff, frac.Cmp(decimalHalf)) {
-				if d.Sign() >= 0 {
-					integ.Coeff.Add(&integ.Coeff, bigOne)
-				} else {
-					integ.Coeff.Sub(&integ.Coeff, bigOne)
-				}
-			}
 			if frac.Sign() != 0 {
-				res |= Underflow | Inexact
+				res |= Inexact
+				if c.Rounding(&integ.Coeff, frac.Cmp(decimalHalf)) {
+					if d.Sign() >= 0 {
+						integ.Coeff.Add(&integ.Coeff, bigOne)
+					} else {
+						integ.Coeff.Sub(&integ.Coeff, bigOne)
+					}
+				}
 			}
 			if integ.Sign() == 0 {
 				res |= Clamped
@@ -290,6 +291,10 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 		}
 	} else if v > c.MaxExponent {
 		res |= Overflow
+	}
+
+	if res.Inexact() && res.Subnormal() {
+		res |= Underflow
 	}
 
 	d.Exponent = r
