@@ -17,9 +17,10 @@ package apd
 import "math/big"
 
 var (
-	bigOne = big.NewInt(1)
-	bigTwo = big.NewInt(2)
-	bigTen = big.NewInt(10)
+	bigOne  = big.NewInt(1)
+	bigTwo  = big.NewInt(2)
+	bigFive = big.NewInt(5)
+	bigTen  = big.NewInt(10)
 
 	decimalZero       = New(0, 0)
 	decimalOneEighth  = New(125, -3)

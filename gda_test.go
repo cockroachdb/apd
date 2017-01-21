@@ -233,6 +233,7 @@ var GDAfiles = []string{
 	"minus",
 	"multiply",
 	"plus",
+	"rounding",
 	"subtract",
 }
 
@@ -673,6 +674,7 @@ var rounders = map[string]Rounder{
 	"half_even": RoundHalfEven,
 	"half_up":   RoundHalfUp,
 	"up":        RoundUp,
+	"05up":      Round05Up,
 }
 
 // CheckPython returns true if python outputs d for this test case. It prints

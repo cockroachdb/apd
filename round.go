@@ -123,6 +123,9 @@ var (
 	RoundHalfDown Rounder = roundHalfDown
 	// RoundUp rounds away from 0.
 	RoundUp Rounder = roundUp
+	// Round05Up rounds zero or five away from 0; same as round-up, except that
+	// rounding up only occurs if the digit to be rounded up is 0 or 5.
+	Round05Up Rounder = round05Up
 )
 
 func roundDown(result *big.Int, half int) bool {
@@ -131,6 +134,16 @@ func roundDown(result *big.Int, half int) bool {
 
 func roundUp(result *big.Int, half int) bool {
 	return true
+}
+
+func round05Up(result *big.Int, half int) bool {
+	z := new(big.Int)
+	z.Rem(result, bigFive)
+	if z.Sign() == 0 {
+		return true
+	}
+	z.Rem(result, bigTen)
+	return z.Sign() == 0
 }
 
 func roundHalfUp(result *big.Int, half int) bool {
