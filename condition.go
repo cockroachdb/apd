@@ -41,7 +41,7 @@ const (
 	Rounded
 	// DivisionUndefined is raised when both division operands are 0.
 	DivisionUndefined
-	// DivisionByZero is raised when the divisior is zero.
+	// DivisionByZero is raised when the divisor is zero.
 	DivisionByZero
 	// DivisionImpossible is raised when integer division cannot be exactly
 	// represented with the given precision.
@@ -93,14 +93,16 @@ func (r Condition) InvalidOperation() bool { return r&InvalidOperation != 0 }
 // Clamped returns true if the Clamped flag is set.
 func (r Condition) Clamped() bool { return r&Clamped != 0 }
 
-// GoError converts r to an error based on the given traps and returns r.
+// GoError converts r to an error based on the given traps and returns
+// r. Traps are the conditions which will trigger an error result if the
+// corresponding Flag condition occurred.
 func (r Condition) GoError(traps Condition) (Condition, error) {
 	const (
 		systemErrors = SystemOverflow | SystemUnderflow
 	)
 	var err error
 	if r&systemErrors != 0 {
-		err = errors.New(errExponentOutOfRange)
+		err = errors.New(errExponentOutOfRangeStr)
 	} else if t := r & traps; t != 0 {
 		err = errors.New(t.String())
 	}
@@ -150,6 +152,7 @@ func (r Condition) String() string {
 // equivalent Underflows.
 func (c Condition) negateOverflowFlags() Condition {
 	if c.Overflow() {
+		// Underflow always also means Subnormal. See GDA definition.
 		c |= Underflow | Subnormal
 		c &= ^Overflow
 	}

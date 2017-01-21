@@ -33,7 +33,7 @@ func testExponentError(t *testing.T, err error) {
 	if err == nil {
 		return
 	}
-	if err.Error() == errExponentOutOfRange {
+	if err.Error() == errExponentOutOfRangeStr {
 		t.Skip(err)
 	}
 }
@@ -234,7 +234,7 @@ func TestQuoErr(t *testing.T) {
 		p    uint32
 		err  string
 	}{
-		{x: "1", y: "1", p: 0, err: errZeroPrecision},
+		{x: "1", y: "1", p: 0, err: errZeroPrecisionStr},
 		{x: "1", y: "0", p: 1, err: "division by zero"},
 	}
 	for _, tc := range tests {
@@ -373,7 +373,7 @@ func TestToStandard(t *testing.T) {
 
 	for c, r := range tests {
 		t.Run(c, func(t *testing.T) {
-			d, err := NewFromString(c)
+			d, _, err := NewFromString(c)
 			if err != nil {
 				t.Fatal(err)
 			}

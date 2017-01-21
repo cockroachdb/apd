@@ -340,7 +340,7 @@ func BenchmarkGDA(b *testing.B) {
 					}
 					operands := make([]*Decimal, 2)
 					for i, o := range tc.Operands {
-						d, err := NewFromString(o)
+						d, _, err := NewFromString(o)
 						if err != nil {
 							continue Loop
 						}

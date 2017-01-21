@@ -38,7 +38,7 @@ func (e *ErrDecimal) Err() error {
 		return e.err
 	}
 	if e.Ctx != nil {
-		_, err := e.Flags.GoError(e.Ctx.Traps)
+		_, err := e.Ctx.goError(e.Flags)
 		return err
 	}
 	return nil

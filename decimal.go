@@ -42,11 +42,12 @@ func New(coeff int64, exponent int32) *Decimal {
 	}
 }
 
-func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
+func (d *Decimal) setString(c *Context, s string) (Condition, error) {
+	var exps []int64
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
+			return 0, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
 		exps = append(exps, exp)
 		s = s[:i]
@@ -56,36 +57,22 @@ func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 		exps = append(exps, -exp)
 		s = s[:i] + s[i+1:]
 	}
-	i, ok := new(big.Int).SetString(s, 10)
-	if !ok {
-		return nil, nil, errors.Errorf("parse mantissa: %s", s)
+	if _, ok := d.Coeff.SetString(s, 10); !ok {
+		return 0, errors.Errorf("parse mantissa: %s", s)
 	}
-	return i, exps, nil
+	return c.goError(d.setExponent(c, 0, exps...))
 }
 
 // NewFromString creates a new decimal from s. It has no restrictions on
 // exponents or precision.
-func NewFromString(s string) (*Decimal, error) {
-	i, exps, err := newFromString(s)
-	if err != nil {
-		return nil, err
-	}
-	d := &Decimal{
-		Coeff: *i,
-	}
-	_, err = d.setExponent(&BaseContext, 0, exps...).GoError(BaseContext.Traps)
-	return d, err
+func NewFromString(s string) (*Decimal, Condition, error) {
+	return BaseContext.NewFromString(s)
 }
 
 // SetString set's d to s and returns d. It has no restrictions on exponents
 // or precision.
 func (d *Decimal) SetString(s string) (*Decimal, error) {
-	i, exps, err := newFromString(s)
-	if err != nil {
-		return d, err
-	}
-	d.Coeff = *i
-	_, err = d.setExponent(&BaseContext, 0, exps...).GoError(BaseContext.Traps)
+	_, err := d.setString(&BaseContext, s)
 	return d, err
 }
 
@@ -93,16 +80,13 @@ func (d *Decimal) SetString(s string) (*Decimal, error) {
 // exponents restricted by the context and its value rounded if it contains more
 // digits than the context's precision.
 func (c *Context) NewFromString(s string) (*Decimal, Condition, error) {
-	i, exps, err := newFromString(s)
+	d := new(Decimal)
+	res, err := d.setString(c, s)
 	if err != nil {
 		return nil, 0, err
 	}
-	d := &Decimal{
-		Coeff: *i,
-	}
-	res := d.setExponent(c, 0, exps...)
 	res |= c.round(d, d)
-	_, err = res.GoError(c.Traps)
+	_, err = c.goError(res)
 	return d, res, err
 }
 
@@ -164,6 +148,9 @@ func (d *Decimal) ToStandard() string {
 
 // Set sets d's Coefficient and Exponent from x and returns d.
 func (d *Decimal) Set(x *Decimal) *Decimal {
+	if d == x {
+		return d
+	}
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
 	return d
@@ -219,7 +206,7 @@ func (d *Decimal) Float64() (float64, error) {
 }
 
 const (
-	errExponentOutOfRange = "exponent out of range"
+	errExponentOutOfRangeStr = "exponent out of range"
 )
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
@@ -336,7 +323,7 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
 	if s > MaxExponent {
-		return nil, nil, 0, errors.New(errExponentOutOfRange)
+		return nil, nil, 0, errors.New(errExponentOutOfRangeStr)
 	}
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)
