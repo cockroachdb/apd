@@ -290,7 +290,12 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			res |= Rounded
 		}
 	} else if v > c.MaxExponent {
-		res |= Overflow
+		if d.Sign() == 0 {
+			res |= Clamped
+			r = c.MaxExponent
+		} else {
+			res |= Overflow
+		}
 	}
 
 	if res.Inexact() && res.Subnormal() {
