@@ -243,6 +243,8 @@ var GDAfiles = []string{
 	"remainder",
 	"rounding",
 	"subtract",
+	"tointegral",
+	"tointegralx",
 }
 
 func TestGDA(t *testing.T) {
@@ -315,6 +317,8 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 		res, err = c.Sub(d, x, y)
 	case "tointegral":
 		res, err = c.ToIntegral(d, x)
+	case "tointegralx":
+		res, err = c.ToIntegralX(d, x)
 	default:
 		done <- fmt.Errorf("unknown operation: %s", tc.Operation)
 	}

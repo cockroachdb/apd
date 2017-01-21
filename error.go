@@ -168,3 +168,8 @@ func (e *ErrDecimal) Sub(d, x, y *Decimal) *Decimal {
 func (e *ErrDecimal) ToIntegral(d, x *Decimal) *Decimal {
 	return e.op2(d, x, e.Ctx.ToIntegral)
 }
+
+// ToIntegralX performs e.Ctx.ToIntegralX(d, x) and returns d.
+func (e *ErrDecimal) ToIntegralX(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.ToIntegralX)
+}
