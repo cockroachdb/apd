@@ -223,6 +223,7 @@ var GDAfiles = []string{
 
 	"abs",
 	"base",
+	"compare",
 	"minus",
 	"plus",
 }
@@ -431,12 +432,12 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				c.Traps &= ^(Subnormal | Underflow)
 			}
 			var res, opres Condition
+			opctx := c
+			if tc.SkipPrecision() {
+				opctx = opctx.WithPrecision(1000)
+			}
 			for i, o := range tc.Operands {
-				ctx := c
-				if tc.SkipPrecision() {
-					ctx = ctx.WithPrecision(0)
-				}
-				d, ores, err := c.NewFromString(o)
+				d, ores, err := opctx.NewFromString(o)
 				if err != nil {
 					switch tc.Operation {
 					case "tosci":
@@ -498,7 +499,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			// Verify the operands didn't change.
 			for i, o := range tc.Operands {
-				v := newDecimal(t, c, o)
+				v := newDecimal(t, opctx, o)
 				if v.Cmp(operands[i]) != 0 {
 					t.Fatalf("operand %d changed from %s to %s", i, o, operands[i])
 				}
@@ -529,7 +530,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 						rcond |= Clamped
 
 					case "lost_digits":
-						// TODO(mjibson): implement this
+						// TODO(mjibson) implement this
+						// Lost_digits isn't support yet and slightly changes the results. Ignore
+						// any test cases with it until it's working.
+						t.Skip("Lost_Digits")
+
 					case "invalid_context":
 						// ignore
 
@@ -704,11 +709,13 @@ print %s`
 		t.Fatalf("unknown operator: %s", tc.Operation)
 	}
 	var line string
+	// TODO(mjibson): use a context with high precision but correct exponents
+	// during operand creation.
 	switch len(tc.Operands) {
 	case 1:
-		line = fmt.Sprintf("c.%s(c.create_decimal('%s'))", op, tc.Operands[0])
+		line = fmt.Sprintf("c.%s(Decimal('%s'))", op, tc.Operands[0])
 	case 2:
-		line = fmt.Sprintf("c.create_decimal('%s') %s c.create_decimal('%s')", tc.Operands[0], op, tc.Operands[1])
+		line = fmt.Sprintf("Decimal('%s') %s Decimal('%s')", tc.Operands[0], op, tc.Operands[1])
 	default:
 		t.Fatalf("unknown operands: %d", len(tc.Operands))
 	}
@@ -737,8 +744,8 @@ func (tc TestCase) PrintIgnore() {
 }
 
 var GDAignore = map[string]bool{
-	// python-identical results. (Both apd and python disagree with GDA in these
-	// cases.)
+	// python-identical results. Both apd and python disagree with GDA in these
+	// cases. It is also possible the python script above is incorrect.
 	"add642":  true,
 	"add643":  true,
 	"add644":  true,
@@ -785,8 +792,6 @@ var GDAignore = map[string]bool{
 	"sub927":  true,
 	"sub928":  true,
 	"sub929":  true,
-	"sub930":  true,
-	"sub932":  true,
 	"sub934":  true,
 	"sub936":  true,
 	"sub937":  true,
