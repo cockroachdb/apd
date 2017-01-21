@@ -234,6 +234,7 @@ var GDAfiles = []string{
 	"minus",
 	"multiply",
 	"plus",
+	"reduce",
 	"remainder",
 	"rounding",
 	"subtract",
@@ -300,7 +301,7 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	case "quantize":
 		res, err = c.Quantize(d, x, y)
 	case "reduce":
-		d.Reduce(x)
+		res, err = c.Reduce(d, x)
 	case "remainder":
 		res, err = c.Rem(d, x, y)
 	case "squareroot":

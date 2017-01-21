@@ -899,6 +899,12 @@ func (c *Context) Floor(d, x *Decimal) (Condition, error) {
 	return 0, nil
 }
 
+// Reduce sets d to x with all trailing zeros removed.
+func (c *Context) Reduce(d, x *Decimal) (Condition, error) {
+	d.Reduce(x)
+	return c.Round(d, d)
+}
+
 // exp10 returns x, 1*10^x. An error is returned if x is too large.
 func exp10(x int64) (f, exp *big.Int, err error) {
 	if x > MaxExponent || x < MinExponent {

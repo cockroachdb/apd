@@ -139,6 +139,11 @@ func (e *ErrDecimal) QuoInteger(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.QuoInteger)
 }
 
+// Reduce performs e.Ctx.Reduce(d, x) and returns d.
+func (e *ErrDecimal) Reduce(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.Reduce)
+}
+
 // Rem performs e.Ctx.Rem(d, x, y) and returns d.
 func (e *ErrDecimal) Rem(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Rem)
