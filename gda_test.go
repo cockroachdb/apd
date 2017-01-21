@@ -230,6 +230,7 @@ var GDAfiles = []string{
 	"base",
 	"compare",
 	"divide",
+	"divideint",
 	"minus",
 	"multiply",
 	"plus",
