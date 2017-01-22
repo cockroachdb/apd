@@ -80,6 +80,10 @@ func (c *Context) goError(flags Condition) (Condition, error) {
 	return flags.GoError(c.Traps)
 }
 
+func (c *Context) Etiny() int32 {
+	return c.MinExponent - int32(c.Precision) + 1
+}
+
 // Add sets d to the sum x+y.
 func (c *Context) Add(d, x, y *Decimal) (Condition, error) {
 	a, b, s, err := upscale(x, y)
@@ -637,6 +641,11 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 		res |= Overflow
 		if x.Sign() < 0 {
 			res = res.negateOverflowFlags()
+			res |= Clamped
+			d.Coeff.SetInt64(0)
+			d.Exponent = c.Etiny()
+		} else {
+			// TODO(mjibson): set Infinity here when supported.
 		}
 		return c.goError(res)
 	}

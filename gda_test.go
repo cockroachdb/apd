@@ -235,6 +235,7 @@ var GDAfiles = []string{
 	"compare",
 	"divide",
 	"divideint",
+	"exp",
 	"minus",
 	"multiply",
 	"plus",
@@ -605,6 +606,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				// Ignore Clamped on error.
 				if tc.Result == "?" {
 					rcond &= ^Clamped
+					res &= ^Clamped
 				}
 
 				if rcond != res {
@@ -645,6 +647,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			r := newDecimal(t, testCtx, tc.Result)
 			if d.Cmp(r) != 0 {
+				t.Logf("want: %s", tc.Result)
+				t.Logf("got: %s (%#v)", d, d)
 				// Some operations allow 1ulp of error in tests.
 				switch tc.Operation {
 				case "exp", "ln", "log10", "power":
@@ -663,8 +667,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 						return
 					}
 				}
-				t.Logf("want: %s", tc.Result)
-				t.Fatalf("got: %s (%#v)", d, d)
+				t.Fatalf("unexpected result")
 			} else {
 				t.Logf("got: %s (%#v)", d, d)
 			}
@@ -924,8 +927,43 @@ var GDAignore = map[string]bool{
 	"pow341": true,
 
 	// shouldn't overflow, but does
-	"exp726":  true,
-	"exp1236": true,
+	"exp1236":  true,
+	"exp726":   true,
+	"expx055":  true,
+	"expx056":  true,
+	"expx057":  true,
+	"expx058":  true,
+	"expx059":  true,
+	"expx1236": true,
+	"expx709":  true,
+	"expx711":  true,
+	"expx722":  true,
+	"expx724":  true,
+	"expx726":  true,
+	"expx732":  true,
+	"expx733":  true,
+	"expx736":  true,
+	"expx737":  true,
+	"expx758":  true,
+	"expx759":  true,
+	"expx760":  true,
+	"expx761":  true,
+	"expx762":  true,
+	"expx763":  true,
+	"expx764":  true,
+	"expx765":  true,
+	"expx766":  true,
+	"expx769":  true,
+	"expx770":  true,
+	"expx771":  true,
+
+	// exceeds system overflow
+	"expx291": true,
+	"expx292": true,
+	"expx293": true,
+	"expx294": true,
+	"expx295": true,
+	"expx296": true,
 
 	// inexact zeros
 	"addx1633":  true,
