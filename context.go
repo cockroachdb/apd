@@ -309,12 +309,22 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
+	// Use same precision as in decNumber.
+	workp := c.Precision + 1
+	if nd := uint32(x.NumDigits()); workp < nd {
+		workp = nd
+	}
+	if workp < 7 {
+		workp = 7
+	}
+
 	f := new(Decimal).Set(x)
 	nd := x.NumDigits()
 	e := nd + int64(x.Exponent)
 	f.Exponent = int32(-nd)
 	approx := new(Decimal)
-	nc := c.WithPrecision(c.Precision)
+	nc := c.WithPrecision(workp)
+	nc.Rounding = RoundHalfEven
 	ed := MakeErrDecimal(nc)
 	if e%2 == 0 {
 		approx.SetCoefficient(819).SetExponent(-3)
@@ -330,12 +340,11 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 
 	p := uint32(3)
 	tmp := new(Decimal)
-	// The algorithm in the paper says to use c.Precision + 2. 7 instead of 2
-	// here allows all of the non-extended tests to pass without allowing 1ulp
-	// of error or ignoring the Inexact flag, similarly to the Quo precision
-	// increase. This does mean that there are probably some inputs for which
-	// Sqrt is 1ulp off or will incorrectly mark things as Inexact or exact.
-	for maxp := c.Precision + 7; p != maxp; {
+
+	// The algorithm in the paper says to use c.Precision + 2. decNumber uses
+	// workp + 2. But we use workp + 5 to make the tests pass. This means it is
+	// possible there are inputs we don't compute correctly and could be 1ulp off.
+	for maxp := workp + 5; p != maxp; {
 		p = 2*p - 2
 		if p > maxp {
 			p = maxp
@@ -348,13 +357,14 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	nc.Precision = c.Precision
+	nc.Precision = workp + 1
 	dp := int32(c.Precision)
 	approxsubhalf := new(Decimal)
 	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
 	nc.Rounding = RoundUp
 	ed.Mul(approxsubhalf, approxsubhalf, approxsubhalf)
 	if approxsubhalf.Cmp(f) > 0 {
+		// TODO(mjibson): this branch is never taken in tests, why? Can it be removed?
 		ed.Sub(approx, approx, New(1, -dp))
 	} else {
 		approxaddhalf := new(Decimal)
@@ -374,6 +384,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	d.Exponent += int32(e / 2)
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
+	d.Reduce(d) // Remove trailing zeros.
 	return nc.Round(d, d)
 }
 
