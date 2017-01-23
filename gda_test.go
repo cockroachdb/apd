@@ -243,6 +243,7 @@ var GDAfiles = []string{
 	"plus",
 	"power",
 	"quantize",
+	"randoms",
 	"reduce",
 	"remainder",
 	"rounding",
