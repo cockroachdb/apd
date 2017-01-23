@@ -563,7 +563,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	// tmp2 = m * ln(2)
 	// Disable Subnormal because decimalLog2 is so long.
-	nc.Traps ^= Subnormal
+	nc.Traps &= ^Subnormal
 	ed.Mul(tmp2, m, decimalLog2)
 	ed.Add(tmp1, tmp1, tmp2)
 
