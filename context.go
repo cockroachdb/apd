@@ -647,6 +647,8 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	cp := int64(c.Precision)
 	tmp1 := new(Decimal).Abs(x)
 	tmp2 := New(cp*23, 0)
+	// TODO(mjibson): figure out why the paper has this number and attempt to
+	// increase or remove this limit. Many tests fail because of this.
 	// if abs(x) > 23*currentprecision; assert false
 	if tmp1.Cmp(tmp2) > 0 {
 		res |= Overflow
