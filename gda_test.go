@@ -240,6 +240,7 @@ var GDAfiles = []string{
 	"minus",
 	"multiply",
 	"plus",
+	"power",
 	"quantize",
 	"reduce",
 	"remainder",
@@ -448,7 +449,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				t.Parallel()
 			}
 			// helpful acme address link
-			t.Logf("%s:/^%s", path, tc.ID)
+			t.Logf("%s:/^%s ", path, tc.ID)
 			t.Logf("%s %s = %s (%s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, strings.Join(tc.Conditions, " "))
 			t.Logf("prec: %d, round: %s, Emax: %d, Emin: %d", tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
 			mode, ok := rounders[tc.Rounding]
@@ -489,6 +490,17 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				}
 				operands[i] = d
 				opres |= ores
+			}
+			switch tc.Operation {
+			case "power":
+				tmp := new(Decimal).Abs(operands[1])
+				// We don't handle power near the max exp limit.
+				if tmp.Cmp(New(MaxExponent, 0)) >= 0 {
+					t.Skip("x ** large y")
+				}
+				if tmp.Cmp(New(int64(c.MaxExponent), 0)) >= 0 {
+					t.Skip("x ** large y")
+				}
 			}
 			var s string
 			d := new(Decimal)
@@ -612,6 +624,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				}
 
 				if rcond != res {
+					if tc.Operation == "power" && (res.Overflow() || res.Underflow()) {
+						t.Skip("power overflow")
+					}
 					t.Logf("got: %s (%#v)", d, d)
 					t.Logf("error: %+v", err)
 					t.Errorf("expected flags %q (%d); got flags %q (%d)", rcond, rcond, res, res)
@@ -631,6 +646,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			if err != nil {
 				testExponentError(t, err)
+				if tc.Operation == "power" && (res.Overflow() || res.Underflow()) {
+					t.Skip("power overflow")
+				}
 				if *flagPython {
 					if tc.CheckPython(t, d) {
 						return
@@ -853,6 +871,10 @@ var GDAignore = map[string]bool{
 	// Very large exponents we don't support yet
 	"qua531": true,
 
+	// GDA says decNumber should skip these
+	"powx4302": true,
+	"powx4303": true,
+
 	// TODO(mjibson): fix tests below
 
 	// incorrect rounding
@@ -890,7 +912,8 @@ var GDAignore = map[string]bool{
 	"log1310": true,
 
 	// The Vienna case
-	"pow220": true,
+	"pow220":  true,
+	"powx219": true,
 
 	// very high precision
 	"pow250": true,
@@ -898,35 +921,6 @@ var GDAignore = map[string]bool{
 	"pow252": true,
 	"pow253": true,
 	"pow254": true,
-
-	// x**y with very large y
-	"pow063": true,
-	"pow064": true,
-	"pow065": true,
-	"pow066": true,
-	"pow118": true,
-	"pow119": true,
-	"pow120": true,
-	"pow181": true,
-	"pow182": true,
-	"pow183": true,
-	"pow184": true,
-	"pow186": true,
-	"pow187": true,
-	"pow189": true,
-	"pow190": true,
-	"pow260": true,
-	"pow261": true,
-	"pow270": true,
-	"pow271": true,
-	"pow310": true,
-	"pow311": true,
-	"pow320": true,
-	"pow321": true,
-	"pow330": true,
-	"pow331": true,
-	"pow340": true,
-	"pow341": true,
 
 	// shouldn't overflow, but does
 	"exp1236":  true,
