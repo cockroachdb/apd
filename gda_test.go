@@ -27,7 +27,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -36,7 +35,6 @@ const testDir = "testdata"
 
 var (
 	flagPython     = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
-	flagSummary    = flag.Bool("summary", false, "print a summary")
 	flagFailFast   = flag.Bool("fast", false, "stop work after first error; disables parallel testing")
 	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors")
 	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
@@ -259,29 +257,11 @@ func TestGDA(t *testing.T) {
 	for _, fname := range GDAfiles {
 		succeed := t.Run(fname, func(t *testing.T) {
 			path, tcs := readGDA(t, fname)
-			ignored, skipped, success, fail, total := gdaTest(t, path, tcs)
-			missing := total - ignored - skipped - success - fail
-			if *flagSummary {
-				fmt.Fprintf(&buf, "%10s%8d%8d%8d%8d%8d%8d\n",
-					fname,
-					total,
-					success,
-					fail,
-					ignored,
-					skipped,
-					missing,
-				)
-				if missing != 0 {
-					t.Fatalf("unaccounted summary result: missing: %d, total: %d, %d, %d, %d", missing, total, ignored, skipped, success)
-				}
-			}
+			gdaTest(t, path, tcs)
 		})
 		if !succeed && *flagFailFast {
 			break
 		}
-	}
-	if *flagSummary {
-		fmt.Print(buf.String())
 	}
 }
 
@@ -391,9 +371,7 @@ func readGDA(t testing.TB, name string) (string, []TestCase) {
 	return path, tcs
 }
 
-func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int) {
-	var lock sync.Mutex
-	var ignored, skipped, success, fail, total int
+func gdaTest(t *testing.T, path string, tcs []TestCase) {
 	for _, tc := range tcs {
 		tc := tc
 		succeed := t.Run(tc.ID, func(t *testing.T) {
@@ -413,21 +391,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				defer func() { timeDone <- struct{}{} }()
 			}
 			defer func() {
-				lock.Lock()
-				total++
-				if GDAignore[tc.ID] {
-					ignored++
-				} else if t.Skipped() {
-					skipped++
-				} else if t.Failed() {
-					fail++
+				if t.Failed() {
 					if *flagIgnore {
 						tc.PrintIgnore()
 					}
-				} else {
-					success++
 				}
-				lock.Unlock()
 			}()
 			if GDAignore[tc.ID] {
 				t.Skip("ignored")
@@ -698,12 +666,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			if *flagFailFast {
 				break
 			}
-		} else {
-			success++
 		}
 	}
-	success -= ignored + skipped
-	return ignored, skipped, success, fail, total
 }
 
 var rounders = map[string]Rounder{
