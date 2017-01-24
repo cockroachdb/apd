@@ -203,30 +203,6 @@ func TestParseDecTest(t *testing.T) {
 }
 
 var GDAfiles = []string{
-	"abs0",
-	"add0",
-	"base0",
-	"compare0",
-	"cuberoot-apd",
-	"divide0",
-	"divideint0",
-	"exp0",
-	"ln0",
-	"log100",
-	"minus0",
-	"multiply0",
-	"plus0",
-	"power0",
-	"quantize0",
-	"randoms0",
-	"randombound320",
-	"reduce0",
-	"remainder0",
-	"rounding0",
-	"squareroot0",
-	"subtract0",
-	"tointegral0",
-
 	"abs",
 	"add",
 	"base",
@@ -538,12 +514,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 					case "clamped":
 						rcond |= Clamped
 
-					case "lost_digits":
-						// TODO(mjibson) implement this
-						// Lost_digits isn't support yet and slightly changes the results. Ignore
-						// any test cases with it until it's working.
-						t.Skip("Lost_Digits")
-
 					case "invalid_context":
 						// ignore
 
@@ -759,117 +729,13 @@ func (tc TestCase) PrintIgnore() {
 }
 
 var GDAignore = map[string]bool{
-	// python-identical results. Both apd and python disagree with GDA in these
-	// cases. It is also possible the python script above is incorrect.
-	"add642":  true,
-	"add643":  true,
-	"add644":  true,
-	"add651":  true,
-	"add652":  true,
-	"add653":  true,
-	"add662":  true,
-	"add663":  true,
-	"add664":  true,
-	"add671":  true,
-	"add672":  true,
-	"add673":  true,
-	"add682":  true,
-	"add683":  true,
-	"add684":  true,
-	"add691":  true,
-	"add692":  true,
-	"add693":  true,
-	"add702":  true,
-	"add703":  true,
-	"add704":  true,
-	"add711":  true,
-	"add712":  true,
-	"add713":  true,
-	"radd163": true,
-	"radd449": true,
-	"sub062":  true,
-	"sub063":  true,
-	"sub067":  true,
-	"sub068":  true,
-	"sub080":  true,
-	"sub142":  true,
-	"sub143":  true,
-	"sub332":  true,
-	"sub333":  true,
-	"sub342":  true,
-	"sub343":  true,
-	"sub363":  true,
-	"sub910":  true,
-	"sub911":  true,
-	"sub922":  true,
-	"sub923":  true,
-	"sub926":  true,
-	"sub927":  true,
-	"sub928":  true,
-	"sub929":  true,
-	"sub934":  true,
-	"sub936":  true,
-	"sub937":  true,
-	"sub938":  true,
-	"sub939":  true,
-	"sub940":  true,
-	"sub941":  true,
-	"sub942":  true,
-	"sub943":  true,
-	"sub944":  true,
-	"sub945":  true,
-	"sub946":  true,
-	"sub947":  true,
-
-	// GDA thinks these aren't subnormal, but python does
-	"qua545": true,
-	"qua547": true,
-	"qua548": true,
-	"qua549": true,
-
-	// Invalid context errors, OK to skip.
-	"ln901":  true,
-	"ln903":  true,
-	"ln905":  true,
-	"log903": true,
-	"log905": true,
-
-	// Very large exponents we don't support yet
-	"qua531": true,
-
 	// GDA says decNumber should skip these
 	"powx4302": true,
 	"powx4303": true,
 
 	// TODO(mjibson): fix tests below
 
-	// incorrect rounding
-	"rpo213": true,
-	"rpo412": true,
-
-	// ln(x) at extreme input ranges
-	"ln0901": true,
-	"ln0902": true,
-
-	// ln(x) of very small x, subnormals
-	"ln759": true,
-	"ln760": true,
-	"ln761": true,
-	"ln762": true,
-	"ln763": true,
-	"ln764": true,
-	"ln765": true,
-	"ln766": true,
-
 	// log10(x) with large exponents, overflows
-	"log0001":  true,
-	"log0020":  true,
-	"log1146":  true,
-	"log1147":  true,
-	"log1156":  true,
-	"log1157":  true,
-	"log1166":  true,
-	"log1167":  true,
 	"logx0020": true,
 	"logx1146": true,
 	"logx1147": true,
@@ -880,27 +746,14 @@ var GDAignore = map[string]bool{
 
 	// log10(x) where x is 1.0 +/- some tiny epsilon. Our results are close but
 	// differ in the last places.
-	"log1304":  true,
-	"log1309":  true,
-	"log1310":  true,
 	"logx1304": true,
 	"logx1309": true,
 	"logx1310": true,
 
 	// The Vienna case
-	"pow220":  true,
 	"powx219": true,
 
-	// very high precision
-	"pow250": true,
-	"pow251": true,
-	"pow252": true,
-	"pow253": true,
-	"pow254": true,
-
 	// shouldn't overflow, but does
-	"exp1236":  true,
-	"exp726":   true,
 	"expx055":  true,
 	"expx056":  true,
 	"expx057":  true,
@@ -1033,13 +886,6 @@ var GDAignore = map[string]bool{
 }
 
 var GDAignoreFlags = map[string]bool{
-	// unflagged overflow
-	"exp705": true,
-
-	// unflagged underflow
-	"exp755": true,
-	"exp760": true,
-
 	// unflagged clamped
 	"sqtx9024": true,
 	"sqtx9025": true,
