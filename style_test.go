@@ -27,6 +27,8 @@ import (
 	"github.com/ghemawat/stream"
 )
 
+// REVIEW: for now I'm not going to review this.
+
 var (
 	flagStyle = flag.Bool("style", false, "enable style test")
 )

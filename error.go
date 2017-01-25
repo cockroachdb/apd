@@ -24,6 +24,9 @@ func NewErrDecimal(c *Context) *ErrDecimal {
 // ErrDecimal performs operations on decimals and collects errors during
 // operations. If an error is already set, the operation is skipped. Designed to
 // be used for many operations in a row, with a single error check at the end.
+// REVIEW: I dont love this name as it's kind of misleading. ErrDecimal sounds like
+// an error I could get from decimals. Is there a name that better expresses what
+// this type will be used for?
 type ErrDecimal struct {
 	err error
 	Ctx *Context
@@ -38,6 +41,8 @@ func (e *ErrDecimal) Err() error {
 		return e.err
 	}
 	if e.Ctx != nil {
+		// REVIEW: do we want to save this as e.err so that we dont need to
+		// call e.Flags.GoError every time?
 		_, err := e.Flags.GoError(e.Ctx.Traps)
 		return err
 	}
@@ -65,6 +70,7 @@ func (e *ErrDecimal) op3(d, x, y *Decimal, f func(a, b, c *Decimal) (Condition, 
 }
 
 // Abs performs e.Ctx.Abs(d, x) and returns d.
+// REVIEW: I'd just like to add that I really appreciate the alphabetical ordering here.
 func (e *ErrDecimal) Abs(d, x *Decimal) *Decimal {
 	return e.op2(d, x, e.Ctx.Abs)
 }

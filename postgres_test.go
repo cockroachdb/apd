@@ -39,6 +39,8 @@ var (
 	flagPostgres = flag.String("postgres", "postgres://postgres@localhost?sslmode=disable", "Postgres connection strings; specify multiple with semicolons")
 )
 
+// REVIEW: for now I'm not going to review this.
+
 func TestPostgres(t *testing.T) {
 	var seed int64
 	err := binary.Read(crand.Reader, binary.LittleEndian, &seed)

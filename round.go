@@ -18,6 +18,7 @@ import "math/big"
 
 // Round sets d to rounded x. If d has zero Precision, no rounding will
 // occur. If d has no Rounding specified, RoundHalfUp is used.
+// REVIEW: does d have a Precision or a Rounding, or does c?
 func (c *Context) Round(d, x *Decimal) (Condition, error) {
 	return c.round(d, x).GoError(c.Traps)
 }
@@ -66,6 +67,7 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 		if m.Sign() != 0 {
 			res |= Inexact
 			m.Abs(m)
+			// REVIEW: use NewWithBigInt (which we should have).
 			discard := &Decimal{Coeff: *m, Exponent: int32(-diff)}
 			if r(y, discard.Cmp(decimalHalf)) {
 				roundAddOne(y, &diff)
@@ -79,6 +81,7 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 
 // roundAddOne adds 1 to abs(b).
 func roundAddOne(b *big.Int, diff *int64) {
+	// REVIEW: any way we can avoid calling this twice?
 	nd := NumDigits(b)
 	if b.Sign() >= 0 {
 		b.Add(b, bigOne)
@@ -92,6 +95,7 @@ func roundAddOne(b *big.Int, diff *int64) {
 	}
 }
 
+// REVIEW: all of these should be tested.
 var (
 	// RoundDown rounds toward 0; truncate.
 	RoundDown Rounder = roundDown

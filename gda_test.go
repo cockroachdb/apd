@@ -42,6 +42,8 @@ var (
 	flagTime       = flag.Duration("time", 0, "interval at which to print long-running functions; 0 disables")
 )
 
+// REVIEW: for now I'm not going to review this.
+
 type TestCase struct {
 	Precision                int
 	MaxExponent, MinExponent int

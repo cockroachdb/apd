@@ -25,10 +25,12 @@ var (
 	testCtx = &BaseContext
 )
 
+// REVIEW: we dont want this in general?
 func (d *Decimal) GoString() string {
 	return fmt.Sprintf(`{Coeff: %s, Exponent: %d}`, d.Coeff.String(), d.Exponent)
 }
 
+// REVIEW: comment on why we need this please.
 func testExponentError(t *testing.T, err error) {
 	if err == nil {
 		return

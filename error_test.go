@@ -18,6 +18,7 @@ import "testing"
 
 // Appease the unused test.
 // TODO(mjibson): actually test all the ErrDecimal methods.
+// REVIEW: ^^^ what he said.
 func TestErrDecimal(t *testing.T) {
 	ed := NewErrDecimal(testCtx)
 	a := New(1, 0)
@@ -32,6 +33,7 @@ func TestErrDecimal(t *testing.T) {
 	ed.Round(a, a)
 }
 
+// REVIEW: this is testing something more specific than "NewErrDecimal", right?
 func TestNewErrDecimal(t *testing.T) {
 	c := &Context{
 		Precision:   5,
