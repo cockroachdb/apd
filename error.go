@@ -15,6 +15,13 @@
 package apd
 
 // NewErrDecimal creates a ErrDecimal with given context.
+// REVIEW: ErrDecimal always seems to be used for a series of operations
+// in a single scope. From a conceptual standpoint then, I'd think we would
+// want to return a value here and not a reference so that the ErrDecimal
+// looks like it lives on the stack where its operations are performed. Again,
+// I dont think this will actually have an effect on runtime behavior because all
+// receivers would still be pointers.
+// Would require s/NewErrDecimal/MakeErrDecimal/
 func NewErrDecimal(c *Context) *ErrDecimal {
 	return &ErrDecimal{
 		Ctx: c,

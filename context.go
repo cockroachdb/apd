@@ -70,6 +70,8 @@ var BaseContext = Context{
 	// Disable rounding.
 	Precision: 0,
 	// MaxExponent and MinExponent are set to the packages's limits.
+	// REVIEW: I'm happy that this assignment forces Go's type system to verify that
+	// both MaxExponent and MinExponent fit in int32s.
 	MaxExponent: MaxExponent,
 	MinExponent: MinExponent,
 	// Default error conditions.
@@ -245,8 +247,6 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	return res.GoError(c.Traps)
 }
 
-// REVIEW LIMIT FOR NOW
-
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
 // cannot fit in d.Precision digits, an error is returned.
 func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
@@ -309,6 +309,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 
 	switch x.Coeff.Sign() {
 	case -1:
+		// REVIEW: no plans to support complex numbers? what a shame.
 		res := InvalidOperation
 		return res.GoError(c.Traps)
 	case 0:
@@ -340,6 +341,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	tmp := new(Decimal)
 	// The algorithm in the paper says to use c.Precision + 2. 7 instead of 2
 	// here allows all of the non-extended tests to pass without allowing 1ulp
+	// REVIEW: s/similary/similarly
 	// of error or ignoring the Inexact flag, similary to the Quo precision
 	// increase. This does mean that there are probably some inputs for which
 	// Sqrt is 1ulp off or will incorrectly mark things as Inexact or exact.
@@ -356,6 +358,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
+	// REVIEW: I'll take your word for it...
 	p = c.Precision
 	nc.Precision = p
 	dp := int32(p)
@@ -387,6 +390,15 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 }
 
 // Cbrt sets d to the cube root of x.
+// REVIEW: reviewing these arithmetic operations properly would take a day each:
+// 1. read paper,
+// 2. understand code
+// 3. verify it's correct
+// 4. verify that it's as efficient as possible
+// 5. verify that it has proper test coverage that checks all edge cases.
+//
+// I wonder if it would be best to delegate out this responsibility (e.g.
+// one person per operation).
 func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	// The cube root calculation is implemented using Newton-Raphson
 	// method. We start with an initial estimate for cbrt(d), and
@@ -921,6 +933,7 @@ func exp10(x int64) (f, exp *big.Int, err error) {
 	if x > MaxExponent || x < MinExponent {
 		return nil, nil, errors.New(errExponentOutOfRange)
 	}
+	// REVIEW: another use case for the table.
 	f = big.NewInt(x)
 	return f, new(big.Int).Exp(bigTen, f, nil), nil
 }

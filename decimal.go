@@ -127,19 +127,23 @@ func (d *Decimal) String() string {
 	return d.ToSci()
 }
 
-// REVIEW LIMIT FOR NOW
-
 // ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
 	s := d.Coeff.String()
 	if s == "0" {
+		// REVIEW: 0 never needs to display a certain number of significant figures?
 		return s
 	}
+	// REVIEW: it would probably be more efficient to do something like:
+	// prefix := ""
+	// if d.Coeff.Sign() < 0 { prefix = "-" }
+	// and then return prefix + ... below everywhere. Not a big deal though.
 	neg := d.Coeff.Sign() < 0
 	if neg {
 		s = s[1:]
 	}
 	adj := int(d.Exponent) + (len(s) - 1)
+	// REVIEW: where is this -6 coming from? I'd move it to a well-named constant
 	if d.Exponent <= 0 && adj >= -6 {
 		if d.Exponent < 0 {
 			if left := -int(d.Exponent) - len(s); left > 0 {
@@ -192,6 +196,7 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 
 // SetCoefficient sets d's Coefficient value to x and returns d. The Exponent
 // is not changed.
+// REVIEW: do you think we'll ever want a SetCoefficient(*big.Int) method?
 func (d *Decimal) SetCoefficient(x int64) *Decimal {
 	d.Coeff.SetInt64(x)
 	return d
@@ -205,6 +210,9 @@ func (d *Decimal) SetExponent(x int32) *Decimal {
 
 // SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
 // hold the exact value of f.
+// REVIEW: should we add checking in here for NaN and ±Inf before calling
+// SetString? I'm guessing that would barf at this point. Maybe not once you
+// add support for NaN and ±Inf in this library though.
 func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
 	return d.SetString(strconv.FormatFloat(f, 'E', -1, 64))
 }
@@ -241,7 +249,7 @@ func (d *Decimal) Float64() (float64, error) {
 
 const (
 	// REVIEW: s/errExponentOutOfRange/errExponentOutOfRangeStr/ since this
-	// inst actually the error you're returning.
+	// isn't actually the error you're returning.
 	errExponentOutOfRange = "exponent out of range"
 )
 
@@ -251,6 +259,9 @@ const (
 func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	var sum int64
 	for _, x := range xs {
+		// REVIEW: It might be worth pulling out this logic (following 6 lines) into
+		// a helper because it's used in multiple places. Something like
+		// `checkOverflow(int64) (Condition, bool)` or `checkOverflow(int64) Condition`
 		if x > MaxExponent {
 			return SystemOverflow | Overflow
 		}
@@ -261,6 +272,7 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	}
 	r := int32(sum)
 
+	// REVIEW: clength? coefficient length?
 	// adj is the adjusted exponent: exponent + clength - 1
 	adj := sum + d.NumDigits() - 1
 	// Make sure it is less than the system limits.
@@ -276,6 +288,7 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 	// d is subnormal.
 	if v < c.MinExponent {
 		res |= Subnormal
+		// REVIEW: why is Etiny capital?
 		Etiny := c.MinExponent - (int32(c.Precision) - 1)
 		// Only need to round if exponent < Etiny.
 		if r < Etiny {
@@ -286,6 +299,14 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 			}
 			nc := c.WithPrecision(uint32(np))
 			b := new(big.Int).Set(&d.Coeff)
+			// REVIEW: another place where NewWithBig or MakeWithBig could be used.
+			//
+			// REVIEW: I know Go will almost certainly move it to the heap anyway, but
+			// for clarity and in case Go's escape analysis ever improves, I'd prefer
+			// tmp := Decimal{... (use case for the Make constructor)
+			// ...
+			// res |= nc.Rounding.Round(nc, &tmp, &tmp)
+			// This comment applies here and to a number of places in this library.
 			tmp := &Decimal{
 				Coeff: *b,
 			}
@@ -301,10 +322,12 @@ func (d *Decimal) setExponent(c *Context, xs ...int64) Condition {
 		res |= Overflow
 	}
 
+	// REVIEW: do we make any promises about the receiver's state in cases of overflows?
 	d.Exponent = r
 	return res
 }
 
+// REVIEW: it would be nice for these to live near the definition of Decimal.
 const (
 	// TODO(mjibson): MaxExponent is set because both upscale and Round
 	// perform a calculation of 10^x, where x is an exponent. This is done by
@@ -319,6 +342,8 @@ const (
 	MinExponent = -MaxExponent
 )
 
+// REVIEW: this doesnt really make sense. it converts them, then *returns* them
+// with this scaling.
 // upscale converts a and b to big.Ints with the same scaling, and their
 // scaling. An error can be produced if the resulting scale factor is out
 // of range.
@@ -334,9 +359,15 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	s := int64(a.Exponent) - int64(b.Exponent)
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
+	// REVIEW: won't this throw an error when a.Exponent == MaxExponent and
+	// b.Exponent == MinExponent?
 	if s > MaxExponent {
 		return nil, nil, 0, errors.New(errExponentOutOfRange)
 	}
+	// REVIEW: this would be a good use for the pow10LookupTable, but it doesn't
+	// look like you brought that over.
+	// REVIEW: I'd suggest you swap the names x and y so that x corresponds to a
+	// and y corresponds to b. This looks confusing right now.
 	y := big.NewInt(s)
 	e := new(big.Int).Exp(bigTen, y, nil)
 	y.Mul(&a.Coeff, e)
@@ -366,6 +397,8 @@ func (d *Decimal) Cmp(x *Decimal) int {
 	}
 
 	// Next compare adjusted exponents.
+	// REVIEW: any way to avoid the call to NumDigits? I'd expect Cmp to be
+	// relatively quick, but NumDigits is a relatively heavyweight function.
 	dn := d.NumDigits() + int64(d.Exponent)
 	xn := x.NumDigits() + int64(x.Exponent)
 	if dn < xn {
@@ -394,6 +427,7 @@ func (d *Decimal) Cmp(x *Decimal) int {
 	if diff < 0 {
 		diff = -diff
 	}
+	// REVIEW: again, use case for pow10LookupTable.
 	y := big.NewInt(diff)
 	e := new(big.Int).Exp(bigTen, y, nil)
 	db := new(big.Int).Set(&d.Coeff)
@@ -460,6 +494,8 @@ func (d *Decimal) Abs(x *Decimal) *Decimal {
 }
 
 // Reduce sets d to x with all trailing zeros removed and returns d.
+// REVIEW: is this an appropriate name for this method? Do other libraries
+// call this Reduce?
 func (d *Decimal) Reduce(x *Decimal) *Decimal {
 	if x.Sign() == 0 {
 		d.SetCoefficient(0)
@@ -470,6 +506,7 @@ func (d *Decimal) Reduce(x *Decimal) *Decimal {
 
 	// Divide by 10 in a loop. In benchmarks this is 20% faster than converting
 	// to a string and trimming the 0s from the end.
+	// REVIEW: for what set of inputs?
 	z := new(big.Int).Set(&d.Coeff)
 	r := new(big.Int)
 	for {
