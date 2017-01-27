@@ -42,6 +42,14 @@ func New(coeff int64, exponent int32) *Decimal {
 	}
 }
 
+// NewWithBigInt creates a new decimal with the given coefficient and exponent.
+func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
+	return &Decimal{
+		Coeff:    *coeff,
+		Exponent: exponent,
+	}
+}
+
 func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 	var exps []int64
 	if i := strings.IndexAny(s, "eE"); i >= 0 {

@@ -32,7 +32,9 @@ func TestErrDecimal(t *testing.T) {
 	ed.Round(a, a)
 }
 
-func TestNewErrDecimal(t *testing.T) {
+// TestNewErrDecimalWithPrecision tests that WithPrecision generates a copy
+// and not a reference.
+func TestNewErrDecimalWithPrecision(t *testing.T) {
 	c := &Context{
 		Precision:   5,
 		MaxExponent: 2,

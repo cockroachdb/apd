@@ -38,8 +38,8 @@ func (e *ErrDecimal) Err() error {
 		return e.err
 	}
 	if e.Ctx != nil {
-		_, err := e.Ctx.goError(e.Flags)
-		return err
+		_, e.err = e.Ctx.goError(e.Flags)
+		return e.err
 	}
 	return nil
 }

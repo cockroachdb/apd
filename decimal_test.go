@@ -29,6 +29,10 @@ func (d *Decimal) GoString() string {
 	return fmt.Sprintf(`{Coeff: %s, Exponent: %d}`, d.Coeff.String(), d.Exponent)
 }
 
+// testExponentError skips t if err was caused by an exponent being outside
+// of the package's supported exponent range. Since the exponent is so large,
+// we don't support those tests yet (i.e., it's an expected failure, so we
+// skip it).
 func testExponentError(t *testing.T, err error) {
 	if err == nil {
 		return
