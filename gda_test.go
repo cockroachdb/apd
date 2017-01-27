@@ -325,6 +325,9 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	return
 }
 
+// BenchmarkGDA benchmarks a GDA test. It should not be used without specifying
+// a sub-benchmark to run. For example:
+// go test -run XX -bench GDA/squareroot
 func BenchmarkGDA(b *testing.B) {
 	for _, fname := range GDAfiles {
 		b.Run(fname, func(b *testing.B) {

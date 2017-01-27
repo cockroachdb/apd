@@ -14,9 +14,9 @@
 
 package apd
 
-// NewErrDecimal creates a ErrDecimal with given context.
-func NewErrDecimal(c *Context) *ErrDecimal {
-	return &ErrDecimal{
+// MakeErrDecimal creates a ErrDecimal with given context.
+func MakeErrDecimal(c *Context) ErrDecimal {
+	return ErrDecimal{
 		Ctx: c,
 	}
 }

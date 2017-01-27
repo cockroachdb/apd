@@ -34,6 +34,20 @@ type Decimal struct {
 	Exponent int32
 }
 
+const (
+	// TODO(mjibson): MaxExponent is set because both upscale and Round
+	// perform a calculation of 10^x, where x is an exponent. This is done by
+	// big.Int.Exp. This restriction could be lifted if better algorithms were
+	// determined during upscale and Round that don't need to perform Exp.
+
+	// MaxExponent is the highest exponent supported. Exponents near this range will
+	// perform very slowly (many seconds per operation).
+	MaxExponent = 100000
+	// MinExponent is the lowest exponent supported with the same limitations as
+	// MaxExponent.
+	MinExponent = -MaxExponent
+)
+
 // New creates a new decimal with the given coefficient and exponent.
 func New(coeff int64, exponent int32) *Decimal {
 	return &Decimal{
@@ -105,13 +119,17 @@ func (d *Decimal) String() string {
 
 // ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
+	// See: http://speleotrove.com/decimal/daconvs.html#reftostr
+	const adjExponentLimit = -6
+
 	s := d.Coeff.String()
-	neg := d.Coeff.Sign() < 0
-	if neg {
+	prefix := ""
+	if d.Coeff.Sign() < 0 {
+		prefix = "-"
 		s = s[1:]
 	}
 	adj := int(d.Exponent) + (len(s) - 1)
-	if d.Exponent <= 0 && adj >= -6 {
+	if d.Exponent <= 0 && adj >= adjExponentLimit {
 		if d.Exponent < 0 {
 			if left := -int(d.Exponent) - len(s); left > 0 {
 				s = "0." + strings.Repeat("0", left) + s
@@ -129,10 +147,7 @@ func (d *Decimal) ToSci() string {
 		}
 		s = fmt.Sprintf("%s%sE%+d", s[:1], dot, adj)
 	}
-	if neg {
-		s = "-" + s
-	}
-	return s
+	return prefix + s
 }
 
 // ToStandard converts d to a standard notation string (i.e., no exponent
@@ -301,23 +316,9 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 	return res
 }
 
-const (
-	// TODO(mjibson): MaxExponent is set because both upscale and Round
-	// perform a calculation of 10^x, where x is an exponent. This is done by
-	// big.Int.Exp. This restriction could be lifted if better algorithms were
-	// determined during upscale and Round that don't need to perform Exp.
-
-	// MaxExponent is the highest exponent supported. Exponents near this range will
-	// perform very slowly (many seconds per operation).
-	MaxExponent = 100000
-	// MinExponent is the lowest exponent supported with the same limitations as
-	// MaxExponent.
-	MinExponent = -MaxExponent
-)
-
-// upscale converts a and b to big.Ints with the same scaling, and their
-// scaling. An error can be produced if the resulting scale factor is out
-// of range.
+// upscale converts a and b to big.Ints with the same scaling. It returns
+// them with this scaling, along with the scaling. An error can be produced
+// if the resulting scale factor is out of range.
 func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	if a.Exponent == b.Exponent {
 		return &a.Coeff, &b.Coeff, a.Exponent, nil
@@ -333,14 +334,15 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	if s > MaxExponent {
 		return nil, nil, 0, errors.New(errExponentOutOfRangeStr)
 	}
-	y := big.NewInt(s)
-	e := new(big.Int).Exp(bigTen, y, nil)
-	y.Mul(&a.Coeff, e)
-	x := &b.Coeff
+	x := big.NewInt(s)
+	// TODO(mjibson): use a table here.
+	e := new(big.Int).Exp(bigTen, x, nil)
+	x.Mul(&a.Coeff, e)
+	y := &b.Coeff
 	if swapped {
 		x, y = y, x
 	}
-	return y, x, b.Exponent, nil
+	return x, y, b.Exponent, nil
 }
 
 // Cmp compares d and x and returns:
@@ -391,6 +393,7 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		diff = -diff
 	}
 	y := big.NewInt(diff)
+	// TODO(mjibson): use a table here.
 	e := new(big.Int).Exp(bigTen, y, nil)
 	db := new(big.Int).Set(&d.Coeff)
 	xb := new(big.Int).Set(&x.Coeff)
@@ -464,8 +467,8 @@ func (d *Decimal) Reduce(x *Decimal) *Decimal {
 	}
 	d.Set(x)
 
-	// Divide by 10 in a loop. In benchmarks this is 20% faster than converting
-	// to a string and trimming the 0s from the end.
+	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
+	// faster than converting to a string and trimming the 0s from the end.
 	z := new(big.Int).Set(&d.Coeff)
 	r := new(big.Int)
 	for {

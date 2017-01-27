@@ -311,7 +311,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	f.Exponent = int32(-nd)
 	approx := new(Decimal)
 	nc := c.WithPrecision(c.Precision)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 	if e%2 == 0 {
 		approx.SetCoefficient(819).SetExponent(-3)
 		ed.Mul(approx, approx, f)
@@ -328,7 +328,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	tmp := new(Decimal)
 	// The algorithm in the paper says to use c.Precision + 2. 7 instead of 2
 	// here allows all of the non-extended tests to pass without allowing 1ulp
-	// of error or ignoring the Inexact flag, similary to the Quo precision
+	// of error or ignoring the Inexact flag, similarly to the Quo precision
 	// increase. This does mean that there are probably some inputs for which
 	// Sqrt is 1ulp off or will incorrectly mark things as Inexact or exact.
 	for maxp := c.Precision + 7; p != maxp; {
@@ -344,9 +344,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	p = c.Precision
-	nc.Precision = p
-	dp := int32(p)
+	nc.Precision = c.Precision
+	dp := int32(c.Precision)
 	approxsubhalf := new(Decimal)
 	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
 	nc.Rounding = RoundUp
@@ -394,7 +393,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 
 	z := new(Decimal).Set(x)
 	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 	exp8 := 0
 
 	// Follow Ken Turkowski paper:
@@ -492,7 +491,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	nc := c.WithPrecision(p)
 	nc.Rounding = RoundHalfEven
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 
 	tmp1 := new(Decimal)
 	tmp2 := new(Decimal)
@@ -676,7 +675,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 
 	// Stage 4
 	nc.Precision = uint32(p)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 	sum := New(1, 0)
 	tmp2.Exponent = 0
 	for i := n - 1; i > 0; i-- {
@@ -718,7 +717,7 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 	n, z := new(Decimal), d
 	n.Set(x)
 	z.Set(decimalOne)
-	ed := NewErrDecimal(c)
+	ed := MakeErrDecimal(c)
 	for b.Sign() > 0 {
 		if b.Bit(0) == 1 {
 			ed.Mul(z, z, n)
@@ -804,7 +803,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	p += 4
 
 	nc := BaseContext.WithPrecision(p)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 
 	ed.Abs(tmp, x)
 	ed.Ln(tmp, tmp)
@@ -923,5 +922,6 @@ func exp10(x int64) (f, exp *big.Int, err error) {
 		return nil, nil, errors.New(errExponentOutOfRangeStr)
 	}
 	f = big.NewInt(x)
+	// TODO(mjibson): use a table here.
 	return f, new(big.Int).Exp(bigTen, f, nil), nil
 }
