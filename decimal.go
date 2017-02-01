@@ -34,6 +34,20 @@ type Decimal struct {
 	Exponent int32
 }
 
+const (
+	// TODO(mjibson): MaxExponent is set because both upscale and Round
+	// perform a calculation of 10^x, where x is an exponent. This is done by
+	// big.Int.Exp. This restriction could be lifted if better algorithms were
+	// determined during upscale and Round that don't need to perform Exp.
+
+	// MaxExponent is the highest exponent supported. Exponents near this range will
+	// perform very slowly (many seconds per operation).
+	MaxExponent = 100000
+	// MinExponent is the lowest exponent supported with the same limitations as
+	// MaxExponent.
+	MinExponent = -MaxExponent
+)
+
 // New creates a new decimal with the given coefficient and exponent.
 func New(coeff int64, exponent int32) *Decimal {
 	return &Decimal{
@@ -42,11 +56,20 @@ func New(coeff int64, exponent int32) *Decimal {
 	}
 }
 
-func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
+// NewWithBigInt creates a new decimal with the given coefficient and exponent.
+func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
+	return &Decimal{
+		Coeff:    *coeff,
+		Exponent: exponent,
+	}
+}
+
+func (d *Decimal) setString(c *Context, s string) (Condition, error) {
+	var exps []int64
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
+			return 0, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
 		}
 		exps = append(exps, exp)
 		s = s[:i]
@@ -56,36 +79,22 @@ func newFromString(s string) (coeff *big.Int, exps []int64, err error) {
 		exps = append(exps, -exp)
 		s = s[:i] + s[i+1:]
 	}
-	i, ok := new(big.Int).SetString(s, 10)
-	if !ok {
-		return nil, nil, errors.Errorf("parse mantissa: %s", s)
+	if _, ok := d.Coeff.SetString(s, 10); !ok {
+		return 0, errors.Errorf("parse mantissa: %s", s)
 	}
-	return i, exps, nil
+	return c.goError(d.setExponent(c, 0, exps...))
 }
 
 // NewFromString creates a new decimal from s. It has no restrictions on
 // exponents or precision.
-func NewFromString(s string) (*Decimal, error) {
-	i, exps, err := newFromString(s)
-	if err != nil {
-		return nil, err
-	}
-	d := &Decimal{
-		Coeff: *i,
-	}
-	_, err = d.setExponent(&BaseContext, 0, exps...).GoError(BaseContext.Traps)
-	return d, err
+func NewFromString(s string) (*Decimal, Condition, error) {
+	return BaseContext.NewFromString(s)
 }
 
 // SetString set's d to s and returns d. It has no restrictions on exponents
 // or precision.
 func (d *Decimal) SetString(s string) (*Decimal, error) {
-	i, exps, err := newFromString(s)
-	if err != nil {
-		return d, err
-	}
-	d.Coeff = *i
-	_, err = d.setExponent(&BaseContext, 0, exps...).GoError(BaseContext.Traps)
+	_, err := d.setString(&BaseContext, s)
 	return d, err
 }
 
@@ -93,16 +102,13 @@ func (d *Decimal) SetString(s string) (*Decimal, error) {
 // exponents restricted by the context and its value rounded if it contains more
 // digits than the context's precision.
 func (c *Context) NewFromString(s string) (*Decimal, Condition, error) {
-	i, exps, err := newFromString(s)
+	d := new(Decimal)
+	res, err := d.setString(c, s)
 	if err != nil {
 		return nil, 0, err
 	}
-	d := &Decimal{
-		Coeff: *i,
-	}
-	res := d.setExponent(c, 0, exps...)
 	res |= c.round(d, d)
-	_, err = res.GoError(c.Traps)
+	_, err = c.goError(res)
 	return d, res, err
 }
 
@@ -113,13 +119,17 @@ func (d *Decimal) String() string {
 
 // ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
+	// See: http://speleotrove.com/decimal/daconvs.html#reftostr
+	const adjExponentLimit = -6
+
 	s := d.Coeff.String()
-	neg := d.Coeff.Sign() < 0
-	if neg {
+	prefix := ""
+	if d.Coeff.Sign() < 0 {
+		prefix = "-"
 		s = s[1:]
 	}
 	adj := int(d.Exponent) + (len(s) - 1)
-	if d.Exponent <= 0 && adj >= -6 {
+	if d.Exponent <= 0 && adj >= adjExponentLimit {
 		if d.Exponent < 0 {
 			if left := -int(d.Exponent) - len(s); left > 0 {
 				s = "0." + strings.Repeat("0", left) + s
@@ -137,10 +147,7 @@ func (d *Decimal) ToSci() string {
 		}
 		s = fmt.Sprintf("%s%sE%+d", s[:1], dot, adj)
 	}
-	if neg {
-		s = "-" + s
-	}
-	return s
+	return prefix + s
 }
 
 // ToStandard converts d to a standard notation string (i.e., no exponent
@@ -164,6 +171,9 @@ func (d *Decimal) ToStandard() string {
 
 // Set sets d's Coefficient and Exponent from x and returns d.
 func (d *Decimal) Set(x *Decimal) *Decimal {
+	if d == x {
+		return d
+	}
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
 	return d
@@ -219,7 +229,7 @@ func (d *Decimal) Float64() (float64, error) {
 }
 
 const (
-	errExponentOutOfRange = "exponent out of range"
+	errExponentOutOfRangeStr = "exponent out of range"
 )
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
@@ -306,23 +316,9 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 	return res
 }
 
-const (
-	// TODO(mjibson): MaxExponent is set because both upscale and Round
-	// perform a calculation of 10^x, where x is an exponent. This is done by
-	// big.Int.Exp. This restriction could be lifted if better algorithms were
-	// determined during upscale and Round that don't need to perform Exp.
-
-	// MaxExponent is the highest exponent supported. Exponents near this range will
-	// perform very slowly (many seconds per operation).
-	MaxExponent = 100000
-	// MinExponent is the lowest exponent supported with the same limitations as
-	// MaxExponent.
-	MinExponent = -MaxExponent
-)
-
-// upscale converts a and b to big.Ints with the same scaling, and their
-// scaling. An error can be produced if the resulting scale factor is out
-// of range.
+// upscale converts a and b to big.Ints with the same scaling. It returns
+// them with this scaling, along with the scaling. An error can be produced
+// if the resulting scale factor is out of range.
 func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	if a.Exponent == b.Exponent {
 		return &a.Coeff, &b.Coeff, a.Exponent, nil
@@ -336,16 +332,17 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 	// TODO(mjibson): figure out a better way to upscale numbers with highly
 	// differing exponents.
 	if s > MaxExponent {
-		return nil, nil, 0, errors.New(errExponentOutOfRange)
+		return nil, nil, 0, errors.New(errExponentOutOfRangeStr)
 	}
-	y := big.NewInt(s)
-	e := new(big.Int).Exp(bigTen, y, nil)
-	y.Mul(&a.Coeff, e)
-	x := &b.Coeff
+	x := big.NewInt(s)
+	// TODO(mjibson): use a table here.
+	e := new(big.Int).Exp(bigTen, x, nil)
+	x.Mul(&a.Coeff, e)
+	y := &b.Coeff
 	if swapped {
 		x, y = y, x
 	}
-	return y, x, b.Exponent, nil
+	return x, y, b.Exponent, nil
 }
 
 // Cmp compares d and x and returns:
@@ -396,6 +393,7 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		diff = -diff
 	}
 	y := big.NewInt(diff)
+	// TODO(mjibson): use a table here.
 	e := new(big.Int).Exp(bigTen, y, nil)
 	db := new(big.Int).Set(&d.Coeff)
 	xb := new(big.Int).Set(&x.Coeff)
@@ -469,8 +467,8 @@ func (d *Decimal) Reduce(x *Decimal) *Decimal {
 	}
 	d.Set(x)
 
-	// Divide by 10 in a loop. In benchmarks this is 20% faster than converting
-	// to a string and trimming the 0s from the end.
+	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
+	// faster than converting to a string and trimming the 0s from the end.
 	z := new(big.Int).Set(&d.Coeff)
 	r := new(big.Int)
 	for {

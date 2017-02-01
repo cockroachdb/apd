@@ -27,7 +27,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -36,7 +35,6 @@ const testDir = "testdata"
 
 var (
 	flagPython     = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
-	flagSummary    = flag.Bool("summary", false, "print a summary")
 	flagFailFast   = flag.Bool("fast", false, "stop work after first error; disables parallel testing")
 	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors")
 	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
@@ -205,43 +203,25 @@ func TestParseDecTest(t *testing.T) {
 }
 
 var GDAfiles = []string{
-	"abs0",
-	"add0",
-	"base0",
-	"compare0",
-	"cuberoot-apd",
-	"divide0",
-	"divideint0",
-	"exp0",
-	"ln0",
-	"log100",
-	"minus0",
-	"multiply0",
-	"plus0",
-	"power0",
-	"quantize0",
-	"randoms0",
-	"randombound320",
-	"reduce0",
-	"remainder0",
-	"rounding0",
-	"squareroot0",
-	"subtract0",
-	"tointegral0",
-
 	"abs",
 	"add",
 	"base",
 	"compare",
 	"divide",
 	"divideint",
+	"exp",
+	"ln",
+	"log10",
 	"minus",
 	"multiply",
 	"plus",
+	"power",
 	"quantize",
+	"randoms",
 	"reduce",
 	"remainder",
 	"rounding",
+	"squareroot",
 	"subtract",
 	"tointegral",
 	"tointegralx",
@@ -253,29 +233,11 @@ func TestGDA(t *testing.T) {
 	for _, fname := range GDAfiles {
 		succeed := t.Run(fname, func(t *testing.T) {
 			path, tcs := readGDA(t, fname)
-			ignored, skipped, success, fail, total := gdaTest(t, path, tcs)
-			missing := total - ignored - skipped - success - fail
-			if *flagSummary {
-				fmt.Fprintf(&buf, "%10s%8d%8d%8d%8d%8d%8d\n",
-					fname,
-					total,
-					success,
-					fail,
-					ignored,
-					skipped,
-					missing,
-				)
-				if missing != 0 {
-					t.Fatalf("unaccounted summary result: missing: %d, total: %d, %d, %d, %d", missing, total, ignored, skipped, success)
-				}
-			}
+			gdaTest(t, path, tcs)
 		})
 		if !succeed && *flagFailFast {
 			break
 		}
-	}
-	if *flagSummary {
-		fmt.Print(buf.String())
 	}
 }
 
@@ -325,6 +287,9 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	return
 }
 
+// BenchmarkGDA benchmarks a GDA test. It should not be used without specifying
+// a sub-benchmark to run. For example:
+// go test -run XX -bench GDA/squareroot
 func BenchmarkGDA(b *testing.B) {
 	for _, fname := range GDAfiles {
 		b.Run(fname, func(b *testing.B) {
@@ -340,7 +305,7 @@ func BenchmarkGDA(b *testing.B) {
 					}
 					operands := make([]*Decimal, 2)
 					for i, o := range tc.Operands {
-						d, err := NewFromString(o)
+						d, _, err := NewFromString(o)
 						if err != nil {
 							continue Loop
 						}
@@ -382,9 +347,7 @@ func readGDA(t testing.TB, name string) (string, []TestCase) {
 	return path, tcs
 }
 
-func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int) {
-	var lock sync.Mutex
-	var ignored, skipped, success, fail, total int
+func gdaTest(t *testing.T, path string, tcs []TestCase) {
 	for _, tc := range tcs {
 		tc := tc
 		succeed := t.Run(tc.ID, func(t *testing.T) {
@@ -404,21 +367,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				defer func() { timeDone <- struct{}{} }()
 			}
 			defer func() {
-				lock.Lock()
-				total++
-				if GDAignore[tc.ID] {
-					ignored++
-				} else if t.Skipped() {
-					skipped++
-				} else if t.Failed() {
-					fail++
+				if t.Failed() {
 					if *flagIgnore {
 						tc.PrintIgnore()
 					}
-				} else {
-					success++
 				}
-				lock.Unlock()
 			}()
 			if GDAignore[tc.ID] {
 				t.Skip("ignored")
@@ -442,7 +395,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				t.Parallel()
 			}
 			// helpful acme address link
-			t.Logf("%s:/^%s", path, tc.ID)
+			t.Logf("%s:/^%s ", path, tc.ID)
 			t.Logf("%s %s = %s (%s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, strings.Join(tc.Conditions, " "))
 			t.Logf("prec: %d, round: %s, Emax: %d, Emin: %d", tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
 			mode, ok := rounders[tc.Rounding]
@@ -483,6 +436,17 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				}
 				operands[i] = d
 				opres |= ores
+			}
+			switch tc.Operation {
+			case "power":
+				tmp := new(Decimal).Abs(operands[1])
+				// We don't handle power near the max exp limit.
+				if tmp.Cmp(New(MaxExponent, 0)) >= 0 {
+					t.Skip("x ** large y")
+				}
+				if tmp.Cmp(New(int64(c.MaxExponent), 0)) >= 0 {
+					t.Skip("x ** large y")
+				}
 			}
 			var s string
 			d := new(Decimal)
@@ -550,12 +514,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 					case "clamped":
 						rcond |= Clamped
 
-					case "lost_digits":
-						// TODO(mjibson) implement this
-						// Lost_digits isn't support yet and slightly changes the results. Ignore
-						// any test cases with it until it's working.
-						t.Skip("Lost_Digits")
-
 					case "invalid_context":
 						// ignore
 
@@ -602,9 +560,13 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 				// Ignore Clamped on error.
 				if tc.Result == "?" {
 					rcond &= ^Clamped
+					res &= ^Clamped
 				}
 
 				if rcond != res {
+					if tc.Operation == "power" && (res.Overflow() || res.Underflow()) {
+						t.Skip("power overflow")
+					}
 					t.Logf("got: %s (%#v)", d, d)
 					t.Logf("error: %+v", err)
 					t.Errorf("expected flags %q (%d); got flags %q (%d)", rcond, rcond, res, res)
@@ -624,6 +586,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			if err != nil {
 				testExponentError(t, err)
+				if tc.Operation == "power" && (res.Overflow() || res.Underflow()) {
+					t.Skip("power overflow")
+				}
 				if *flagPython {
 					if tc.CheckPython(t, d) {
 						return
@@ -642,6 +607,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			}
 			r := newDecimal(t, testCtx, tc.Result)
 			if d.Cmp(r) != 0 {
+				t.Logf("want: %s", tc.Result)
+				t.Logf("got: %s (%#v)", d, d)
 				// Some operations allow 1ulp of error in tests.
 				switch tc.Operation {
 				case "exp", "ln", "log10", "power":
@@ -660,8 +627,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 						return
 					}
 				}
-				t.Logf("want: %s", tc.Result)
-				t.Fatalf("got: %s (%#v)", d, d)
+				t.Fatalf("unexpected result")
 			} else {
 				t.Logf("got: %s (%#v)", d, d)
 			}
@@ -670,12 +636,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) (int, int, int, int, int
 			if *flagFailFast {
 				break
 			}
-		} else {
-			success++
 		}
 	}
-	success -= ignored + skipped
-	return ignored, skipped, success, fail, total
 }
 
 var rounders = map[string]Rounder{
@@ -767,162 +729,66 @@ func (tc TestCase) PrintIgnore() {
 }
 
 var GDAignore = map[string]bool{
-	// python-identical results. Both apd and python disagree with GDA in these
-	// cases. It is also possible the python script above is incorrect.
-	"add642":  true,
-	"add643":  true,
-	"add644":  true,
-	"add651":  true,
-	"add652":  true,
-	"add653":  true,
-	"add662":  true,
-	"add663":  true,
-	"add664":  true,
-	"add671":  true,
-	"add672":  true,
-	"add673":  true,
-	"add682":  true,
-	"add683":  true,
-	"add684":  true,
-	"add691":  true,
-	"add692":  true,
-	"add693":  true,
-	"add702":  true,
-	"add703":  true,
-	"add704":  true,
-	"add711":  true,
-	"add712":  true,
-	"add713":  true,
-	"radd163": true,
-	"radd449": true,
-	"sub062":  true,
-	"sub063":  true,
-	"sub067":  true,
-	"sub068":  true,
-	"sub080":  true,
-	"sub142":  true,
-	"sub143":  true,
-	"sub332":  true,
-	"sub333":  true,
-	"sub342":  true,
-	"sub343":  true,
-	"sub363":  true,
-	"sub910":  true,
-	"sub911":  true,
-	"sub922":  true,
-	"sub923":  true,
-	"sub926":  true,
-	"sub927":  true,
-	"sub928":  true,
-	"sub929":  true,
-	"sub934":  true,
-	"sub936":  true,
-	"sub937":  true,
-	"sub938":  true,
-	"sub939":  true,
-	"sub940":  true,
-	"sub941":  true,
-	"sub942":  true,
-	"sub943":  true,
-	"sub944":  true,
-	"sub945":  true,
-	"sub946":  true,
-	"sub947":  true,
-
-	// GDA thinks these aren't subnormal, but python does
-	"qua545": true,
-	"qua547": true,
-	"qua548": true,
-	"qua549": true,
-
-	// Invalid context errors, OK to skip.
-	"ln901":  true,
-	"ln903":  true,
-	"ln905":  true,
-	"log903": true,
-	"log905": true,
-
-	// Very large exponents we don't support yet
-	"qua531": true,
+	// GDA says decNumber should skip these
+	"powx4302": true,
+	"powx4303": true,
 
 	// TODO(mjibson): fix tests below
 
-	// incorrect rounding
-	"rpo213": true,
-	"rpo412": true,
-
-	// ln(x) at extreme input ranges
-	"ln0901": true,
-	"ln0902": true,
-
-	// ln(x) of very small x, subnormals
-	"ln759": true,
-	"ln760": true,
-	"ln761": true,
-	"ln762": true,
-	"ln763": true,
-	"ln764": true,
-	"ln765": true,
-	"ln766": true,
-
 	// log10(x) with large exponents, overflows
-	"log0001": true,
-	"log0020": true,
-	"log1146": true,
-	"log1147": true,
-	"log1156": true,
-	"log1157": true,
-	"log1166": true,
-	"log1167": true,
+	"logx0020": true,
+	"logx1146": true,
+	"logx1147": true,
+	"logx1156": true,
+	"logx1157": true,
+	"logx1176": true,
+	"logx1177": true,
 
 	// log10(x) where x is 1.0 +/- some tiny epsilon. Our results are close but
 	// differ in the last places.
-	"log1304": true,
-	"log1309": true,
-	"log1310": true,
+	"logx1304": true,
+	"logx1309": true,
+	"logx1310": true,
 
 	// The Vienna case
-	"pow220": true,
-
-	// very high precision
-	"pow250": true,
-	"pow251": true,
-	"pow252": true,
-	"pow253": true,
-	"pow254": true,
-
-	// x**y with very large y
-	"pow063": true,
-	"pow064": true,
-	"pow065": true,
-	"pow066": true,
-	"pow118": true,
-	"pow119": true,
-	"pow120": true,
-	"pow181": true,
-	"pow182": true,
-	"pow183": true,
-	"pow184": true,
-	"pow186": true,
-	"pow187": true,
-	"pow189": true,
-	"pow190": true,
-	"pow260": true,
-	"pow261": true,
-	"pow270": true,
-	"pow271": true,
-	"pow310": true,
-	"pow311": true,
-	"pow320": true,
-	"pow321": true,
-	"pow330": true,
-	"pow331": true,
-	"pow340": true,
-	"pow341": true,
+	"powx219": true,
 
 	// shouldn't overflow, but does
-	"exp726":  true,
-	"exp1236": true,
+	"expx055":  true,
+	"expx056":  true,
+	"expx057":  true,
+	"expx058":  true,
+	"expx059":  true,
+	"expx1236": true,
+	"expx709":  true,
+	"expx711":  true,
+	"expx722":  true,
+	"expx724":  true,
+	"expx726":  true,
+	"expx732":  true,
+	"expx733":  true,
+	"expx736":  true,
+	"expx737":  true,
+	"expx758":  true,
+	"expx759":  true,
+	"expx760":  true,
+	"expx761":  true,
+	"expx762":  true,
+	"expx763":  true,
+	"expx764":  true,
+	"expx765":  true,
+	"expx766":  true,
+	"expx769":  true,
+	"expx770":  true,
+	"expx771":  true,
+
+	// exceeds system overflow
+	"expx291": true,
+	"expx292": true,
+	"expx293": true,
+	"expx294": true,
+	"expx295": true,
+	"expx296": true,
 
 	// inexact zeros
 	"addx1633":  true,
@@ -931,13 +797,102 @@ var GDAignore = map[string]bool{
 	"addx61633": true,
 	"addx61634": true,
 	"addx61638": true,
+
+	// extreme input range, but should work
+	"lnx0902":  true,
+	"sqtx8137": true,
+	"sqtx8139": true,
+	"sqtx8145": true,
+	"sqtx8147": true,
+	"sqtx8149": true,
+	"sqtx8150": true,
+	"sqtx8151": true,
+	"sqtx8158": true,
+	"sqtx8165": true,
+	"sqtx8168": true,
+	"sqtx8174": true,
+	"sqtx8175": true,
+	"sqtx8179": true,
+	"sqtx8182": true,
+	"sqtx8185": true,
+	"sqtx8186": true,
+	"sqtx8195": true,
+	"sqtx8196": true,
+	"sqtx8197": true,
+	"sqtx8199": true,
+	"sqtx8204": true,
+	"sqtx8212": true,
+	"sqtx8213": true,
+	"sqtx8214": true,
+	"sqtx8218": true,
+	"sqtx8219": true,
+	"sqtx8323": true,
+	"sqtx8324": true,
+	"sqtx8331": true,
+	"sqtx8626": true,
+	"sqtx8627": true,
+	"sqtx8628": true,
+	"sqtx8631": true,
+	"sqtx8632": true,
+	"sqtx8633": true,
+	"sqtx8634": true,
+	"sqtx8636": true,
+	"sqtx8637": true,
+	"sqtx8639": true,
+	"sqtx8640": true,
+	"sqtx8641": true,
+	"sqtx8644": true,
+	"sqtx8645": true,
+	"sqtx8646": true,
+	"sqtx8647": true,
+	"sqtx8648": true,
+	"sqtx8649": true,
+	"sqtx8650": true,
+	"sqtx8651": true,
+	"sqtx8652": true,
+	"sqtx8654": true,
+
+	// tricky cases of underflow subnormals
+	"sqtx8700": true,
+	"sqtx8701": true,
+	"sqtx8702": true,
+	"sqtx8703": true,
+	"sqtx8704": true,
+	"sqtx8705": true,
+	"sqtx8706": true,
+	"sqtx8707": true,
+	"sqtx8708": true,
+	"sqtx8709": true,
+	"sqtx8710": true,
+	"sqtx8711": true,
+	"sqtx8712": true,
+	"sqtx8713": true,
+	"sqtx8714": true,
+	"sqtx8715": true,
+	"sqtx8716": true,
+	"sqtx8717": true,
+	"sqtx8718": true,
+	"sqtx8719": true,
+	"sqtx8720": true,
+	"sqtx8721": true,
+	"sqtx8722": true,
+	"sqtx8723": true,
+	"sqtx8724": true,
+	"sqtx8725": true,
+	"sqtx8726": true,
+	"sqtx8727": true,
+	"sqtx8728": true,
+	"sqtx8729": true,
 }
 
 var GDAignoreFlags = map[string]bool{
-	// unflagged overflow
-	"exp705": true,
-
-	// unflagged underflow
-	"exp755": true,
-	"exp760": true,
+	// unflagged clamped
+	"sqtx9024": true,
+	"sqtx9025": true,
+	"sqtx9026": true,
+	"sqtx9027": true,
+	"sqtx9038": true,
+	"sqtx9039": true,
+	"sqtx9040": true,
+	"sqtx9045": true,
 }

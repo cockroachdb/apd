@@ -29,11 +29,15 @@ func (d *Decimal) GoString() string {
 	return fmt.Sprintf(`{Coeff: %s, Exponent: %d}`, d.Coeff.String(), d.Exponent)
 }
 
+// testExponentError skips t if err was caused by an exponent being outside
+// of the package's supported exponent range. Since the exponent is so large,
+// we don't support those tests yet (i.e., it's an expected failure, so we
+// skip it).
 func testExponentError(t *testing.T, err error) {
 	if err == nil {
 		return
 	}
-	if err.Error() == errExponentOutOfRange {
+	if err.Error() == errExponentOutOfRangeStr {
 		t.Skip(err)
 	}
 }
@@ -234,7 +238,7 @@ func TestQuoErr(t *testing.T) {
 		p    uint32
 		err  string
 	}{
-		{x: "1", y: "1", p: 0, err: errZeroPrecision},
+		{x: "1", y: "1", p: 0, err: errZeroPrecisionStr},
 		{x: "1", y: "0", p: 1, err: "division by zero"},
 	}
 	for _, tc := range tests {
@@ -373,7 +377,7 @@ func TestToStandard(t *testing.T) {
 
 	for c, r := range tests {
 		t.Run(c, func(t *testing.T) {
-			d, err := NewFromString(c)
+			d, _, err := NewFromString(c)
 			if err != nil {
 				t.Fatal(err)
 			}

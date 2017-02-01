@@ -21,7 +21,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Context maintains options for Decimal operations.
+// Context maintains options for Decimal operations. It can safely be used
+// concurrently, but not modified concurrently.
 type Context struct {
 	// Precision is the number of places to round during rounding.
 	Precision uint32
@@ -43,7 +44,8 @@ type Context struct {
 
 const (
 	// DefaultTraps is the default trap set used by BaseContext.
-	DefaultTraps = SystemOverflow | SystemUnderflow |
+	DefaultTraps = SystemOverflow |
+		SystemUnderflow |
 		Overflow |
 		Underflow |
 		Subnormal |
@@ -52,10 +54,10 @@ const (
 		DivisionImpossible |
 		InvalidOperation
 
-	errZeroPrecision = "Context may not have 0 Precision for this operation"
+	errZeroPrecisionStr = "Context may not have 0 Precision for this operation"
 )
 
-// BaseContext is a useful default Context.
+// BaseContext is a useful default Context. Should not be mutated.
 var BaseContext = Context{
 	// Disable rounding.
 	Precision: 0,
@@ -73,8 +75,14 @@ func (c *Context) WithPrecision(p uint32) *Context {
 	return &r
 }
 
+// goError converts flags into an error based on c.Traps.
 func (c *Context) goError(flags Condition) (Condition, error) {
 	return flags.GoError(c.Traps)
+}
+
+// etiny returns the smallest value an Exponent can contain.
+func (c *Context) etiny() int32 {
+	return c.MinExponent - int32(c.Precision) + 1
 }
 
 // Add sets d to the sum x+y.
@@ -117,17 +125,24 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
 	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
-// Quo sets d to the quotient x/y for y != 0. c's Precision must be > 0.
+// Quo sets d to the quotient x/y for y != 0. c.Precision must be > 0. If an
+// exact division is required, use a context with high precision and verify
+// it was exact by checking the Inexact flag on the return Condition.
 func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	if c.Precision == 0 {
 		// 0 precision is disallowed because we compute the required number of digits
 		// during the 10**x calculation using the precision.
-		return 0, errors.New(errZeroPrecision)
+		return 0, errors.New(errZeroPrecisionStr)
 	}
 	if c.Precision > 5000 {
+		// High precision could result in a large number of iterations. Arbitrarily
+		// limit the precision to prevent runaway processes. This limit was chosen
+		// arbitrarily and could likely be increased or removed if the impact was
+		// measured. Until then, this is an attempt to prevent users from shooting
+		// themselves in the foot.
 		return 0, errors.New("Quo requires Precision <= 5000")
 	}
 
@@ -139,7 +154,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		} else {
 			res |= DivisionByZero
 		}
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 	// An integer variable, adjust, is initialized to 0.
 	var adjust int64
@@ -227,7 +242,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	}
 
 	d.Set(quo)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
@@ -242,7 +257,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 		} else {
 			res |= DivisionByZero
 		}
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 	a, b, _, err := upscale(x, y)
 	if err != nil {
@@ -253,7 +268,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 		res |= DivisionImpossible
 	}
 	d.Exponent = 0
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // Rem sets d to the remainder part of the quotient x/y. If
@@ -268,7 +283,7 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 		} else {
 			res |= InvalidOperation
 		}
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 	a, b, s, err := upscale(x, y)
 	if err != nil {
@@ -281,7 +296,7 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	}
 	d.Exponent = s
 	res |= c.round(d, d)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // Sqrt sets d to the square root of x.
@@ -293,11 +308,20 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	switch x.Coeff.Sign() {
 	case -1:
 		res := InvalidOperation
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	case 0:
 		d.Coeff.SetInt64(0)
 		d.Exponent = 0
 		return 0, nil
+	}
+
+	// Use same precision as in decNumber.
+	workp := c.Precision + 1
+	if nd := uint32(x.NumDigits()); workp < nd {
+		workp = nd
+	}
+	if workp < 7 {
+		workp = 7
 	}
 
 	f := new(Decimal).Set(x)
@@ -305,8 +329,9 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	e := nd + int64(x.Exponent)
 	f.Exponent = int32(-nd)
 	approx := new(Decimal)
-	nc := c.WithPrecision(c.Precision)
-	ed := NewErrDecimal(nc)
+	nc := c.WithPrecision(workp)
+	nc.Rounding = RoundHalfEven
+	ed := MakeErrDecimal(nc)
 	if e%2 == 0 {
 		approx.SetCoefficient(819).SetExponent(-3)
 		ed.Mul(approx, approx, f)
@@ -321,12 +346,11 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 
 	p := uint32(3)
 	tmp := new(Decimal)
-	// The algorithm in the paper says to use c.Precision + 2. 7 instead of 2
-	// here allows all of the non-extended tests to pass without allowing 1ulp
-	// of error or ignoring the Inexact flag, similary to the Quo precision
-	// increase. This does mean that there are probably some inputs for which
-	// Sqrt is 1ulp off or will incorrectly mark things as Inexact or exact.
-	for maxp := c.Precision + 7; p != maxp; {
+
+	// The algorithm in the paper says to use c.Precision + 2. decNumber uses
+	// workp + 2. But we use workp + 5 to make the tests pass. This means it is
+	// possible there are inputs we don't compute correctly and could be 1ulp off.
+	for maxp := workp + 5; p != maxp; {
 		p = 2*p - 2
 		if p > maxp {
 			p = maxp
@@ -339,14 +363,14 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	p = c.Precision
-	nc.Precision = p
-	dp := int32(p)
+	nc.Precision = workp + 1
+	dp := int32(c.Precision)
 	approxsubhalf := new(Decimal)
 	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
 	nc.Rounding = RoundUp
 	ed.Mul(approxsubhalf, approxsubhalf, approxsubhalf)
 	if approxsubhalf.Cmp(f) > 0 {
+		// TODO(mjibson): this branch is never taken in tests, why? Can it be removed?
 		ed.Sub(approx, approx, New(1, -dp))
 	} else {
 		approxaddhalf := new(Decimal)
@@ -366,6 +390,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	d.Exponent += int32(e / 2)
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
+	d.Reduce(d) // Remove trailing zeros.
 	return nc.Round(d, d)
 }
 
@@ -380,7 +405,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	switch x.Coeff.Sign() {
 	case -1:
 		res := InvalidOperation
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	case 0:
 		d.Coeff.SetInt64(0)
 		d.Exponent = 0
@@ -389,10 +414,11 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 
 	z := new(Decimal).Set(x)
 	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 	exp8 := 0
 
-	// Follow Ken Turkowski paper:
+	// See: Turkowski, Ken. Computing the cube root. technical report, Apple
+	// Computer, 1998.
 	// https://people.freebsd.org/~lstewart/references/apple_tr_kt32_cuberoot.pdf
 	//
 	// Computing the cube root of any number is reduced to computing
@@ -463,7 +489,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	if x.Sign() <= 0 {
 		res := InvalidOperation
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 
 	if x.Cmp(decimalOne) == 0 {
@@ -487,7 +513,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	nc := c.WithPrecision(p)
 	nc.Rounding = RoundHalfEven
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 
 	tmp1 := new(Decimal)
 	tmp2 := new(Decimal)
@@ -555,7 +581,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	// tmp2 = m * ln(2)
 	// Disable Subnormal because decimalLog2 is so long.
-	nc.Traps ^= Subnormal
+	nc.Traps &= ^Subnormal
 	ed.Mul(tmp2, m, decimalLog2)
 	ed.Add(tmp1, tmp1, tmp2)
 
@@ -564,14 +590,14 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	}
 	res := c.round(d, tmp1)
 	res |= Inexact
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // Log10 sets d to the base 10 log of x.
 func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 	if x.Sign() <= 0 {
 		res := InvalidOperation
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 
 	if x.Cmp(decimalOne) == 0 {
@@ -603,7 +629,7 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 		return 0, err
 	}
 	res |= qr
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // Exp sets d = e**x.
@@ -617,7 +643,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	}
 
 	if c.Precision == 0 {
-		return 0, errors.New(errZeroPrecision)
+		return 0, errors.New(errZeroPrecisionStr)
 	}
 
 	nc := c.WithPrecision(c.Precision)
@@ -628,19 +654,26 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	cp := int64(c.Precision)
 	tmp1 := new(Decimal).Abs(x)
 	tmp2 := New(cp*23, 0)
+	// TODO(mjibson): figure out why the paper has this number and attempt to
+	// increase or remove this limit. Many tests fail because of this.
 	// if abs(x) > 23*currentprecision; assert false
 	if tmp1.Cmp(tmp2) > 0 {
 		res |= Overflow
 		if x.Sign() < 0 {
 			res = res.negateOverflowFlags()
+			res |= Clamped
+			d.Coeff.SetInt64(0)
+			d.Exponent = c.etiny()
+		} else {
+			// TODO(mjibson): set Infinity here when supported.
 		}
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 	// if abs(x) <= setexp(.9, -currentprecision); then result 1
 	tmp2.SetCoefficient(9).SetExponent(int32(-cp) - 1)
 	if tmp1.Cmp(tmp2) <= 0 {
 		d.Set(decimalOne)
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 
 	// Stage 2
@@ -671,7 +704,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 
 	// Stage 4
 	nc.Precision = uint32(p)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 	sum := New(1, 0)
 	tmp2.Exponent = 0
 	for i := n - 1; i > 0; i-- {
@@ -697,7 +730,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	}
 	nc.Precision = c.Precision
 	res |= nc.round(d, d)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // integerPower sets d = x**y.
@@ -713,7 +746,7 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 	n, z := new(Decimal), d
 	n.Set(x)
 	z.Set(decimalOne)
-	ed := NewErrDecimal(c)
+	ed := MakeErrDecimal(c)
 	for b.Sign() > 0 {
 		if b.Bit(0) == 1 {
 			ed.Mul(z, z, n)
@@ -776,7 +809,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 			return 0, nil
 		default: // -1
 			res := InvalidOperation
-			return res.GoError(c.Traps)
+			return c.goError(res)
 
 		}
 	}
@@ -787,7 +820,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	if (xs == 0 && ys == 0) || (xs < 0 && !yIsInt) {
 		res := InvalidOperation
-		return res.GoError(c.Traps)
+		return c.goError(res)
 	}
 
 	// decNumber sets the precision to be max(x digits + exponent, c.Precision)
@@ -799,7 +832,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	p += 4
 
 	nc := BaseContext.WithPrecision(p)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 
 	ed.Abs(tmp, x)
 	ed.Ln(tmp, tmp)
@@ -817,7 +850,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	if !yIsInt {
 		res |= Inexact
 	}
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // Quantize sets d to the value of v with x's Exponent.
@@ -827,7 +860,7 @@ func (c *Context) Quantize(d, v, x *Decimal) (Condition, error) {
 		res |= InvalidOperation
 	}
 	res |= c.round(d, d)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 func (c *Context) quantize(d, v, e *Decimal) Condition {
@@ -877,13 +910,13 @@ func (c *Context) toIntegral(d, x *Decimal) Condition {
 func (c *Context) ToIntegral(d, x *Decimal) (Condition, error) {
 	res := c.toIntegral(d, x)
 	res &= ^(Inexact | Rounded)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // ToIntegralX sets d to integral value of x.
 func (c *Context) ToIntegralX(d, x *Decimal) (Condition, error) {
 	res := c.toIntegral(d, x)
-	return res.GoError(c.Traps)
+	return c.goError(res)
 }
 
 // Ceil sets d to the smallest integer >= x.
@@ -915,8 +948,9 @@ func (c *Context) Reduce(d, x *Decimal) (Condition, error) {
 // exp10 returns x, 1*10^x. An error is returned if x is too large.
 func exp10(x int64) (f, exp *big.Int, err error) {
 	if x > MaxExponent || x < MinExponent {
-		return nil, nil, errors.New(errExponentOutOfRange)
+		return nil, nil, errors.New(errExponentOutOfRangeStr)
 	}
 	f = big.NewInt(x)
+	// TODO(mjibson): use a table here.
 	return f, new(big.Int).Exp(bigTen, f, nil), nil
 }

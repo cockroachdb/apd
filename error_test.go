@@ -19,7 +19,7 @@ import "testing"
 // Appease the unused test.
 // TODO(mjibson): actually test all the ErrDecimal methods.
 func TestErrDecimal(t *testing.T) {
-	ed := NewErrDecimal(testCtx)
+	ed := MakeErrDecimal(testCtx)
 	a := New(1, 0)
 	ed.Abs(a, a)
 	ed.Exp(a, a)
@@ -32,13 +32,15 @@ func TestErrDecimal(t *testing.T) {
 	ed.Round(a, a)
 }
 
-func TestNewErrDecimal(t *testing.T) {
+// TestMakeErrDecimalWithPrecision tests that WithPrecision generates a copy
+// and not a reference.
+func TestMakeErrDecimalWithPrecision(t *testing.T) {
 	c := &Context{
 		Precision:   5,
 		MaxExponent: 2,
 	}
 	nc := c.WithPrecision(c.Precision * 2)
-	ed := NewErrDecimal(nc)
+	ed := MakeErrDecimal(nc)
 	if ed.Ctx.Precision != 10 {
 		t.Fatalf("expected %d, got %d", 10, ed.Ctx.Precision)
 	}

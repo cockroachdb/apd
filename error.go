@@ -14,9 +14,9 @@
 
 package apd
 
-// NewErrDecimal creates a ErrDecimal with given context.
-func NewErrDecimal(c *Context) *ErrDecimal {
-	return &ErrDecimal{
+// MakeErrDecimal creates a ErrDecimal with given context.
+func MakeErrDecimal(c *Context) ErrDecimal {
+	return ErrDecimal{
 		Ctx: c,
 	}
 }
@@ -38,8 +38,8 @@ func (e *ErrDecimal) Err() error {
 		return e.err
 	}
 	if e.Ctx != nil {
-		_, err := e.Flags.GoError(e.Ctx.Traps)
-		return err
+		_, e.err = e.Ctx.goError(e.Flags)
+		return e.err
 	}
 	return nil
 }
