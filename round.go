@@ -16,8 +16,9 @@ package apd
 
 import "math/big"
 
-// Round sets d to rounded x. If c has zero Precision, no rounding will
-// occur. If c has no Rounding specified, RoundHalfUp is used.
+// Round sets d to rounded x, rounded to the precision specified by c. If c
+// has zero precision, no rounding will occur. If c has no Rounding specified,
+// RoundHalfUp is used.
 func (c *Context) Round(d, x *Decimal) (Condition, error) {
 	return c.goError(c.round(d, x))
 }

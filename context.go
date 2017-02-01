@@ -80,7 +80,8 @@ func (c *Context) goError(flags Condition) (Condition, error) {
 	return flags.GoError(c.Traps)
 }
 
-func (c *Context) Etiny() int32 {
+// etiny returns the smallest value an Exponent can contain.
+func (c *Context) etiny() int32 {
 	return c.MinExponent - int32(c.Precision) + 1
 }
 
@@ -137,6 +138,11 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return 0, errors.New(errZeroPrecisionStr)
 	}
 	if c.Precision > 5000 {
+		// High precision could result in a large number of iterations. Arbitrarily
+		// limit the precision to prevent runaway processes. This limit was chosen
+		// arbitrarily and could likely be increased or removed if the impact was
+		// measured. Until then, this is an attempt to prevent users from shooting
+		// themselves in the foot.
 		return 0, errors.New("Quo requires Precision <= 5000")
 	}
 
@@ -411,7 +417,8 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	ed := MakeErrDecimal(nc)
 	exp8 := 0
 
-	// Follow Ken Turkowski paper:
+	// See: Turkowski, Ken. Computing the cube root. technical report, Apple
+	// Computer, 1998.
 	// https://people.freebsd.org/~lstewart/references/apple_tr_kt32_cuberoot.pdf
 	//
 	// Computing the cube root of any number is reduced to computing
@@ -656,7 +663,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 			res = res.negateOverflowFlags()
 			res |= Clamped
 			d.Coeff.SetInt64(0)
-			d.Exponent = c.Etiny()
+			d.Exponent = c.etiny()
 		} else {
 			// TODO(mjibson): set Infinity here when supported.
 		}
