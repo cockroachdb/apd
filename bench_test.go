@@ -33,6 +33,7 @@ func runBenches(
 	b *testing.B, precision, inScale, inNumDigits []int, fn func(*testing.B, *Context, *Decimal),
 ) {
 	for _, p := range precision {
+		ctx := BaseContext.WithPrecision(uint32(p))
 		for _, s := range inScale {
 			for _, d := range inNumDigits {
 				numDigits := d
@@ -56,12 +57,11 @@ func runBenches(
 					if _, err := nums[i].SetString(buf.String()); err != nil {
 						b.Fatal(err)
 					}
-					nums[i].SetExponent(int32(s - d))
+					nums[i].SetExponent(int32(s - numDigits))
 				}
 				b.Run(
 					fmt.Sprintf("P%d/S%d/D%d", p, s, d),
 					func(b *testing.B) {
-						ctx := BaseContext.WithPrecision(uint32(p))
 						for i := 0; i <= b.N; i++ {
 							fn(b, ctx, &nums[i%len(nums)])
 						}
@@ -72,9 +72,23 @@ func runBenches(
 	}
 }
 
+func BenchmarkExp(b *testing.B) {
+	precision := []int{5, 10, 100}
+	scale := []int{-5, -3, -2, -1, 1, 2}
+	digits := []int{-100, -10, -2, 2, 10, 100}
+	runBenches(
+		b, precision, scale, digits,
+		func(b *testing.B, ctx *Context, x *Decimal) {
+			if _, err := ctx.Exp(&Decimal{}, x); err != nil {
+				b.Fatal(err)
+			}
+		},
+	)
+}
+
 func BenchmarkLn(b *testing.B) {
 	precision := []int{2, 10, 100}
-	scale := []int{-100, -10, -2, 2, 10, 100}
+	scale := []int{100, -10, -2, 2, 10, 100}
 	digits := []int{2, 10, 100}
 	runBenches(
 		b, precision, scale, digits,
