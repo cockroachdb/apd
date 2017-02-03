@@ -303,6 +303,13 @@ func BenchmarkGDA(b *testing.B) {
 					if GDAignore[tc.ID] || tc.Result == "?" || tc.HasNull() {
 						continue
 					}
+					if tc.Result == "NAN" {
+						continue
+					}
+					// Can't do inf either, and need to support -inf.
+					if strings.Contains(tc.Result, "INFINITY") {
+						continue
+					}
 					operands := make([]*Decimal, 2)
 					for i, o := range tc.Operands {
 						d, _, err := NewFromString(o)
@@ -311,21 +318,11 @@ func BenchmarkGDA(b *testing.B) {
 						}
 						operands[i] = d
 					}
-					mode, ok := rounders[tc.Rounding]
-					if !ok || mode == nil {
-						b.Fatalf("unsupported rounding mode %s", tc.Rounding)
-					}
-					c := &Context{
-						Precision:   uint32(tc.Precision),
-						MaxExponent: int32(tc.MaxExponent),
-						MinExponent: int32(tc.MinExponent),
-						Rounding:    mode,
-						Traps:       Subnormal | DefaultTraps,
-					}
+					c := tc.Context(b)
 					b.StartTimer()
 					_, err := tc.Run(c, nil, res, operands[0], operands[1])
 					if err != nil {
-						b.Fatalf("%s: %s", tc.ID, err)
+						b.Fatalf("%s: %+v", tc.ID, err)
 					}
 				}
 			}
@@ -345,6 +342,24 @@ func readGDA(t testing.TB, name string) (string, []TestCase) {
 		t.Fatal(err)
 	}
 	return path, tcs
+}
+
+func (tc TestCase) Context(t testing.TB) *Context {
+	mode, ok := rounders[tc.Rounding]
+	if !ok || mode == nil {
+		t.Fatalf("unsupported rounding mode %s", tc.Rounding)
+	}
+	c := &Context{
+		Precision:   uint32(tc.Precision),
+		MaxExponent: int32(tc.MaxExponent),
+		MinExponent: int32(tc.MinExponent),
+		Rounding:    mode,
+		Traps:       DefaultTraps,
+	}
+	if tc.Extended {
+		c.Traps &= ^(Subnormal | Underflow)
+	}
+	return c
 }
 
 func gdaTest(t *testing.T, path string, tcs []TestCase) {
@@ -403,16 +418,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
 			}
 			operands := make([]*Decimal, 2)
-			c := &Context{
-				Precision:   uint32(tc.Precision),
-				MaxExponent: int32(tc.MaxExponent),
-				MinExponent: int32(tc.MinExponent),
-				Rounding:    mode,
-				Traps:       DefaultTraps,
-			}
-			if tc.Extended {
-				c.Traps &= ^(Subnormal | Underflow)
-			}
+			c := tc.Context(t)
 			var res, opres Condition
 			opctx := c
 			if tc.SkipPrecision() {
