@@ -526,7 +526,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	m := new(Decimal)
 	for z.Cmp(decimalHalf) < 0 {
 		ed.Sub(m, m, decimalOne)
-		ed.Mul(z, z, decimalTwo)
+		ed.Add(z, z, z)
 	}
 	for z.Cmp(decimalOne) > 0 {
 		ed.Add(m, m, decimalOne)
@@ -556,15 +556,20 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 		// tmp2 = exp(a_n)
 		ed.Exp(tmp2, tmp1)
+
 		// tmp3 = exp(a_n) - z
 		ed.Sub(tmp3, tmp2, z)
+
+		// tmp3 = 2 * (exp(a_n) - z)
+		ed.Add(tmp3, tmp3, tmp3)
+
 		// tmp4 = exp(a_n) + z
 		ed.Add(tmp4, tmp2, z)
-		// tmp2 = (exp(a_n) - z) / (exp(a_n) + z)
-		ed.Quo(tmp2, tmp3, tmp4)
+
 		// tmp2 = 2 * (exp(a_n) - z) / (exp(a_n) + z)
-		ed.Mul(tmp2, tmp2, decimalTwo)
-		// tmp2 = a_n+1 = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
+		ed.Quo(tmp2, tmp3, tmp4)
+
+		// tmp2 = a_(n+1) = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
 		ed.Sub(tmp2, tmp1, tmp2)
 
 		if done, err := loop.done(tmp2); err != nil {
