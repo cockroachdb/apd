@@ -24,7 +24,9 @@ import (
 // Context maintains options for Decimal operations. It can safely be used
 // concurrently, but not modified concurrently.
 type Context struct {
-	// Precision is the number of places to round during rounding.
+	// Precision is the number of places to round during rounding; this is
+	// effectively the total number of digits (before and after the decimal
+	// point).
 	Precision uint32
 	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
 	// nil.
