@@ -457,7 +457,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	z0.Set(z)
 
 	// Loop until convergence.
-	for loop := nc.newLoop("cbrt", z, 1); ; {
+	for loop := nc.newLoop("cbrt", z, c.Precision, 1); false; {
 		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
 		z.Set(z0)
 		ed.Mul(z, z, z0)
@@ -553,7 +553,9 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	ed.Mul(tmp1, tmp1, tmp2)
 
 	// Use Halley's Iteration.
-	for loop := nc.newLoop("ln", x, 1); ; {
+	// We use a bit more precision than the context asks for in newLoop because
+	// this is not the final result.
+	for loop := nc.newLoop("ln", x, c.Precision+1, 1); ; {
 		// tmp1 = a_n (either from initial estimate or last iteration)
 
 		// tmp2 = exp(a_n)
