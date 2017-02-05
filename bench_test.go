@@ -42,6 +42,10 @@ func runBenches(
 					numDigits = -d
 					negative = true
 				}
+				if numDigits > p {
+					// Skip cases where we have more digits than the desired precision.
+					continue
+				}
 
 				// Generate some random numbers with the given number of digits.
 				nums := make([]Decimal, 20)
@@ -74,7 +78,7 @@ func runBenches(
 
 func BenchmarkExp(b *testing.B) {
 	precision := []int{5, 10, 100}
-	scale := []int{-5, -3, -2, -1, 1, 2}
+	scale := []int{-4, -1, 2}
 	digits := []int{-100, -10, -2, 2, 10, 100}
 	runBenches(
 		b, precision, scale, digits,
@@ -88,7 +92,7 @@ func BenchmarkExp(b *testing.B) {
 
 func BenchmarkLn(b *testing.B) {
 	precision := []int{2, 10, 100}
-	scale := []int{100, -10, -2, 2, 10, 100}
+	scale := []int{-100, -10, -2, 2, 10, 100}
 	digits := []int{2, 10, 100}
 	runBenches(
 		b, precision, scale, digits,
