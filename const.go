@@ -32,34 +32,24 @@ var (
 	decimalThree      = New(3, 0)
 	decimalEight      = New(8, 0)
 
-	decimalCbrtC1     = new(Decimal)
-	decimalCbrtC2     = new(Decimal)
-	decimalCbrtC3     = new(Decimal)
-	decimalE          = new(Decimal)
-	decimalLnHermiteB = new(Decimal)
-	decimalLnHermiteC = new(Decimal)
-	decimalLog10      = new(Decimal)
-	decimalLog2       = new(Decimal)
+	decimalCbrtC1     = makeConst(strCbrtC1)
+	decimalCbrtC2     = makeConst(strCbrtC2)
+	decimalCbrtC3     = makeConst(strCbrtC2)
+	decimalLnHermiteB = makeConst(strLnHermiteB)
+	decimalLnHermiteC = makeConst(strLnHermiteC)
+
+	decimalE     = makeConstWithPrecision(strE)
+	decimalLog10 = makeConstWithPrecision(strLog10)
+	decimalLog2  = makeConstWithPrecision(strLog2)
 )
 
-func init() {
-	decs := map[string]*Decimal{
-		strCbrtC1:     decimalCbrtC1,
-		strCbrtC2:     decimalCbrtC2,
-		strCbrtC3:     decimalCbrtC3,
-		strE:          decimalE,
-		strLnHermiteB: decimalLnHermiteB,
-		strLnHermiteC: decimalLnHermiteC,
-		strLog10:      decimalLog10,
-		strLog2:       decimalLog2,
+func makeConst(strVal string) *Decimal {
+	d := &Decimal{}
+	_, err := d.SetString(strVal)
+	if err != nil {
+		panic(err)
 	}
-
-	for str, dec := range decs {
-		_, err := dec.SetString(str)
-		if err != nil {
-			panic(err)
-		}
-	}
+	return d
 }
 
 // constWithPrecision implements a look-up table for a constant, rounded-down to
@@ -79,8 +69,7 @@ func makeConstWithPrecision(strVal string) *constWithPrecision {
 	for p := uint32(1); p < maxPrec; p *= 2 {
 		var d Decimal
 
-		ctx := Context{Precision: p}
-		ctx.WithPrecision(uint32(p))
+		ctx := Context{Precision: p, Rounding: RoundHalfUp}
 		_, err := ctx.Round(&d, &c.unrounded)
 		if err != nil {
 			panic(err)
