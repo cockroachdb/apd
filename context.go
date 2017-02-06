@@ -457,7 +457,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	z0.Set(z)
 
 	// Loop until convergence.
-	for loop := nc.newLoop("cbrt", z, c.Precision, 1); false; {
+	for loop := nc.newLoop("cbrt", z, c.Precision, 1); ; {
 		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
 		z.Set(z0)
 		ed.Mul(z, z, z0)
@@ -480,7 +480,21 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
-	return c.Round(d, z)
+
+	// Cbrt has a flawed inexact determination. Due to how the loop termination
+	// is calculated, there can be extra very tiny digits in z, and thus we can't
+	// just trim z's trailing 0s with Reduce. Instead, we must Round and Reduce,
+	// then check if Reduce did anything by comparing Coefficients. This has some
+	// problems but is good enough to pass the tests. Note that the results are
+	// correct, it is the flags that may be flawed.
+	res, err := c.Round(z, z)
+	// Ignore err above because it may have been due to a trap on Inexact | Round.
+	d.Reduce(z)
+	if d.Coeff.Cmp(&z.Coeff) != 0 {
+		// Some 0s were trimmed, this result is exact.
+		return 0, nil
+	}
+	return res, err
 }
 
 // Ln sets d to the natural log of x.
