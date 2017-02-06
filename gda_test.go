@@ -225,6 +225,9 @@ var GDAfiles = []string{
 	"subtract",
 	"tointegral",
 	"tointegralx",
+
+	// non-GDA tests
+	"cuberoot-apd",
 }
 
 func TestGDA(t *testing.T) {

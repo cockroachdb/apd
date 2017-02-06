@@ -454,12 +454,10 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		ed.Mul(z, z, decimalTwo)
 	}
 
-	z0.Set(z)
-
 	// Loop until convergence.
-	for loop := nc.newLoop("cbrt", z, c.Precision, 1); false; {
+	for loop := nc.newLoop("cbrt", z, c.Precision+1, 1); ; {
 		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
-		z.Set(z0)
+		z0.Set(z)
 		ed.Mul(z, z, z0)
 		ed.Quo(z, x, z)
 		ed.Add(z, z, z0)
@@ -474,13 +472,23 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		} else if done {
 			break
 		}
-		z0.Set(z)
 	}
+
+	res, err := c.Round(d, z)
+
+	// Set z = d^3 to check for exactness.
+	ed.Mul(z, d, d)
+	ed.Mul(z, z, d)
 
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
-	return c.Round(d, z)
+
+	// Result is exact
+	if x.Cmp(z) == 0 {
+		return 0, nil
+	}
+	return res, err
 }
 
 // Ln sets d to the natural log of x.
