@@ -89,3 +89,8 @@ cbtx086 cuberoot 343 -> 7
 cbtx087 cuberoot 512 -> 8
 cbtx088 cuberoot 729 -> 9
 cbtx089 cuberoot 1000 -> 10
+
+-- others
+precision: 5
+
+cbtx100 cuberoot 1.0001 -> 1.0000 Inexact Rounded
