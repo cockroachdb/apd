@@ -24,7 +24,9 @@ import (
 // Context maintains options for Decimal operations. It can safely be used
 // concurrently, but not modified concurrently.
 type Context struct {
-	// Precision is the number of places to round during rounding.
+	// Precision is the number of places to round during rounding; this is
+	// effectively the total number of digits (before and after the decimal
+	// point).
 	Precision uint32
 	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
 	// nil.
@@ -587,7 +589,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	// tmp2 = m * ln(2)
 	// Disable Subnormal because decimalLog2 is so long.
 	nc.Traps &= ^Subnormal
-	ed.Mul(tmp2, m, decimalLog2)
+	ed.Mul(tmp2, m, decimalLog2.get(p))
 	ed.Add(tmp1, tmp1, tmp2)
 
 	if err := ed.Err(); err != nil {
@@ -629,7 +631,7 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 		return 0, errors.Wrap(err, "ln")
 	}
 	nc.Precision = c.Precision
-	qr, err := nc.Quo(d, z, decimalLog10)
+	qr, err := nc.Quo(d, z, decimalLog10.get(p))
 	if err != nil {
 		return 0, err
 	}
