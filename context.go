@@ -499,19 +499,9 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
-	// decNumber's decLnOp uses max(c.Precision, x.NumDigits, 7) + 2.
-	p := c.Precision
-	if p < 7 {
-		p = 7
-	}
-	if nd := uint32(x.NumDigits()); p < nd {
-		p = nd
-	}
-	p += 2
-
-	// However, we must add another 5 to make all the tests pass. I think this
-	// means there could be some inputs that will be rounded wrong.
-	p += 5
+	// The internal precision needs to be a few digits higher because errors in
+	// series/iterations add up.
+	p := c.Precision + 2
 
 	nc := c.WithPrecision(p)
 	nc.Rounding = RoundHalfEven
@@ -524,75 +514,143 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	z := new(Decimal).Set(x)
 
-	// Reduce input range to [1/2, 1].
-	m := new(Decimal)
-	for z.Cmp(decimalHalf) < 0 {
-		ed.Sub(m, m, decimalOne)
-		ed.Add(z, z, z)
-	}
-	for z.Cmp(decimalOne) > 0 {
-		ed.Add(m, m, decimalOne)
-		ed.Mul(z, z, decimalHalf)
-	}
+	// To get an initial estimate, we first reduce the input range to the interval
+	// [0.1, 1) by changing the exponent, and later adjust the result by a
+	// multiple of ln(10).
+	//
+	// However, this does not work well for z very close to 1, where the result is
+	// very close to 0. For example:
+	//   z     = 1.00001
+	//   ln(z) = 0.00000999995
+	// If we adjust by 10:
+	//   z'     = 0.100001
+	//   ln(z') = -2.30257509304
+	//   ln(10) =  2.30258509299
+	//   ln(z)  =  0.00001000...
+	//
+	// The issue is that we may need to calculate a much higher (~double)
+	// precision for ln(z) because many of the significant digits cancel out.
+	//
+	// Halley's iteration has a similar problem when z is close to 1: in this case
+	// the correction term (exp(a_n) - z) needs to be calculated to a high
+	// precision. So for z close to 1 (before scaling) we use a power series
+	// instead (which converges very rapidly in this range).
 
-	// Compute the initial estimate using the Hermite interpolation.
+	resAdjust := new(Decimal)
 
-	// tmp1 = z - 1/2
-	ed.Sub(tmp1, z, decimalHalf)
-	// tmp1 = C (z - 1/2)
-	ed.Mul(tmp1, tmp1, decimalLnHermiteC)
-	// tmp1 = B + C (z - 1/2)
-	ed.Add(tmp1, tmp1, decimalLnHermiteB)
-	// tmp2 = z - 1
-	ed.Sub(tmp2, z, decimalOne)
-	// tmp1 = (z - 1) (B + C (z - 1/2)
-	ed.Mul(tmp1, tmp1, tmp2)
-	// tmp1 = A + (z - 1) (B + C (z - 1/2))
-	ed.Add(tmp1, tmp1, decimalOne)
-	// tmp1 = (z - 1) (A + (z - 1) (B + C (z - 1/2)))
-	ed.Mul(tmp1, tmp1, tmp2)
+	// tmp1 = z - 1
+	ed.Sub(tmp1, z, decimalOne)
+	// tmp3 = 0.1
+	tmp3.SetCoefficient(1).SetExponent(-1)
 
-	// Use Halley's Iteration.
-	// We use a bit more precision than the context asks for in newLoop because
-	// this is not the final result.
-	for loop := nc.newLoop("ln", x, c.Precision+1, 1); ; {
-		// tmp1 = a_n (either from initial estimate or last iteration)
+	usePowerSeries := false
 
-		// tmp2 = exp(a_n)
-		ed.Exp(tmp2, tmp1)
+	if tmp2.Abs(tmp1).Cmp(tmp3) <= 0 {
+		usePowerSeries = true
+	} else {
+		// Reduce input to range [0.1, 1).
+		expDelta := int32(z.NumDigits()) + z.Exponent
+		z.Exponent -= expDelta
 
-		// tmp3 = exp(a_n) - z
-		ed.Sub(tmp3, tmp2, z)
+		// We multiplied the input by 10^-expDelta, we will need to add
+		//   ln(10^expDelta) = expDelta * ln(10)
+		// to the result.
+		resAdjust.SetCoefficient(int64(expDelta))
+		ed.Mul(resAdjust, resAdjust, decimalLn10.get(p))
 
-		// tmp3 = 2 * (exp(a_n) - z)
-		ed.Add(tmp3, tmp3, tmp3)
+		// tmp1 = z - 1
+		ed.Sub(tmp1, z, decimalOne)
 
-		// tmp4 = exp(a_n) + z
-		ed.Add(tmp4, tmp2, z)
-
-		// tmp2 = 2 * (exp(a_n) - z) / (exp(a_n) + z)
-		ed.Quo(tmp2, tmp3, tmp4)
-
-		// tmp2 = a_(n+1) = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
-		ed.Sub(tmp2, tmp1, tmp2)
-
-		if done, err := loop.done(tmp2); err != nil {
-			return 0, err
-		} else if done {
-			break
+		if tmp2.Abs(tmp1).Cmp(tmp3) <= 0 {
+			usePowerSeries = true
+		} else {
+			// Compute an initial estimate using floats.
+			zFloat, err := z.Float64()
+			if err != nil {
+				// We know that z is in a reasonable range; no errors should happen during conversion.
+				return 0, err
+			}
+			if _, err := tmp1.SetFloat64(math.Log(zFloat)); err != nil {
+				return 0, err
+			}
 		}
-		if err := ed.Err(); err != nil {
-			return 0, err
-		}
-
-		tmp1.Set(tmp2)
 	}
 
-	// tmp2 = m * ln(2)
-	// Disable Subnormal because decimalLog2 is so long.
-	nc.Traps &= ^Subnormal
-	ed.Mul(tmp2, m, decimalLog2.get(p))
-	ed.Add(tmp1, tmp1, tmp2)
+	if usePowerSeries {
+		// We use the power series:
+		//   ln(1+x) = 2 sum [ 1 / (2n+1) * (x / (x+2))^(2n+1) ]
+		//
+		// This converges rapidly for small x.
+		// See https://en.wikipedia.org/wiki/Logarithm#Power_series
+
+		// tmp1 is already x
+
+		// tmp3 = x + 2
+		ed.Add(tmp3, tmp1, decimalTwo)
+
+		// tmp2 = (x / (x+2))
+		ed.Quo(tmp2, tmp1, tmp3)
+
+		// tmp1 = tmp3 = 2 * (x / (x+2))
+		ed.Add(tmp3, tmp2, tmp2)
+		tmp1.Set(tmp3)
+
+		eps := Decimal{Coeff: *bigOne, Exponent: -int32(p)}
+		for n := 1; ; n++ {
+
+			// tmp3 *= (x / (x+2))^2
+			ed.Mul(tmp3, tmp3, tmp2)
+			ed.Mul(tmp3, tmp3, tmp2)
+
+			// tmp4 = 2n+1
+			tmp4.SetCoefficient(int64(2*n + 1)).SetExponent(0)
+
+			ed.Quo(tmp4, tmp3, tmp4)
+
+			ed.Add(tmp1, tmp1, tmp4)
+
+			if tmp4.Abs(tmp4).Cmp(&eps) <= 0 {
+				break
+			}
+		}
+	} else {
+		// Use Halley's Iteration.
+		// We use a bit more precision than the context asks for in newLoop because
+		// this is not the final result.
+		for loop := nc.newLoop("ln", x, c.Precision+1, 1); ; {
+			// tmp1 = a_n (either from initial estimate or last iteration)
+
+			// tmp2 = exp(a_n)
+			ed.Exp(tmp2, tmp1)
+
+			// tmp3 = exp(a_n) - z
+			ed.Sub(tmp3, tmp2, z)
+
+			// tmp3 = 2 * (exp(a_n) - z)
+			ed.Add(tmp3, tmp3, tmp3)
+
+			// tmp4 = exp(a_n) + z
+			ed.Add(tmp4, tmp2, z)
+
+			// tmp2 = 2 * (exp(a_n) - z) / (exp(a_n) + z)
+			ed.Quo(tmp2, tmp3, tmp4)
+
+			// tmp1 = a_(n+1) = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
+			ed.Sub(tmp1, tmp1, tmp2)
+
+			if done, err := loop.done(tmp1); err != nil {
+				return 0, err
+			} else if done {
+				break
+			}
+			if err := ed.Err(); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	// Apply the adjustment due to the initial rescaling.
+	ed.Add(tmp1, tmp1, resAdjust)
 
 	if err := ed.Err(); err != nil {
 		return 0, err
@@ -617,15 +675,7 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 	// TODO(mjibson): This is exact under some conditions.
 	res := Inexact
 
-	// decNumber's decLnOp uses max(c.Precision, x.NumDigits + t) + 3, where t
-	// is the number of digits in the exponent. However, they hardcode t to just 6.
-	p := c.Precision
-	if nd := uint32(x.NumDigits() + 6); p < nd {
-		p = nd
-	}
-	p += 3
-
-	nc := BaseContext.WithPrecision(p)
+	nc := BaseContext.WithPrecision(c.Precision + 2)
 	nc.Rounding = RoundHalfEven
 	z := new(Decimal)
 	_, err := nc.Ln(z, x)
@@ -633,7 +683,8 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 		return 0, errors.Wrap(err, "ln")
 	}
 	nc.Precision = c.Precision
-	qr, err := nc.Quo(d, z, decimalLog10.get(p))
+
+	qr, err := nc.Mul(d, z, decimalInvLn10.get(c.Precision+2))
 	if err != nil {
 		return 0, err
 	}
