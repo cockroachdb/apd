@@ -92,3 +92,34 @@ func TestDigitsLookupTable(t *testing.T) {
 		}
 	}
 }
+
+func TestTableExp10(t *testing.T) {
+	tests := []struct {
+		pow int64
+		str string
+	}{
+		{
+			pow: 0,
+			str: "1",
+		},
+		{
+			pow: 1,
+			str: "10",
+		},
+		{
+			pow: 5,
+			str: "100000",
+		},
+		{
+			pow: powerTenTableSize + 1,
+			str: "100000000000000000000000000000000000000000000000000000000000000000",
+		},
+	}
+
+	for i, test := range tests {
+		d := tableExp10(test.pow, nil)
+		if s := d.String(); s != test.str {
+			t.Errorf("%d: expected PowerOfTenDec(%d) to give %s, got %s", i, test.pow, test.str, s)
+		}
+	}
+}

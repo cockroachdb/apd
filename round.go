@@ -70,8 +70,8 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			return SystemUnderflow | Underflow
 		}
 		res |= Rounded
-		y := big.NewInt(diff)
-		e := new(big.Int).Exp(bigTen, y, nil)
+		y := new(big.Int)
+		e := tableExp10(diff, y)
 		m := new(big.Int)
 		y.QuoRem(&d.Coeff, e, m)
 		if m.Sign() != 0 {
