@@ -154,6 +154,11 @@ func (d *Decimal) ToSci() string {
 // part). This can result in long strings given large exponents.
 func (d *Decimal) ToStandard() string {
 	s := d.Coeff.String()
+	var neg string
+	if strings.HasPrefix(s, "-") {
+		neg = "-"
+		s = s[1:]
+	}
 	if d.Exponent < 0 {
 		if left := -int(d.Exponent) - len(s); left > 0 {
 			s = "0." + strings.Repeat("0", left) + s
@@ -166,7 +171,7 @@ func (d *Decimal) ToStandard() string {
 	} else if d.Exponent > 0 {
 		s += strings.Repeat("0", int(d.Exponent))
 	}
-	return s
+	return neg + s
 }
 
 // Set sets d's Coefficient and Exponent from x and returns d.
