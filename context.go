@@ -940,8 +940,7 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 		if diff < MinExponent {
 			return SystemUnderflow | Underflow
 		}
-		y := big.NewInt(-int64(diff))
-		e := new(big.Int).Exp(bigTen, y, nil)
+		e := tableExp10(-int64(diff), nil)
 		d.Coeff.Mul(&d.Coeff, e)
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
@@ -1013,12 +1012,11 @@ func (c *Context) Reduce(d, x *Decimal) (Condition, error) {
 	return c.Round(d, d)
 }
 
-// exp10 returns x, 1*10^x. An error is returned if x is too large.
+// exp10 returns x, 10^x. An error is returned if x is too large.
 func exp10(x int64) (f, exp *big.Int, err error) {
 	if x > MaxExponent || x < MinExponent {
 		return nil, nil, errors.New(errExponentOutOfRangeStr)
 	}
 	f = big.NewInt(x)
-	// TODO(mjibson): use a table here.
-	return f, new(big.Int).Exp(bigTen, f, nil), nil
+	return f, tableExp10(x, f), nil
 }

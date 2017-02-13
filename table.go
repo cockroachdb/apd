@@ -85,3 +85,39 @@ func NumDigits(b *big.Int) int64 {
 	}
 	return n
 }
+
+// powerTenTableSize is the magnitude of the maximum power of 10 exponent that
+// is stored in the pow10LookupTable. For instance, if the powerTenTableSize
+// if 3, then the lookup table will store power of 10 values from 10^0 to
+// 10^3 inclusive.
+const powerTenTableSize = 64
+
+var pow10LookupTable [powerTenTableSize + 1]big.Int
+
+func init() {
+	tmpInt := new(big.Int)
+	for i := int64(0); i <= powerTenTableSize; i++ {
+		setBigWithPow(&pow10LookupTable[i], tmpInt, i)
+	}
+}
+
+func setBigWithPow(bi *big.Int, tmpInt *big.Int, pow int64) {
+	if tmpInt == nil {
+		tmpInt = new(big.Int)
+	}
+	bi.Exp(bigTen, tmpInt.SetInt64(pow), nil)
+}
+
+// tableExp10 returns 10^x for x >= 0, looked up from a table when possible. If
+// f is not nil, it will be set to x. The returned value must not be mutated.
+func tableExp10(x int64, f *big.Int) *big.Int {
+	if x <= powerTenTableSize {
+		if f != nil {
+			f.SetInt64(int64(x))
+		}
+		return &pow10LookupTable[x]
+	}
+	b := new(big.Int)
+	setBigWithPow(b, f, x)
+	return b
+}
