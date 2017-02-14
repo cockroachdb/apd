@@ -284,6 +284,13 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 		res, err = c.ToIntegral(d, x)
 	case "tointegralx":
 		res, err = c.ToIntegralX(d, x)
+
+	// Below used only in benchmarks. Tests call it themselves.
+	case "compare":
+		x.Cmp(y)
+	case "tosci":
+		x.ToSci()
+
 	default:
 		done <- fmt.Errorf("unknown operation: %s", tc.Operation)
 	}
@@ -296,17 +303,20 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 func BenchmarkGDA(b *testing.B) {
 	for _, fname := range GDAfiles {
 		b.Run(fname, func(b *testing.B) {
+			b.StopTimer()
 			_, tcs := readGDA(b, fname)
 			res := new(Decimal)
-			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 			Loop:
 				for _, tc := range tcs {
-					b.StopTimer()
 					if GDAignore[tc.ID] || tc.Result == "?" || tc.HasNull() {
 						continue
 					}
 					if tc.Result == "NAN" {
+						continue
+					}
+					switch tc.Operation {
+					case "apply", "toeng":
 						continue
 					}
 					// Can't do inf either, and need to support -inf.
@@ -323,10 +333,9 @@ func BenchmarkGDA(b *testing.B) {
 					}
 					c := tc.Context(b)
 					b.StartTimer()
-					_, err := tc.Run(c, nil, res, operands[0], operands[1])
-					if err != nil {
-						b.Fatalf("%s: %+v", tc.ID, err)
-					}
+					// Ignore errors here because the full tests catch them.
+					_, _ = tc.Run(c, nil, res, operands[0], operands[1])
+					b.StopTimer()
 				}
 			}
 		})
