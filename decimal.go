@@ -462,12 +462,38 @@ func (d *Decimal) Abs(x *Decimal) *Decimal {
 
 // Reduce sets d to x with all trailing zeros removed and returns d.
 func (d *Decimal) Reduce(x *Decimal) *Decimal {
-	if x.Sign() == 0 {
+	neg := false
+	switch x.Sign() {
+	case 0:
 		d.SetCoefficient(0)
 		d.Exponent = 0
 		return d
+	case -1:
+		neg = true
 	}
 	d.Set(x)
+
+	// Use a uint64 for the division if possible.
+	if d.Coeff.BitLen() <= 64 {
+		i := d.Coeff.Uint64()
+		e := d.Exponent
+		for i >= 10000 && i%10000 == 0 {
+			i /= 10000
+			e += 4
+		}
+		for i%10 == 0 {
+			i /= 10
+			e++
+		}
+		if e != d.Exponent {
+			d.Exponent = e
+			d.Coeff.SetUint64(i)
+			if neg {
+				d.Coeff.Neg(&d.Coeff)
+			}
+		}
+		return d
+	}
 
 	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
 	// faster than converting to a string and trimming the 0s from the end.
