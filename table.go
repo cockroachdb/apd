@@ -25,9 +25,12 @@ import "math/big"
 // Using this proof, for a given digit count, the map will return the lower number
 // of decimal digits (k) the binary digit count could represent, along with the
 // value of the border between the two decimal digit counts (10^k).
-const digitsTableSize = 128
+const (
+	digitsTableSize = 128
+	digitsTableLen  = digitsTableSize + 1
+)
 
-var digitsLookupTable [digitsTableSize + 1]tableVal
+var digitsLookupTable [digitsTableLen]tableVal
 
 type tableVal struct {
 	digits int64
@@ -51,13 +54,6 @@ func init() {
 	}
 }
 
-func lookupBits(bitLen int) (tableVal, bool) {
-	if bitLen > 0 && bitLen < len(digitsLookupTable) {
-		return digitsLookupTable[bitLen], true
-	}
-	return tableVal{}, false
-}
-
 // NumDigits returns the number of decimal digits of d.Coeff.
 func (d *Decimal) NumDigits() int64 {
 	return NumDigits(&d.Coeff)
@@ -69,17 +65,25 @@ func NumDigits(b *big.Int) int64 {
 	if bl == 0 {
 		return 1
 	}
-	if val, ok := lookupBits(bl); ok {
-		ab := new(big.Int).Abs(b)
-		if ab.Cmp(&val.border) < 0 {
+
+	if bl < digitsTableLen {
+		val := digitsLookupTable[bl]
+		a := b
+		if b.Sign() < 0 {
+			a = new(big.Int).Abs(b)
+		}
+		if a.Cmp(&val.border) < 0 {
 			return val.digits
 		}
 		return val.digits + 1
 	}
 
 	n := int64(float64(bl) / digitsToBitsRatio)
-	a := new(big.Int).Abs(b)
 	e := new(big.Int).Exp(bigTen, big.NewInt(n), nil)
+	a := b
+	if b.Sign() < 0 {
+		a = new(big.Int).Abs(b)
+	}
 	if a.Cmp(e) >= 0 {
 		n++
 	}

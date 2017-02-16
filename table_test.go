@@ -22,6 +22,31 @@ import (
 	"testing"
 )
 
+func BenchmarkNumDigitsLookup(b *testing.B) {
+	b.StopTimer()
+	runTest := func(start string, c byte) {
+		buf := bytes.NewBufferString(start)
+		var offset int
+		if strings.HasPrefix(start, "-") {
+			offset--
+		}
+		for i := 1; i < digitsTableSize; i++ {
+			buf.WriteByte(c)
+			d, _, _ := NewFromString(buf.String())
+
+			b.StartTimer()
+			d.NumDigits()
+			b.StopTimer()
+		}
+	}
+	for i := 0; i < b.N; i++ {
+		runTest("", '9')
+		runTest("1", '0')
+		runTest("-", '9')
+		runTest("-1", '0')
+	}
+}
+
 func TestNumDigits(t *testing.T) {
 	runTest := func(start string, c byte) {
 		buf := bytes.NewBufferString(start)
