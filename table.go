@@ -119,16 +119,14 @@ func setBigWithPow(bi *big.Int, tmpInt *big.Int, pow int64) {
 	bi.Exp(bigTen, tmpInt.SetInt64(pow), nil)
 }
 
-// tableExp10 returns 10^x for x >= 0, looked up from a table when possible. If
-// f is not nil, it will be set to x. The returned value must not be mutated.
-func tableExp10(x int64, f *big.Int) *big.Int {
+// tableExp10 returns 10^x for x >= 0, looked up from a table when
+// possible. This returned value must not be mutated. tmp is used as an
+// intermediate variable, but may be nil.
+func tableExp10(x int64, tmp *big.Int) *big.Int {
 	if x <= powerTenTableSize {
-		if f != nil {
-			f.SetInt64(int64(x))
-		}
 		return &pow10LookupTable[x]
 	}
 	b := new(big.Int)
-	setBigWithPow(b, f, x)
+	setBigWithPow(b, tmp, x)
 	return b
 }
