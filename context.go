@@ -789,7 +789,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	}
 
 	// sum ** k
-	_, ki, err := exp10(int64(t))
+	ki, err := exp10(int64(t))
 	if err != nil {
 		return 0, errors.Wrap(err, "ki")
 	}
@@ -1013,10 +1013,9 @@ func (c *Context) Reduce(d, x *Decimal) (Condition, error) {
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.
-func exp10(x int64) (f, exp *big.Int, err error) {
+func exp10(x int64) (exp *big.Int, err error) {
 	if x > MaxExponent || x < MinExponent {
-		return nil, nil, errors.New(errExponentOutOfRangeStr)
+		return nil, errors.New(errExponentOutOfRangeStr)
 	}
-	f = big.NewInt(x)
-	return f, tableExp10(x, f), nil
+	return tableExp10(x, nil), nil
 }
