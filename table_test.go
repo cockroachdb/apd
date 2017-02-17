@@ -22,6 +22,48 @@ import (
 	"testing"
 )
 
+func BenchmarkNumDigitsLookup(b *testing.B) {
+	b.StopTimer()
+	runTest := func(start string, c byte) {
+		buf := bytes.NewBufferString(start)
+		for i := 1; i < digitsTableSize; i++ {
+			buf.WriteByte(c)
+			d, _, _ := NewFromString(buf.String())
+
+			b.StartTimer()
+			d.NumDigits()
+			b.StopTimer()
+		}
+	}
+	for i := 0; i < b.N; i++ {
+		runTest("", '9')
+		runTest("1", '0')
+		runTest("-", '9')
+		runTest("-1", '0')
+	}
+}
+
+func BenchmarkNumDigitsFull(b *testing.B) {
+	b.StopTimer()
+	runTest := func(start string, c byte) {
+		buf := bytes.NewBufferString(start)
+		for i := 1; i < 1000; i++ {
+			buf.WriteByte(c)
+			d, _, _ := NewFromString(buf.String())
+
+			b.StartTimer()
+			d.NumDigits()
+			b.StopTimer()
+		}
+	}
+	for i := 0; i < b.N; i++ {
+		runTest("", '9')
+		runTest("1", '0')
+		runTest("-", '9')
+		runTest("-1", '0')
+	}
+}
+
 func TestNumDigits(t *testing.T) {
 	runTest := func(start string, c byte) {
 		buf := bytes.NewBufferString(start)
@@ -112,7 +154,7 @@ func TestTableExp10(t *testing.T) {
 		},
 		{
 			pow: powerTenTableSize + 1,
-			str: "100000000000000000000000000000000000000000000000000000000000000000",
+			str: "1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
 
