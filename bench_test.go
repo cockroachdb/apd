@@ -58,7 +58,7 @@ func runBenches(
 					for j := 1; j < numDigits; j++ {
 						buf.WriteByte('0' + byte(rand.Intn(10)))
 					}
-					if _, err := nums[i].SetString(buf.String()); err != nil {
+					if _, _, err := nums[i].SetString(buf.String()); err != nil {
 						b.Fatal(err)
 					}
 					nums[i].SetExponent(int32(s - numDigits))

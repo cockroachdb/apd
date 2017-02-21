@@ -91,11 +91,10 @@ func NewFromString(s string) (*Decimal, Condition, error) {
 	return BaseContext.NewFromString(s)
 }
 
-// SetString set's d to s and returns d. It has no restrictions on exponents
+// SetString sets d to s and returns d. It has no restrictions on exponents
 // or precision.
-func (d *Decimal) SetString(s string) (*Decimal, error) {
-	_, err := d.setString(&BaseContext, s)
-	return d, err
+func (d *Decimal) SetString(s string) (*Decimal, Condition, error) {
+	return BaseContext.SetString(d, s)
 }
 
 // NewFromString creates a new decimal from s. The returned Decimal has its
@@ -103,6 +102,13 @@ func (d *Decimal) SetString(s string) (*Decimal, error) {
 // digits than the context's precision.
 func (c *Context) NewFromString(s string) (*Decimal, Condition, error) {
 	d := new(Decimal)
+	return c.SetString(d, s)
+}
+
+// SetString sets d to s and returns d. The returned Decimal has its exponents
+// restricted by the context and its value rounded if it contains more digits
+// than the context's precision.
+func (c *Context) SetString(d *Decimal, s string) (*Decimal, Condition, error) {
 	res, err := d.setString(c, s)
 	if err != nil {
 		return nil, 0, err
@@ -200,7 +206,8 @@ func (d *Decimal) SetExponent(x int32) *Decimal {
 // SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
 // hold the exact value of f.
 func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
-	return d.SetString(strconv.FormatFloat(f, 'E', -1, 64))
+	_, _, err := d.SetString(strconv.FormatFloat(f, 'E', -1, 64))
+	return d, err
 }
 
 // Int64 returns the int64 representation of x. If x cannot be represented in an int64, an error is returned.

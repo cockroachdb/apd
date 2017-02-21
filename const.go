@@ -45,7 +45,7 @@ var (
 
 func makeConst(strVal string) *Decimal {
 	d := &Decimal{}
-	_, err := d.SetString(strVal)
+	_, _, err := d.SetString(strVal)
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +62,7 @@ type constWithPrecision struct {
 
 func makeConstWithPrecision(strVal string) *constWithPrecision {
 	c := &constWithPrecision{}
-	if _, err := c.unrounded.SetString(strVal); err != nil {
+	if _, _, err := c.unrounded.SetString(strVal); err != nil {
 		panic(err)
 	}
 	// The length of the string might be one higher than the availble precision
