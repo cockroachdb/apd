@@ -390,3 +390,34 @@ func TestToStandard(t *testing.T) {
 		})
 	}
 }
+
+func TestContextSetStringt(t *testing.T) {
+	tests := []struct {
+		s      string
+		c      *Context
+		expect string
+	}{
+		{
+			s:      "1.234",
+			c:      &BaseContext,
+			expect: "1.234",
+		},
+		{
+			s:      "1.234",
+			c:      BaseContext.WithPrecision(2),
+			expect: "1.2",
+		},
+	}
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("%d: %s", i, tc.s), func(t *testing.T) {
+			d := new(Decimal)
+			if _, _, err := tc.c.SetString(d, tc.s); err != nil {
+				t.Fatal(err)
+			}
+			got := d.String()
+			if got != tc.expect {
+				t.Fatalf("expected: %s, got: %s", tc.expect, got)
+			}
+		})
+	}
+}
