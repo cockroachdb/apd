@@ -932,16 +932,16 @@ func (c *Context) Quantize(d, v, x *Decimal) (Condition, error) {
 }
 
 func (c *Context) quantize(d, v, e *Decimal) Condition {
+	// Record exp here in case d == e.
+	exp := e.Exponent
+	diff := exp - v.Exponent
 	d.Coeff.Set(&v.Coeff)
-	diff := e.Exponent - v.Exponent
 	var res Condition
-	var offset int32
 	if diff < 0 {
 		if diff < MinExponent {
 			return SystemUnderflow | Underflow
 		}
-		e := tableExp10(-int64(diff), nil)
-		d.Coeff.Mul(&d.Coeff, e)
+		d.Coeff.Mul(&d.Coeff, tableExp10(-int64(diff), nil))
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
@@ -952,9 +952,14 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 		} else {
 			nc := c.WithPrecision(uint32(p))
 			neg := d.Sign() < 0
+			d.Exponent = -diff
 			// Avoid the c.Precision == 0 check.
-			res = nc.Rounding.Round(nc, d, d)
-			offset = d.Exponent - diff
+			res = nc.rounding().Round(nc, d, d)
+			// Adjust for 0.9 -> 1.0 rollover.
+			for d.Exponent > 0 {
+				d.Exponent--
+				d.Coeff.Mul(&d.Coeff, bigTen)
+			}
 			// TODO(mjibson): There may be a bug in roundAddOne or roundFunc that
 			// unexpectedly removes a negative sign when converting from -9 to -10. This
 			// check is needed until it is fixed.
@@ -963,7 +968,7 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 			}
 		}
 	}
-	d.Exponent = e.Exponent + offset
+	d.Exponent = exp
 	return res
 }
 
