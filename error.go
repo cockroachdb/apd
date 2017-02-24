@@ -124,9 +124,15 @@ func (e *ErrDecimal) Pow(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Pow)
 }
 
-// Quantize performs e.Ctx.Quantize(d, v, x) and returns d.
-func (e *ErrDecimal) Quantize(d, v, x *Decimal) *Decimal {
-	return e.op3(d, v, x, e.Ctx.Quantize)
+// Quantize performs e.Ctx.Quantize(d, v, exp) and returns d.
+func (e *ErrDecimal) Quantize(d, v *Decimal, exp int32) *Decimal {
+	if e.Err() != nil {
+		return d
+	}
+	res, err := e.Ctx.Quantize(d, v, exp)
+	e.Flags |= res
+	e.err = err
+	return d
 }
 
 // Quo performs e.Ctx.Quo(d, x, y) and returns d.
