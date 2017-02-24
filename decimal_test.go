@@ -421,3 +421,48 @@ func TestContextSetStringt(t *testing.T) {
 		})
 	}
 }
+
+func TestQuantize(t *testing.T) {
+	tests := []struct {
+		s      string
+		e      int32
+		expect string
+	}{
+		{
+			s:      "1.00",
+			e:      -1,
+			expect: "1.0",
+		},
+		{
+			s:      "2.0",
+			e:      -1,
+			expect: "2.0",
+		},
+		{
+			s:      "3",
+			e:      -1,
+			expect: "3.0",
+		},
+		{
+			s:      "9.9999",
+			e:      -2,
+			expect: "10.00",
+		},
+	}
+	c := BaseContext.WithPrecision(10)
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %d", tc.s, tc.e), func(t *testing.T) {
+			d, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.Quantize(d, d, &Decimal{Exponent: tc.e}); err != nil {
+				t.Fatal(err)
+			}
+			s := d.String()
+			if s != tc.expect {
+				t.Fatalf("expected: %s, got: %s", tc.expect, s)
+			}
+		})
+	}
+}
