@@ -228,7 +228,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			half := dividend.Cmp(divisor)
 			rounding := c.rounding()
 			if rounding(&quo.Coeff, half) {
-				roundAddOne(&quo.Coeff, &diff)
+				roundAddOne(&quo.Coeff, &diff, 1 /* positive */)
 			}
 		}
 	}
@@ -951,16 +951,9 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 			}
 		} else {
 			nc := c.WithPrecision(uint32(p))
-			neg := d.Sign() < 0
 			// Avoid the c.Precision == 0 check.
 			res = nc.Rounding.Round(nc, d, d)
 			offset = d.Exponent - diff
-			// TODO(mjibson): There may be a bug in roundAddOne or roundFunc that
-			// unexpectedly removes a negative sign when converting from -9 to -10. This
-			// check is needed until it is fixed.
-			if neg && d.Sign() > 0 {
-				d.Coeff.Neg(&d.Coeff)
-			}
 		}
 	}
 	d.Exponent = e.Exponent + offset
