@@ -50,10 +50,11 @@ type Rounder func(result *big.Int, half int) bool
 func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 	d.Set(x)
 	nd := x.NumDigits()
+	xs := x.Sign()
 	var res Condition
 
 	// adj is the adjusted exponent: exponent + clength - 1
-	if adj := int64(x.Exponent) + nd - 1; x.Sign() != 0 && adj < int64(c.MinExponent) {
+	if adj := int64(x.Exponent) + nd - 1; xs != 0 && adj < int64(c.MinExponent) {
 		// Subnormal is defined before rounding.
 		res |= Subnormal
 		// setExponent here to prevent double-rounded subnormals.
@@ -79,7 +80,7 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			m.Abs(m)
 			discard := NewWithBigInt(m, int32(-diff))
 			if r(y, discard.Cmp(decimalHalf)) {
-				roundAddOne(y, &diff)
+				roundAddOne(y, &diff, xs)
 			}
 		}
 		d.Coeff = *y
@@ -91,9 +92,9 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 }
 
 // roundAddOne adds 1 to abs(b).
-func roundAddOne(b *big.Int, diff *int64) {
+func roundAddOne(b *big.Int, diff *int64, sign int) {
 	nd := NumDigits(b)
-	if b.Sign() >= 0 {
+	if sign >= 0 {
 		b.Add(b, bigOne)
 	} else {
 		b.Sub(b, bigOne)
