@@ -271,7 +271,7 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	case "power":
 		res, err = c.Pow(d, x, y)
 	case "quantize":
-		res, err = c.Quantize(d, x, y)
+		res, err = c.Quantize(d, x, y.Exponent)
 	case "reduce":
 		res, err = c.Reduce(d, x)
 	case "remainder":

@@ -921,9 +921,10 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	return c.goError(res)
 }
 
-// Quantize sets d to the value of v with x's Exponent.
-func (c *Context) Quantize(d, v, x *Decimal) (Condition, error) {
-	res := c.quantize(d, v, x)
+// Quantize adjusts and rounds v as necessary so it is represented with
+// exponent exp and stores the result in d.
+func (c *Context) Quantize(d, v *Decimal, exp int32) (Condition, error) {
+	res := c.quantize(d, v, exp)
 	if nd := d.NumDigits(); nd > int64(c.Precision) {
 		res |= InvalidOperation
 	}
@@ -931,17 +932,15 @@ func (c *Context) Quantize(d, v, x *Decimal) (Condition, error) {
 	return c.goError(res)
 }
 
-func (c *Context) quantize(d, v, e *Decimal) Condition {
+func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
+	diff := exp - v.Exponent
 	d.Coeff.Set(&v.Coeff)
-	diff := e.Exponent - v.Exponent
 	var res Condition
-	var offset int32
 	if diff < 0 {
 		if diff < MinExponent {
 			return SystemUnderflow | Underflow
 		}
-		e := tableExp10(-int64(diff), nil)
-		d.Coeff.Mul(&d.Coeff, e)
+		d.Coeff.Mul(&d.Coeff, tableExp10(-int64(diff), nil))
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
@@ -951,17 +950,36 @@ func (c *Context) quantize(d, v, e *Decimal) Condition {
 			}
 		} else {
 			nc := c.WithPrecision(uint32(p))
+
+			// The idea here is that the resulting d.Exponent after rounding will be 0. We
+			// have a number of, say, 5 digits, but p (our precision) above is set at, say,
+			// 3. So here d.Exponent is set to `-2`. We have a number like `NNN.xx`, where
+			// the `.xx` part will be rounded away. However during rounding of 0.9 to 1.0,
+			// d.Exponent could be set to 1 instead of 0, so we have to reduce it and
+			// increase the coefficient below.
+
+			// Another solution is to set d.Exponent = v.Exponent and adjust it to exp,
+			// instead of setting d.Exponent = -diff and adjusting it to zero. Although
+			// this computes the correct result, it fails the Max/MinExponent checks
+			// during Round and raises underflow flags. Quantize (as per the spec)
+			// is guaranteed to not raise underflow, and using 0 instead of exp as the
+			// target eliminates this problem.
+
+			d.Exponent = -diff
 			// Avoid the c.Precision == 0 check.
-			res = nc.Rounding.Round(nc, d, d)
-			offset = d.Exponent - diff
+			res = nc.rounding().Round(nc, d, d)
+			// Adjust for 0.9 -> 1.0 rollover.
+			if d.Exponent > 0 {
+				d.Coeff.Mul(&d.Coeff, bigTen)
+			}
 		}
 	}
-	d.Exponent = e.Exponent + offset
+	d.Exponent = exp
 	return res
 }
 
 func (c *Context) toIntegral(d, x *Decimal) Condition {
-	res := c.quantize(d, x, decimalOne)
+	res := c.quantize(d, x, 0)
 	// TODO(mjibson): trim here, once trim is in
 	return res
 }
