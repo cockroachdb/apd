@@ -768,38 +768,6 @@ var GDAignore = map[string]bool{
 	"logx1309": true,
 	"logx1310": true,
 
-	// The Vienna case
-	"powx219": true,
-
-	// shouldn't overflow, but does
-	"expx055":  true,
-	"expx056":  true,
-	"expx057":  true,
-	"expx058":  true,
-	"expx059":  true,
-	"expx1236": true,
-	"expx709":  true,
-	"expx711":  true,
-	"expx722":  true,
-	"expx724":  true,
-	"expx726":  true,
-	"expx732":  true,
-	"expx733":  true,
-	"expx736":  true,
-	"expx737":  true,
-	"expx758":  true,
-	"expx759":  true,
-	"expx760":  true,
-	"expx761":  true,
-	"expx762":  true,
-	"expx763":  true,
-	"expx764":  true,
-	"expx765":  true,
-	"expx766":  true,
-	"expx769":  true,
-	"expx770":  true,
-	"expx771":  true,
-
 	// exceeds system overflow
 	"expx291": true,
 	"expx292": true,
@@ -913,4 +881,7 @@ var GDAignoreFlags = map[string]bool{
 	"sqtx9039": true,
 	"sqtx9040": true,
 	"sqtx9045": true,
+
+	// missing underflow, subnormal
+	"expx756": true,
 }

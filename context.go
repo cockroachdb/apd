@@ -719,11 +719,18 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	res := Inexact | Rounded
 
 	// Stage 1
-	cp := int64(c.Precision)
+	cp := int64(nc.Precision)
 	tmp1 := new(Decimal).Abs(x)
+	if f, err := tmp1.Float64(); err == nil {
+		// This algorithm doesn't work if currentprecision*23 < |x|. Attempt to
+		// increase the working precision if needed as long as it isn't too large. If
+		// it is too large, don't bump the precision, causing an early overflow return.
+		if ncp := f / 23; ncp > float64(cp) && ncp < 1000 {
+			cp = int64(math.Ceil(ncp))
+			nc.Precision = uint32(cp)
+		}
+	}
 	tmp2 := New(cp*23, 0)
-	// TODO(mjibson): figure out why the paper has this number and attempt to
-	// increase or remove this limit. Many tests fail because of this.
 	// if abs(x) > 23*currentprecision; assert false
 	if tmp1.Cmp(tmp2) > 0 {
 		res |= Overflow
@@ -753,7 +760,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	k := New(1, t)
 	r := new(Decimal)
 	if _, err := nc.Quo(r, x, k); err != nil {
-		return 0, errors.Wrap(err, "QuoInteger")
+		return 0, errors.Wrap(err, "Quo")
 	}
 	ra := new(Decimal).Abs(r)
 	p := cp + int64(t) + 2
@@ -793,10 +800,14 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "ki")
 	}
+	nc.MaxExponent *= 2
+	nc.MinExponent *= 2
 	if _, err := nc.integerPower(d, sum, ki); err != nil {
 		return 0, errors.Wrap(err, "integer power")
 	}
 	nc.Precision = c.Precision
+	nc.MaxExponent = c.MaxExponent
+	nc.MinExponent = c.MinExponent
 	res |= nc.round(d, d)
 	return c.goError(res)
 }
