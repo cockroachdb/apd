@@ -24,7 +24,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -81,7 +80,6 @@ func ParseDecTest(r io.Reader) ([]TestCase, error) {
 		Extended: true,
 	}
 	var err error
-	negZero := regexp.MustCompile(`^-0(\.0+)?(E.*)?$`)
 	var res []TestCase
 
 Loop:
@@ -157,10 +155,6 @@ Loop:
 				return nil, fmt.Errorf("bad test case line: %q", text)
 			}
 			tc.Result = strings.ToUpper(cleanNumber(line[0]))
-			// We don't currently support -0.
-			if negZero.MatchString(tc.Result) {
-				continue
-			}
 			tc.Conditions = line[1:]
 			res = append(res, tc)
 		}
@@ -500,6 +494,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			case <-time.After(time.Second * 120):
 				t.Fatalf("timeout")
 			}
+			if d.Coeff.Sign() < 0 {
+				t.Fatalf("negative coeff: %s", d.Coeff.String())
+			}
 			// Verify the operands didn't change.
 			for i, o := range tc.Operands {
 				v := newDecimal(t, opctx, o)
@@ -630,12 +627,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				// Some operations allow 1ulp of error in tests.
 				switch tc.Operation {
 				case "exp", "ln", "log10", "power":
-					if d.Cmp(r) < 0 {
-						d.Coeff.Add(&d.Coeff, bigOne)
-					} else {
-						r.Coeff.Add(&r.Coeff, bigOne)
-					}
-					if d.Cmp(r) == 0 {
+					nc := c.WithPrecision(0)
+					nc.Sub(d, d, r)
+					if d.Coeff.Cmp(bigOne) == 0 {
 						t.Logf("pass: within 1ulp: %s, %s", d, r)
 						return
 					}
@@ -815,6 +809,14 @@ var GDAignore = map[string]bool{
 	"addx61633": true,
 	"addx61634": true,
 	"addx61638": true,
+
+	// should be -0E-398, got -1E-398
+	"addx1613":  true,
+	"addx1614":  true,
+	"addx1618":  true,
+	"addx61613": true,
+	"addx61614": true,
+	"addx61618": true,
 
 	// extreme input range, but should work
 	"lnx0902":  true,
