@@ -714,16 +714,20 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 		return 0, errors.New(errZeroPrecisionStr)
 	}
 
-	nc := c.WithPrecision(c.Precision)
-	nc.Rounding = RoundHalfEven
 	res := Inexact | Rounded
 
 	// Stage 1
-	cp := int64(c.Precision)
+	cp := c.Precision
 	tmp1 := new(Decimal).Abs(x)
-	tmp2 := New(cp*23, 0)
-	// TODO(mjibson): figure out why the paper has this number and attempt to
-	// increase or remove this limit. Many tests fail because of this.
+	if f, err := tmp1.Float64(); err == nil {
+		// This algorithm doesn't work if currentprecision*23 < |x|. Attempt to
+		// increase the working precision if needed as long as it isn't too large. If
+		// it is too large, don't bump the precision, causing an early overflow return.
+		if ncp := f / 23; ncp > float64(cp) && ncp < 1000 {
+			cp = uint32(math.Ceil(ncp))
+		}
+	}
+	tmp2 := New(int64(cp)*23, 0)
 	// if abs(x) > 23*currentprecision; assert false
 	if tmp1.Cmp(tmp2) > 0 {
 		res |= Overflow
@@ -752,11 +756,13 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	}
 	k := New(1, t)
 	r := new(Decimal)
+	nc := c.WithPrecision(cp)
+	nc.Rounding = RoundHalfEven
 	if _, err := nc.Quo(r, x, k); err != nil {
-		return 0, errors.Wrap(err, "QuoInteger")
+		return 0, errors.Wrap(err, "Quo")
 	}
 	ra := new(Decimal).Abs(r)
-	p := cp + int64(t) + 2
+	p := int64(cp) + int64(t) + 2
 
 	// Stage 3
 	rf, err := ra.Float64()
@@ -821,7 +827,11 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 		}
 		b.Rsh(b, 1)
 
-		ed.Mul(n, n, n)
+		// Only compute the next n if we are going to use it. Otherwise n can overflow
+		// on the last iteration causing this to error.
+		if b.Sign() > 0 {
+			ed.Mul(n, n, n)
+		}
 		if err := ed.Err(); err != nil {
 			// In the negative case, convert overflow to underflow.
 			if neg {
