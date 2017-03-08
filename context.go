@@ -895,24 +895,29 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	nc := BaseContext.WithPrecision(p)
 
+	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
+	res := c.quantize(integ, integ, 0)
+	nres, err := nc.integerPower(d, x, &integ.Coeff)
+	res |= nres
+	if err != nil {
+		return res, err
+	}
+
 	if yIsInt {
-		// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
-		res := c.quantize(integ, integ, 0)
-		nres, err := nc.integerPower(d, x, &integ.Coeff)
-		res |= nres
-		if err != nil {
-			return res, err
-		}
 		res |= c.round(d, d)
 		return c.goError(res)
 	}
 
 	ed := MakeErrDecimal(nc)
 
+	// Compute x**frac(y)
 	ed.Abs(tmp, x)
 	ed.Ln(tmp, tmp)
-	ed.Mul(tmp, tmp, y)
+	ed.Mul(tmp, tmp, frac)
 	ed.Exp(tmp, tmp)
+
+	// Join integer and frac parts back.
+	ed.Mul(tmp, d, tmp)
 
 	if xs < 0 && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
 		ed.Neg(tmp, tmp)
@@ -921,7 +926,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	if err := ed.Err(); err != nil {
 		return ed.Flags, err
 	}
-	res := c.round(d, tmp)
+	res |= c.round(d, tmp)
 	res |= Inexact
 	return c.goError(res)
 }
