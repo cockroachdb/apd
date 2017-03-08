@@ -842,36 +842,20 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 	}
 
 	if neg {
-		e := z.Exponent
-		if e < 0 {
-			e = -e
-		}
-		qc := c.WithPrecision((uint32(z.NumDigits()) + uint32(e)) * 2)
-		ed.Ctx = qc
 		ed.Quo(z, decimalOne, z)
-		ed.Ctx = c
 	}
 	return ed.Flags, ed.Err()
 }
 
 // Pow sets d = x**y.
 func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
-	// x ** 1 == x
-	if y.Cmp(decimalOne) == 0 {
-		return c.Round(d, x)
-	}
-	// 1 ** x == 1
-	if x.Cmp(decimalOne) == 0 {
-		return c.Round(d, x)
-	}
-
 	// Check if y is of type int.
 	tmp := new(Decimal)
 	if _, err := c.Abs(tmp, y); err != nil {
 		return 0, errors.Wrap(err, "Abs")
 	}
 	integ, frac := new(Decimal), new(Decimal)
-	tmp.Modf(integ, frac)
+	y.Modf(integ, frac)
 	yIsInt := frac.Sign() == 0
 
 	xs := x.Sign()
@@ -910,12 +894,30 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	p += 4
 
 	nc := BaseContext.WithPrecision(p)
+
+	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
+	res := c.quantize(integ, integ, 0)
+	nres, err := nc.integerPower(d, x, &integ.Coeff)
+	res |= nres
+	if err != nil {
+		return res, err
+	}
+
+	if yIsInt {
+		res |= c.round(d, d)
+		return c.goError(res)
+	}
+
 	ed := MakeErrDecimal(nc)
 
+	// Compute x**frac(y)
 	ed.Abs(tmp, x)
 	ed.Ln(tmp, tmp)
-	ed.Mul(tmp, tmp, y)
+	ed.Mul(tmp, tmp, frac)
 	ed.Exp(tmp, tmp)
+
+	// Join integer and frac parts back.
+	ed.Mul(tmp, d, tmp)
 
 	if xs < 0 && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
 		ed.Neg(tmp, tmp)
@@ -924,10 +926,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	if err := ed.Err(); err != nil {
 		return ed.Flags, err
 	}
-	res := c.round(d, tmp)
-	if !yIsInt {
-		res |= Inexact
-	}
+	res |= c.round(d, tmp)
+	res |= Inexact
 	return c.goError(res)
 }
 

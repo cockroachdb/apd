@@ -557,7 +557,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				rcond &= ^Rounded
 
 				switch tc.Operation {
-				case "log10", "power":
+				case "log10":
 					// TODO(mjibson): Under certain conditions these are exact, but we don't
 					// correctly mark them. Ignore these flags for now.
 					// squareroot sometimes marks things exact when GDA says they should be
