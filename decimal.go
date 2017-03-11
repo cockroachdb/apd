@@ -222,7 +222,7 @@ func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
 func (d *Decimal) Int64() (int64, error) {
 	integ, frac := new(Decimal), new(Decimal)
 	d.Modf(integ, frac)
-	if frac.Sign() != 0 {
+	if !frac.IsZero() {
 		return 0, errors.Errorf("%s: has fractional part", d)
 	}
 	var ed ErrDecimal
@@ -287,7 +287,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 
 	// d is subnormal.
 	if v < c.MinExponent {
-		if d.Sign() != 0 {
+		if !d.IsZero() {
 			res |= Subnormal
 		}
 		Etiny := c.MinExponent - (int32(c.Precision) - 1)
@@ -305,13 +305,13 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			integ, frac := new(Decimal), new(Decimal)
 			tmp.Modf(integ, frac)
 			frac.Abs(frac)
-			if frac.Sign() != 0 {
+			if !frac.IsZero() {
 				res |= Inexact
 				if c.Rounding(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
 					integ.Coeff.Add(&integ.Coeff, bigOne)
 				}
 			}
-			if integ.Sign() == 0 {
+			if integ.IsZero() {
 				res |= Clamped
 			}
 			r = Etiny
@@ -319,7 +319,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			res |= Rounded
 		}
 	} else if v > c.MaxExponent {
-		if d.Sign() == 0 {
+		if d.IsZero() {
 			res |= Clamped
 			r = c.MaxExponent
 		} else {

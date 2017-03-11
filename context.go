@@ -180,10 +180,10 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return 0, errors.New("Quo requires Precision <= 5000")
 	}
 
-	if y.Sign() == 0 {
+	if y.IsZero() {
 		// TODO(mjibson): correctly set Inf and NaN here.
 		var res Condition
-		if x.Sign() == 0 {
+		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= DivisionByZero
@@ -196,7 +196,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	quo := new(Decimal)
 	var res Condition
 	var diff int64
-	if x.Sign() != 0 {
+	if !x.IsZero() {
 		dividend := new(big.Int).Abs(&x.Coeff)
 		divisor := new(big.Int).Abs(&y.Coeff)
 
@@ -281,10 +281,10 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 // cannot fit in d.Precision digits, an error is returned.
 func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	var res Condition
-	if y.Sign() == 0 {
+	if y.IsZero() {
 		// TODO(mjibson): correctly set Inf and NaN here (since this is Integer
 		// division, may be different or not apply like in Quo).
-		if x.Sign() == 0 {
+		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= DivisionByZero
@@ -309,10 +309,10 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 // the integer part cannot fit in d.Precision digits, an error is returned.
 func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	var res Condition
-	if y.Sign() == 0 {
+	if y.IsZero() {
 		// TODO(mjibson): correctly set Inf and NaN here (since this is Remainder
 		// division, may be different or not apply like in Quo).
-		if x.Sign() == 0 {
+		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= InvalidOperation
@@ -739,7 +739,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	// See: Variable Precision Exponential Function, T. E. Hull and A. Abrham, ACM
 	// Transactions on Mathematical Software, Vol 12 #2, pp79-91, ACM, June 1986.
 
-	if x.Sign() == 0 {
+	if x.IsZero() {
 		d.Set(decimalOne)
 		return 0, nil
 	}
@@ -890,7 +890,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 	integ, frac := new(Decimal), new(Decimal)
 	y.Modf(integ, frac)
-	yIsInt := frac.Sign() == 0
+	yIsInt := frac.IsZero()
 
 	xs := x.Sign()
 	ys := y.Sign()
@@ -989,7 +989,7 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
-			if d.Sign() != 0 {
+			if !d.IsZero() {
 				d.SetCoefficient(0)
 				res = Inexact | Rounded
 			}

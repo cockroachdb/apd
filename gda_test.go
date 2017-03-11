@@ -478,7 +478,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				case "tosci":
 					s = operands[0].ToSci()
 					// non-extended tests don't retain exponents for 0
-					if !tc.Extended && operands[0].Sign() == 0 {
+					if !tc.Extended && operands[0].IsZero() {
 						s = "0"
 					}
 				default:
