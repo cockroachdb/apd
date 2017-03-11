@@ -26,9 +26,12 @@ import (
 
 // Decimal is an arbitrary-precision decimal. Its value is:
 //
-//     Coeff * 10 ^ Exponent
+//     Negative × Coeff × 10**Exponent
 //
+// Coeff must be positive. If it is negative results may be incorrect and
+// apd may panic.
 type Decimal struct {
+	Negative bool
 	Coeff    big.Int
 	Exponent int32
 }
@@ -49,10 +52,13 @@ const (
 
 // New creates a new decimal with the given coefficient and exponent.
 func New(coeff int64, exponent int32) *Decimal {
-	return &Decimal{
+	d := &Decimal{
+		Negative: coeff < 0,
 		Coeff:    *big.NewInt(coeff),
 		Exponent: exponent,
 	}
+	d.Coeff.Abs(&d.Coeff)
+	return d
 }
 
 // NewWithBigInt creates a new decimal with the given coefficient and exponent.
@@ -64,6 +70,10 @@ func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
 }
 
 func (d *Decimal) setString(c *Context, s string) (Condition, error) {
+	d.Negative = strings.HasPrefix(s, "-")
+	if d.Negative {
+		s = s[1:]
+	}
 	var exps []int64
 	if i := strings.IndexAny(s, "eE"); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
@@ -128,11 +138,6 @@ func (d *Decimal) ToSci() string {
 	const adjExponentLimit = -6
 
 	s := d.Coeff.String()
-	prefix := ""
-	if d.Coeff.Sign() < 0 {
-		prefix = "-"
-		s = s[1:]
-	}
 	adj := int(d.Exponent) + (len(s) - 1)
 	if d.Exponent <= 0 && adj >= adjExponentLimit {
 		if d.Exponent < 0 {
@@ -152,18 +157,16 @@ func (d *Decimal) ToSci() string {
 		}
 		s = fmt.Sprintf("%s%sE%+d", s[:1], dot, adj)
 	}
-	return prefix + s
+	if d.Negative {
+		s = "-" + s
+	}
+	return s
 }
 
 // ToStandard converts d to a standard notation string (i.e., no exponent
 // part). This can result in long strings given large exponents.
 func (d *Decimal) ToStandard() string {
 	s := d.Coeff.String()
-	var neg string
-	if strings.HasPrefix(s, "-") {
-		neg = "-"
-		s = s[1:]
-	}
 	if d.Exponent < 0 {
 		if left := -int(d.Exponent) - len(s); left > 0 {
 			s = "0." + strings.Repeat("0", left) + s
@@ -176,7 +179,10 @@ func (d *Decimal) ToStandard() string {
 	} else if d.Exponent > 0 {
 		s += strings.Repeat("0", int(d.Exponent))
 	}
-	return neg + s
+	if d.Negative {
+		s = "-" + s
+	}
+	return s
 }
 
 // Set sets d's Coefficient and Exponent from x and returns d.
@@ -184,15 +190,18 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 	if d == x {
 		return d
 	}
+	d.Negative = x.Negative
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
 	return d
 }
 
-// SetCoefficient sets d's Coefficient value to x and returns d. The Exponent
-// is not changed.
+// SetCoefficient sets d's coefficient and negative value to x and returns
+// d. The exponent is not changed.
 func (d *Decimal) SetCoefficient(x int64) *Decimal {
+	d.Negative = x < 0
 	d.Coeff.SetInt64(x)
+	d.Coeff.Abs(&d.Coeff)
 	return d
 }
 
@@ -213,7 +222,7 @@ func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
 func (d *Decimal) Int64() (int64, error) {
 	integ, frac := new(Decimal), new(Decimal)
 	d.Modf(integ, frac)
-	if frac.Sign() != 0 {
+	if !frac.IsZero() {
 		return 0, errors.Errorf("%s: has fractional part", d)
 	}
 	var ed ErrDecimal
@@ -229,6 +238,9 @@ func (d *Decimal) Int64() (int64, error) {
 	v := integ.Coeff.Int64()
 	for i := int32(0); i < integ.Exponent; i++ {
 		v *= 10
+	}
+	if d.Negative {
+		v = -v
 	}
 	return v, nil
 }
@@ -275,7 +287,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 
 	// d is subnormal.
 	if v < c.MinExponent {
-		if d.Sign() != 0 {
+		if !d.IsZero() {
 			res |= Subnormal
 		}
 		Etiny := c.MinExponent - (int32(c.Precision) - 1)
@@ -293,17 +305,13 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			integ, frac := new(Decimal), new(Decimal)
 			tmp.Modf(integ, frac)
 			frac.Abs(frac)
-			if frac.Sign() != 0 {
+			if !frac.IsZero() {
 				res |= Inexact
-				if c.Rounding(&integ.Coeff, frac.Cmp(decimalHalf)) {
-					if d.Sign() >= 0 {
-						integ.Coeff.Add(&integ.Coeff, bigOne)
-					} else {
-						integ.Coeff.Sub(&integ.Coeff, bigOne)
-					}
+				if c.Rounding(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
+					integ.Coeff.Add(&integ.Coeff, bigOne)
 				}
 			}
-			if integ.Sign() == 0 {
+			if integ.IsZero() {
 				res |= Clamped
 			}
 			r = Etiny
@@ -311,7 +319,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			res |= Rounded
 		}
 	} else if v > c.MaxExponent {
-		if d.Sign() == 0 {
+		if d.IsZero() {
 			res |= Clamped
 			r = c.MaxExponent
 		} else {
@@ -353,6 +361,15 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 		x, y = y, x
 	}
 	return x, y, b.Exponent, nil
+}
+
+// setBig sets b to d's coefficient with negative.
+func (d *Decimal) setBig(b *big.Int) *big.Int {
+	b.Set(&d.Coeff)
+	if d.Negative {
+		b.Neg(b)
+	}
+	return b
 }
 
 // Cmp compares d and x and returns:
@@ -402,10 +419,9 @@ func (d *Decimal) Cmp(x *Decimal) int {
 	if diff < 0 {
 		diff = -diff
 	}
-	db := new(big.Int)
-	e := tableExp10(diff, db)
-	db.Set(&d.Coeff)
-	xb := new(big.Int).Set(&x.Coeff)
+	e := tableExp10(diff, nil)
+	db := d.setBig(new(big.Int))
+	xb := x.setBig(new(big.Int))
 	if d.Exponent > x.Exponent {
 		db.Mul(db, e)
 	} else {
@@ -417,11 +433,22 @@ func (d *Decimal) Cmp(x *Decimal) int {
 // Sign returns:
 //
 //	-1 if d <  0
-//	 0 if d == 0
+//	 0 if d == 0 or -0
 //	+1 if d >  0
 //
 func (d *Decimal) Sign() int {
-	return d.Coeff.Sign()
+	if d.Coeff.Sign() == 0 {
+		return 0
+	}
+	if d.Negative {
+		return -1
+	}
+	return 1
+}
+
+// IsZero returns true if d == 0 or -0.
+func (d *Decimal) IsZero() bool {
+	return d.Sign() == 0
 }
 
 // Modf sets integ to the integral part of d and frac to the fractional part
@@ -429,10 +456,13 @@ func (d *Decimal) Sign() int {
 // either 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be
 // <= 0.
 func (d *Decimal) Modf(integ, frac *Decimal) {
+	neg := d.Negative
+
 	// No fractional part.
 	if d.Exponent > 0 {
+		frac.Negative = neg
 		frac.Exponent = 0
-		frac.SetCoefficient(0)
+		frac.Coeff.SetInt64(0)
 		integ.Set(d)
 		return
 	}
@@ -440,8 +470,9 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	exp := -int64(d.Exponent)
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {
+		integ.Negative = neg
 		integ.Exponent = 0
-		integ.SetCoefficient(0)
+		integ.Coeff.SetInt64(0)
 		frac.Set(d)
 		return
 	}
@@ -450,19 +481,21 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	integ.Coeff.QuoRem(&d.Coeff, e, &frac.Coeff)
 	integ.Exponent = 0
 	frac.Exponent = d.Exponent
+	frac.Negative = neg
+	integ.Negative = neg
 }
 
 // Neg sets d to -x and returns d.
 func (d *Decimal) Neg(x *Decimal) *Decimal {
 	d.Set(x)
-	d.Coeff.Neg(&d.Coeff)
+	d.Negative = !d.Negative
 	return d
 }
 
 // Abs sets d to |x| and returns d.
 func (d *Decimal) Abs(x *Decimal) *Decimal {
 	d.Set(x)
-	d.Coeff.Abs(&d.Coeff)
+	d.Negative = false
 	return d
 }
 
@@ -494,16 +527,14 @@ func (d *Decimal) Reduce(x *Decimal) *Decimal {
 		if e != d.Exponent {
 			d.Exponent = e
 			d.Coeff.SetUint64(i)
-			if neg {
-				d.Coeff.Neg(&d.Coeff)
-			}
+			d.Negative = neg
 		}
 		return d
 	}
 
 	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
 	// faster than converting to a string and trimming the 0s from the end.
-	z := new(big.Int).Set(&d.Coeff)
+	z := d.setBig(new(big.Int))
 	r := new(big.Int)
 	for {
 		z.QuoRem(&d.Coeff, bigTen, r)

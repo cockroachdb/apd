@@ -87,32 +87,62 @@ func (c *Context) etiny() int32 {
 	return c.MinExponent - int32(c.Precision) + 1
 }
 
-// Add sets d to the sum x+y.
-func (c *Context) Add(d, x, y *Decimal) (Condition, error) {
+func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	a, b, s, err := upscale(x, y)
 	if err != nil {
-		return 0, errors.Wrap(err, "Add")
+		return 0, errors.Wrap(err, "add")
 	}
-	d.Coeff.Add(a, b)
+	xn := x.Negative
+	yn := y.Negative
+	ax := x
+	ay := y
+	if xn {
+		ax = new(Decimal).Abs(x)
+	}
+	if yn {
+		ay = new(Decimal).Abs(y)
+	}
+
+	if subtract {
+		yn = !yn
+	}
+	subtract = xn != yn
+	if subtract {
+		d.Coeff.Sub(a, b)
+		d.Coeff.Abs(&d.Coeff)
+	} else {
+		d.Coeff.Add(a, b)
+	}
 	d.Exponent = s
+	if !d.IsZero() {
+		if ax.Cmp(ay) > 0 {
+			d.Negative = xn
+		} else {
+			d.Negative = yn
+		}
+	} else {
+		d.Negative = xn && yn
+		// TODO(mjibson): this is in the spec, but apparently not tested
+		// if xn != yn && c.Rounding == RoundFloor {
+		//	d.Negative = true
+		// }
+	}
 	return c.Round(d, d)
+}
+
+// Add sets d to the sum x+y.
+func (c *Context) Add(d, x, y *Decimal) (Condition, error) {
+	return c.add(d, x, y, false)
 }
 
 // Sub sets d to the difference x-y.
 func (c *Context) Sub(d, x, y *Decimal) (Condition, error) {
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return 0, errors.Wrap(err, "Sub")
-	}
-	d.Coeff.Sub(a, b)
-	d.Exponent = s
-	return c.Round(d, d)
+	return c.add(d, x, y, true)
 }
 
 // Abs sets d to |x| (the absolute value of x).
 func (c *Context) Abs(d, x *Decimal) (Condition, error) {
-	d.Set(x)
-	d.Coeff.Abs(&d.Coeff)
+	d.Abs(x)
 	return c.Round(d, d)
 }
 
@@ -125,6 +155,8 @@ func (c *Context) Neg(d, x *Decimal) (Condition, error) {
 // Mul sets d to the product x*y.
 func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
+	// The sign of the result is the exclusive or of the signs of the operands.
+	d.Negative = x.Negative != y.Negative
 	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
 	return c.goError(res)
@@ -148,10 +180,10 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return 0, errors.New("Quo requires Precision <= 5000")
 	}
 
-	if y.Coeff.Sign() == 0 {
+	if y.IsZero() {
 		// TODO(mjibson): correctly set Inf and NaN here.
 		var res Condition
-		if x.Coeff.Sign() == 0 {
+		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= DivisionByZero
@@ -164,7 +196,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	quo := new(Decimal)
 	var res Condition
 	var diff int64
-	if x.Coeff.Sign() != 0 {
+	if !x.IsZero() {
 		dividend := new(big.Int).Abs(&x.Coeff)
 		divisor := new(big.Int).Abs(&y.Coeff)
 
@@ -227,8 +259,8 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			dividend.Mul(dividend, bigTwo)
 			half := dividend.Cmp(divisor)
 			rounding := c.rounding()
-			if rounding(&quo.Coeff, half) {
-				roundAddOne(&quo.Coeff, &diff, 1 /* positive */)
+			if rounding(&quo.Coeff, quo.Negative, half) {
+				roundAddOne(&quo.Coeff, &diff)
 			}
 		}
 	}
@@ -239,9 +271,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 
 	// The sign of the result is the exclusive or of the signs of the operands.
-	if xn, yn := x.Sign() == -1, y.Sign() == -1; xn != yn {
-		quo.Coeff.Neg(&quo.Coeff)
-	}
+	quo.Negative = x.Negative != y.Negative
 
 	d.Set(quo)
 	return c.goError(res)
@@ -251,10 +281,10 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 // cannot fit in d.Precision digits, an error is returned.
 func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	var res Condition
-	if y.Coeff.Sign() == 0 {
+	if y.IsZero() {
 		// TODO(mjibson): correctly set Inf and NaN here (since this is Integer
 		// division, may be different or not apply like in Quo).
-		if x.Coeff.Sign() == 0 {
+		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= DivisionByZero
@@ -270,6 +300,8 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 		res |= DivisionImpossible
 	}
 	d.Exponent = 0
+	// The sign of the result is the exclusive or of the signs of the operands.
+	d.Negative = x.Negative != y.Negative
 	return c.goError(res)
 }
 
@@ -277,10 +309,10 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 // the integer part cannot fit in d.Precision digits, an error is returned.
 func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	var res Condition
-	if y.Coeff.Sign() == 0 {
+	if y.IsZero() {
 		// TODO(mjibson): correctly set Inf and NaN here (since this is Remainder
 		// division, may be different or not apply like in Quo).
-		if x.Coeff.Sign() == 0 {
+		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= InvalidOperation
@@ -297,6 +329,8 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 		res |= DivisionImpossible
 	}
 	d.Exponent = s
+	// The sign of the result is sign if the dividend.
+	d.Negative = x.Negative
 	res |= c.round(d, d)
 	return c.goError(res)
 }
@@ -307,12 +341,12 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// and A. Abrham, ACM Transactions on Mathematical Software, Vol 11 #3,
 	// pp229–237, ACM, September 1985.
 
-	switch x.Coeff.Sign() {
+	switch x.Sign() {
 	case -1:
 		res := InvalidOperation
 		return c.goError(res)
 	case 0:
-		d.Coeff.SetInt64(0)
+		d.SetCoefficient(0)
 		d.Exponent = 0
 		return 0, nil
 	}
@@ -404,12 +438,12 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	//     x_{n+1} = 1/3 * ( 2 * x_n + (d / x_n / x_n) ).
 
 	// Validate the sign of x.
-	switch x.Coeff.Sign() {
+	switch x.Sign() {
 	case -1:
 		res := InvalidOperation
 		return c.goError(res)
 	case 0:
-		d.Coeff.SetInt64(0)
+		d.SetCoefficient(0)
 		d.Exponent = 0
 		return 0, nil
 	}
@@ -705,7 +739,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	// See: Variable Precision Exponential Function, T. E. Hull and A. Abrham, ACM
 	// Transactions on Mathematical Software, Vol 12 #2, pp79-91, ACM, June 1986.
 
-	if x.Coeff.Sign() == 0 {
+	if x.IsZero() {
 		d.Set(decimalOne)
 		return 0, nil
 	}
@@ -734,7 +768,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 		if x.Sign() < 0 {
 			res = res.negateOverflowFlags()
 			res |= Clamped
-			d.Coeff.SetInt64(0)
+			d.SetCoefficient(0)
 			d.Exponent = c.etiny()
 		} else {
 			// TODO(mjibson): set Infinity here when supported.
@@ -856,7 +890,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 	integ, frac := new(Decimal), new(Decimal)
 	y.Modf(integ, frac)
-	yIsInt := frac.Sign() == 0
+	yIsInt := frac.IsZero()
 
 	xs := x.Sign()
 	ys := y.Sign()
@@ -897,7 +931,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
 	res := c.quantize(integ, integ, 0)
-	nres, err := nc.integerPower(d, x, &integ.Coeff)
+	nres, err := nc.integerPower(d, x, integ.setBig(&integ.Coeff))
 	res |= nres
 	if err != nil {
 		return res, err
@@ -945,6 +979,7 @@ func (c *Context) Quantize(d, v *Decimal, exp int32) (Condition, error) {
 func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 	diff := exp - v.Exponent
 	d.Coeff.Set(&v.Coeff)
+	d.Negative = v.Negative
 	var res Condition
 	if diff < 0 {
 		if diff < MinExponent {
@@ -954,8 +989,8 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
-			if d.Sign() != 0 {
-				d.Coeff.SetInt64(0)
+			if !d.IsZero() {
+				d.SetCoefficient(0)
 				res = Inexact | Rounded
 			}
 		} else {
