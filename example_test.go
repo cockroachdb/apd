@@ -31,14 +31,14 @@ func ExampleContext_overflow() {
 	d := apd.New(997, 0)
 	for {
 		res, err := c.Add(d, d, one)
-		fmt.Printf("d: %4s, overflow: %5v, err: %v\n", d, res.Overflow(), err)
+		fmt.Printf("d: %8s, overflow: %5v, err: %v\n", d, res.Overflow(), err)
 		if err != nil {
 			return
 		}
 	}
-	// Output: d:  998, overflow: false, err: <nil>
-	// d:  999, overflow: false, err: <nil>
-	// d: 1000, overflow:  true, err: overflow
+	// Output: d:      998, overflow: false, err: <nil>
+	// d:      999, overflow: false, err: <nil>
+	// d: Infinity, overflow:  true, err: overflow
 }
 
 // ExampleInexact demonstrates how to detect inexact operations.
@@ -97,6 +97,6 @@ func ExampleErrDecimal() {
 	fmt.Printf("%s, err: %v\n", d, ed.Err())
 	// Output: 10, err: <nil>
 	// 30, err: <nil>
-	// 30, err: division by zero
-	// 30, err: division by zero
+	// Infinity, err: division by zero
+	// Infinity, err: division by zero
 }

@@ -26,7 +26,7 @@ var (
 )
 
 func (d *Decimal) GoString() string {
-	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, Negative: %v}`, d.Coeff.String(), d.Exponent, d.Negative)
+	return fmt.Sprintf(`{Coeff: %s, Exponent: %d, Negative: %v, Form: %s}`, d.Coeff.String(), d.Exponent, d.Negative, d.Form)
 }
 
 // testExponentError skips t if err was caused by an exponent being outside
