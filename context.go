@@ -1120,10 +1120,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 
 	// Check if y is of type int.
-	tmp := new(Decimal)
-	if _, err := c.Abs(tmp, y); err != nil {
-		return 0, errors.Wrap(err, "Abs")
-	}
+	tmp := new(Decimal).Abs(y)
 
 	xs := x.Sign()
 	ys := y.Sign()
