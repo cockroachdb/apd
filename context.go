@@ -1148,8 +1148,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 
 	if (xs == 0 && ys == 0) || (xs < 0 && !yIsInt) {
-		res := InvalidOperation
-		return c.goError(res)
+		d.Set(decimalNaN)
+		return c.goError(InvalidOperation)
 	}
 
 	// decNumber sets the precision to be max(x digits + exponent, c.Precision)
