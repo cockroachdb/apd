@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -458,6 +459,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				Negative: true,
 				Exponent: -6437897,
 			}
+			// Use d1 and d2 to verify that the result can be the same as the first and
+			// second operand.
+			var d1, d2 *Decimal
 			d.Coeff.SetInt64(9221)
 			start := time.Now()
 			defer func() {
@@ -476,8 +480,27 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 					}
 					// Clear d's bogus data.
 					d.Set(operands[0])
+					// Set d1 to prevent the result-equals-operand check failing.
+					d1 = d
 				default:
+					var wg sync.WaitGroup
+					wg.Add(2)
+					// Check that the result is correct even if it is either argument. Use some
+					// go routines since we are running tc.Run three times.
+					go func() {
+						d1 = new(Decimal).Set(operands[0])
+						tc.Run(c, done, d1, d1, operands[1])
+						wg.Done()
+					}()
+					go func() {
+						if operands[1] != nil {
+							d2 = new(Decimal).Set(operands[1])
+							tc.Run(c, done, d2, operands[0], d2)
+						}
+						wg.Done()
+					}()
 					res, err = tc.Run(c, done, d, operands[0], operands[1])
+					wg.Wait()
 				}
 				done <- nil
 			}()
@@ -502,6 +525,13 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				if v.CmpTotal(operands[i]) != 0 {
 					t.Fatalf("operand %d changed from %s to %s", i, o, operands[i])
 				}
+			}
+			// Verify the result-equals-operand worked correctly.
+			if d.CmpTotal(d1) != 0 {
+				t.Errorf("first operand as result mismatch: got %s, expected %s", d1, d)
+			}
+			if d2 != nil && d.CmpTotal(d2) != 0 {
+				t.Errorf("second operand as result mismatch: got %s, expected %s", d2, d)
 			}
 			if !GDAignoreFlags[tc.ID] {
 				var rcond Condition

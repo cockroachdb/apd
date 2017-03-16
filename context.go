@@ -22,7 +22,8 @@ import (
 )
 
 // Context maintains options for Decimal operations. It can safely be used
-// concurrently, but not modified concurrently.
+// concurrently, but not modified concurrently. Arguments for any method
+// can safely be used as both result and operand.
 type Context struct {
 	// Precision is the number of places to round during rounding; this is
 	// effectively the total number of digits (before and after the decimal
@@ -161,10 +162,10 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	}
 	ax := x
 	ay := y
-	if xn {
+	if xn || d == x {
 		ax = new(Decimal).Abs(x)
 	}
-	if yn {
+	if yn || d == y {
 		ay = new(Decimal).Abs(y)
 	}
 
@@ -229,18 +230,20 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	if set, res, err := c.setIfNaN(d, x, y); set {
 		return res, err
 	}
+	// The sign of the result is the exclusive or of the signs of the operands.
+	neg := x.Negative != y.Negative
 	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
 		var res Condition
 		if xi && yi {
 			d.Set(decimalInfinity)
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 		} else if xi {
 			if y.IsZero() {
 				d.Set(decimalNaN)
 				res = InvalidOperation
 			} else {
 				d.Set(decimalInfinity)
-				d.Negative = x.Negative != y.Negative
+				d.Negative = neg
 			}
 		} else {
 			if x.IsZero() {
@@ -248,15 +251,14 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 				res = InvalidOperation
 			} else {
 				d.Set(decimalInfinity)
-				d.Negative = x.Negative != y.Negative
+				d.Negative = neg
 			}
 		}
 		return c.goError(res)
 	}
 
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
-	// The sign of the result is the exclusive or of the signs of the operands.
-	d.Negative = x.Negative != y.Negative
+	d.Negative = neg
 	d.Form = Finite
 	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
@@ -270,6 +272,8 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	if set, res, err := c.setIfNaN(d, x, y); set {
 		return res, err
 	}
+	// The sign of the result is the exclusive or of the signs of the operands.
+	neg := x.Negative != y.Negative
 	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
 		var res Condition
 		if xi && yi {
@@ -277,11 +281,11 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			res = InvalidOperation
 		} else if xi {
 			d.Set(decimalInfinity)
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 		} else {
 			d.SetInt64(0)
 			d.Exponent = c.etiny()
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 			res = Clamped
 		}
 		return c.goError(res)
@@ -309,7 +313,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		} else {
 			res |= DivisionByZero
 			d.Set(decimalInfinity)
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 		}
 		return c.goError(res)
 	}
@@ -393,8 +397,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// the coefficient calculation from the original exponent of the dividend.
 	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 
-	// The sign of the result is the exclusive or of the signs of the operands.
-	quo.Negative = x.Negative != y.Negative
+	quo.Negative = neg
 
 	d.Set(quo)
 	return c.goError(res)
@@ -406,6 +409,8 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	if set, res, err := c.setIfNaN(d, x, y); set {
 		return res, err
 	}
+	// The sign of the result is the exclusive or of the signs of the operands.
+	neg := x.Negative != y.Negative
 	var res Condition
 	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
 		if xi && yi {
@@ -413,10 +418,10 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 			res = InvalidOperation
 		} else if xi {
 			d.Set(decimalInfinity)
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 		} else {
 			d.SetInt64(0)
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 		}
 		return c.goError(res)
 	}
@@ -426,7 +431,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 			res |= DivisionUndefined
 		} else {
 			d.Set(decimalInfinity)
-			d.Negative = x.Negative != y.Negative
+			d.Negative = neg
 			res |= DivisionByZero
 		}
 		return c.goError(res)
@@ -442,8 +447,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 		res |= DivisionImpossible
 	}
 	d.Exponent = 0
-	// The sign of the result is the exclusive or of the signs of the operands.
-	d.Negative = x.Negative != y.Negative
+	d.Negative = neg
 	return c.goError(res)
 }
 
@@ -678,6 +682,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		}
 	}
 
+	z0.Set(x)
 	res, err := c.Round(d, z)
 
 	// Set z = d^3 to check for exactness.
@@ -689,7 +694,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	}
 
 	// Result is exact
-	if x.Cmp(z) == 0 {
+	if z0.Cmp(z) == 0 {
 		return 0, nil
 	}
 	return res, err
@@ -1047,7 +1052,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	return c.goError(res)
 }
 
-// integerPower sets d = x**y.
+// integerPower sets d = x**y. d and x must not point to the same Decimal.
 func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 	// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring.
 
@@ -1157,16 +1162,22 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	nc := BaseContext.WithPrecision(p)
 
+	z := d
+	if z == x {
+		z = new(Decimal)
+	}
+
 	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
 	res := c.quantize(integ, integ, 0)
-	nres, err := nc.integerPower(d, x, integ.setBig(&integ.Coeff))
+	nres, err := nc.integerPower(z, x, integ.setBig(&integ.Coeff))
 	res |= nres
 	if err != nil {
+		d.Set(decimalNaN)
 		return res, err
 	}
 
 	if yIsInt {
-		res |= c.round(d, d)
+		res |= c.round(d, z)
 		return c.goError(res)
 	}
 
@@ -1179,7 +1190,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	ed.Exp(tmp, tmp)
 
 	// Join integer and frac parts back.
-	ed.Mul(tmp, d, tmp)
+	ed.Mul(tmp, z, tmp)
 
 	if err := ed.Err(); err != nil {
 		return ed.Flags, err
