@@ -336,38 +336,62 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 }
 
 // Sqrt sets d to the square root of x.
+// Sqrt uses the Babylonian method for computing the square root, which uses
+// O(log p) steps for p digits of precision. We follow the algorithm in
+// Properly Rounded Variable Precision Square Root by T. E. Hull and A. Abrham,
+// ACM Transactions on Mathematical Software, Vol 11 #3, pp229–237, ACM, September 1985.
 func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
-	// See: Properly Rounded Variable Precision Square Root by T. E. Hull
-	// and A. Abrham, ACM Transactions on Mathematical Software, Vol 11 #3,
-	// pp229–237, ACM, September 1985.
 
 	switch x.Sign() {
 	case -1:
-		res := InvalidOperation
-		return c.goError(res)
+		return c.goError(InvalidOperation)
 	case 0:
 		d.SetCoefficient(0)
 		d.Exponent = 0
 		return 0, nil
 	}
+	// x > 0.
 
-	// Use same precision as in decNumber.
-	workp := c.Precision + 1
-	if nd := uint32(x.NumDigits()); workp < nd {
-		workp = nd
-	}
-	if workp < 7 {
-		workp = 7
+	// TODO(mjibson): Also it would be good if we could keep the number of
+	// variables in scope low. This refactoring doesn't quite work, but perhaps
+	// you can refactor the calls below to use nc.Precision instead of keeping
+	// workp in scope throughout.
+	// TODO(mjibson): Also, what's nc?
+	var nc *Context
+	{
+		// workp is the number of digits of precision used.
+		// We use same precision as in decNumber.
+		workp := c.Precision + 1
+		if nd := uint32(x.NumDigits()); workp < nd {
+			workp = nd
+		}
+		if workp < 7 {
+			workp = 7
+		}
+		nc = c.WithPrecision(workp)
 	}
 
-	f := new(Decimal).Set(x)
-	nd := x.NumDigits()
-	e := nd + int64(x.Exponent)
-	f.Exponent = int32(-nd)
+	// TODO(mjibson): Too many variables without comments/definitions. And nd is a temporary variable that goes out of scope, perhaps it can be closed off? I've given it a try but I'm not too happy with this either... Also, these are my *guesses* for what these variables represent.
+	// f is ...
+	var f *Decimal
+	// e is the number of digits in x.
+	var e int64
+	// ed is ...
+	var ed ErrDecimal
+	{
+		f = new(Decimal).Set(x)
+		nd := x.NumDigits()
+		e = nd + int64(x.Exponent)
+		f.Exponent = int32(-nd)
+		nc.Rounding = RoundHalfEven
+		ed = MakeErrDecimal(nc)
+	}
+
+	// TODO(mjibson): This is my best guess for what's going on, but I'm unsure, so please check:
+
+	// approx stores our first approximation for sqrt(x). We have two guesses: if e is even, then we use .259 + 0.819*f. Oterwise we use 0.0819 + 2.59*f.
+	// TODO(mjibson): Why? I think it's because these are the geometric midpoint "best guesses" for 1 <= f < 10 and 10 <= f < 100 respectively, but I'm not sure.
 	approx := new(Decimal)
-	nc := c.WithPrecision(workp)
-	nc.Rounding = RoundHalfEven
-	ed := MakeErrDecimal(nc)
 	if e%2 == 0 {
 		approx.SetCoefficient(819).SetExponent(-3)
 		ed.Mul(approx, approx, f)
@@ -380,13 +404,16 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		ed.Add(approx, approx, New(819, -4))
 	}
 
+	// TODO(mjibson): Now we repeatedly improve approx. Our precision improves
+	// quadratically, which we keep track of in p.
 	p := uint32(3)
 	tmp := new(Decimal)
 
 	// The algorithm in the paper says to use c.Precision + 2. decNumber uses
 	// workp + 2. But we use workp + 5 to make the tests pass. This means it is
 	// possible there are inputs we don't compute correctly and could be 1ulp off.
-	for maxp := workp + 5; p != maxp; {
+	for maxp := nc.Precision + 5; p != maxp; {
+		// TODO(mjibson): why the minus 2?
 		p = 2*p - 2
 		if p > maxp {
 			p = maxp
@@ -399,7 +426,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	nc.Precision = workp + 1
+	// TODO(mjibson): why the plus 1?
+	nc.Precision = nc.Precision + 1
 	dp := int32(c.Precision)
 	approxsubhalf := new(Decimal)
 	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
@@ -921,6 +949,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	// decNumber sets the precision to be max(x digits + exponent, c.Precision)
 	// + 4. 6 is used as the exponent digits.
+	// TODO(mjibson): what is decNumber, and what is the source of the +4?
+	// Clarify what the 6 is for?
 	p := c.Precision
 	if nd := uint32(x.NumDigits()) + 6; p < nd {
 		p = nd
@@ -967,6 +997,9 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 // Quantize adjusts and rounds v as necessary so it is represented with
 // exponent exp and stores the result in d.
+// TODO(mjibson): "adjusts"?
+// TODO(mjibson): Could use a comment (not just here), or a wrapper Function
+// since you call this sometimes with the same argument for both d and v and that scares me.
 func (c *Context) Quantize(d, v *Decimal, exp int32) (Condition, error) {
 	res := c.quantize(d, v, exp)
 	if nd := d.NumDigits(); nd > int64(c.Precision) {
