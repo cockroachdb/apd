@@ -522,7 +522,9 @@ func (c *Context) rootSpecials(d, x *Decimal) (bool, Condition, error) {
 	return false, 0, nil
 }
 
-// Sqrt sets d to the square root of x.
+// Sqrt sets d to the square root of x. Sqrt uses the Babylonian method
+// for computing the square root, which uses O(log p) steps for p digits
+// of precision.
 func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// See: Properly Rounded Variable Precision Square Root by T. E. Hull
 	// and A. Abrham, ACM Transactions on Mathematical Software, Vol 11 #3,
@@ -532,7 +534,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		return res, err
 	}
 
-	// Use same precision as in decNumber.
+	// workp is the number of digits of precision used. We use the same precision
+	// as in decNumber.
 	workp := c.Precision + 1
 	if nd := uint32(x.NumDigits()); workp < nd {
 		workp = nd
@@ -545,10 +548,12 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	nd := x.NumDigits()
 	e := nd + int64(x.Exponent)
 	f.Exponent = int32(-nd)
-	approx := new(Decimal)
 	nc := c.WithPrecision(workp)
 	nc.Rounding = RoundHalfEven
 	ed := MakeErrDecimal(nc)
+	// Set approx to the first guess, based on whether e (the exponent part of x)
+	// is odd or even.
+	approx := new(Decimal)
 	if e%2 == 0 {
 		approx.SetCoefficient(819).SetExponent(-3)
 		ed.Mul(approx, approx, f)
@@ -561,6 +566,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		ed.Add(approx, approx, New(819, -4))
 	}
 
+	// Now we repeatedly improve approx. Our precision improves quadratically,
+	// which we keep track of in p.
 	p := uint32(3)
 	tmp := new(Decimal)
 
@@ -580,7 +587,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	nc.Precision = workp + 1
+	nc.Precision = workp
 	dp := int32(c.Precision)
 	approxsubhalf := new(Decimal)
 	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
@@ -1149,13 +1156,13 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 		return c.goError(InvalidOperation)
 	}
 
-	// decNumber sets the precision to be max(x digits + exponent, c.Precision)
-	// + 4. 6 is used as the exponent digits.
+	// decNumber sets the precision to be max(x digits, c.Precision) +
+	// len(exponent) + 4. 6 is used as the exponent maximum length.
 	p := c.Precision
-	if nd := uint32(x.NumDigits()) + 6; p < nd {
+	if nd := uint32(x.NumDigits()); p < nd {
 		p = nd
 	}
-	p += 4
+	p += 4 + 6
 
 	nc := BaseContext.WithPrecision(p)
 
