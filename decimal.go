@@ -40,11 +40,13 @@ type Decimal struct {
 type Form int
 
 const (
-	// These are in total-ordering order, and so cannot be otherwise sorted.
+	// These constants must be in the following order. CmpTotal assumes that
+	// the order of these constants reflects the total order on decimals.
 
 	Finite Form = iota
 	Infinite
-	// NaNSignaling will always raise the Invalid condition during an operation.
+	// NaNSignaling will always raise the InvalidOperation condition during
+	// an operation.
 	NaNSignaling
 	NaN
 )
@@ -89,17 +91,25 @@ func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
 	}
 }
 
+func consumePrefix(s, prefix string) (string, bool) {
+	if strings.HasPrefix(s, prefix) {
+		return s[len(prefix):], true
+	}
+	return s, false
+}
+
 func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 	orig := s
-	d.Negative = strings.HasPrefix(s, "-")
-	if d.Negative || strings.HasPrefix(s, "+") {
-		s = s[1:]
+	s, d.Negative = consumePrefix(s, "-")
+	if !d.Negative {
+		s, _ = consumePrefix(s, "+")
 	}
 	s = strings.ToLower(s)
 	d.Exponent = 0
 	d.Coeff.SetInt64(0)
+	// Until there are no parse errors, leave as NaN.
+	d.Form = NaN
 	if strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+") {
-		d.Form = NaN
 		return 0, errors.Errorf("could not parse: %s", orig)
 	}
 	switch s {
@@ -108,15 +118,14 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		return 0, nil
 	}
 	isNaN := false
-	if strings.HasPrefix(s, "nan") {
+	s, consumed := consumePrefix(s, "nan")
+	if consumed {
 		isNaN = true
-		d.Form = NaN
-		s = s[3:]
 	}
-	if strings.HasPrefix(s, "snan") {
+	s, consumed = consumePrefix(s, "snan")
+	if consumed {
 		isNaN = true
 		d.Form = NaNSignaling
-		s = s[4:]
 	}
 	if isNaN {
 		if s != "" {
@@ -129,11 +138,8 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		return 0, nil
 	}
 
-	// Until there are no parse errors, leave as NaN.
-	d.Form = NaN
-
 	var exps []int64
-	if i := strings.IndexAny(s, "eE"); i >= 0 {
+	if i := strings.IndexByte(s, 'e'); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
 			return 0, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
@@ -192,21 +198,28 @@ func (d *Decimal) String() string {
 	return d.ToSci()
 }
 
+func (d *Decimal) strSpecials() (bool, string) {
+	switch d.Form {
+	case NaN:
+		return true, "NaN"
+	case NaNSignaling:
+		return true, "sNaN"
+	case Infinite:
+		return true, "Infinity"
+	case Finite:
+		return false, ""
+	default:
+		return true, "unknown"
+	}
+}
+
 // ToSci returns d in scientific notation if an exponent is needed.
 func (d *Decimal) ToSci() string {
 	// See: http://speleotrove.com/decimal/daconvs.html#reftostr
 	const adjExponentLimit = -6
 
-	var s string
-
-	switch d.Form {
-	case NaN:
-		s = "NaN"
-	case NaNSignaling:
-		s = "sNaN"
-	case Infinite:
-		s = "Infinity"
-	case Finite:
+	set, s := d.strSpecials()
+	if !set {
 		s = d.Coeff.String()
 		adj := int(d.Exponent) + (len(s) - 1)
 		if d.Exponent <= 0 && adj >= adjExponentLimit {
@@ -227,8 +240,6 @@ func (d *Decimal) ToSci() string {
 			}
 			s = fmt.Sprintf("%s%sE%+d", s[:1], dot, adj)
 		}
-	default:
-		s = "unknown"
 	}
 	if d.Negative {
 		s = "-" + s
@@ -239,16 +250,8 @@ func (d *Decimal) ToSci() string {
 // ToStandard converts d to a standard notation string (i.e., no exponent
 // part). This can result in long strings given large exponents.
 func (d *Decimal) ToStandard() string {
-	var s string
-
-	switch d.Form {
-	case NaN:
-		s = "NaN"
-	case NaNSignaling:
-		s = "sNaN"
-	case Infinite:
-		s = "Infinity"
-	case Finite:
+	set, s := d.strSpecials()
+	if !set {
 		s = d.Coeff.String()
 		if d.Exponent < 0 {
 			if left := -int(d.Exponent) - len(s); left > 0 {
@@ -262,8 +265,6 @@ func (d *Decimal) ToStandard() string {
 		} else if d.Exponent > 0 {
 			s += strings.Repeat("0", int(d.Exponent))
 		}
-	default:
-		s = "unknown"
 	}
 	if d.Negative {
 		s = "-" + s
@@ -283,10 +284,10 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 	return d
 }
 
+// SetInt64 sets d to x and returns d.
 func (d *Decimal) SetInt64(x int64) *Decimal {
 	d.SetCoefficient(x)
 	d.Exponent = 0
-	d.Form = Finite
 	return d
 }
 
@@ -402,7 +403,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			frac.Abs(frac)
 			if !frac.IsZero() {
 				res |= Inexact
-				if c.Rounding(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
+				if c.rounding()(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
 					integ.Coeff.Add(&integ.Coeff, bigOne)
 				}
 			}
@@ -513,12 +514,19 @@ func (d *Decimal) CmpTotal(x *Decimal) int {
 			return c
 		}
 
+		lt := -1
+		gt := 1
+		if d.Negative {
+			lt = 1
+			gt = -1
+		}
+
 		// Values are equal, compare exponents.
 		if d.Exponent < x.Exponent {
-			return -1
+			return lt
 		}
 		if d.Exponent > x.Exponent {
-			return 1
+			return gt
 		}
 		return 0
 
@@ -531,7 +539,7 @@ func (d *Decimal) CmpTotal(x *Decimal) int {
 }
 
 func (d *Decimal) cmpOrder() int {
-	v := int(d.Form)
+	v := int(d.Form) + 1
 	if d.Negative {
 		v = -v
 	}
@@ -565,6 +573,19 @@ func (c *Context) Cmp(d, x, y *Decimal) (Condition, error) {
 func (d *Decimal) Cmp(x *Decimal) int {
 	ds := d.Sign()
 	xs := x.Sign()
+
+	// First compare signs.
+	if ds < xs {
+		return -1
+	} else if ds > xs {
+		return 1
+	} else if ds == 0 && xs == 0 {
+		return 0
+	}
+
+	// Use gt and lt here with flipped signs if d is negative. gt and lt then
+	// allow for simpler comparisons since we can ignore the sign of the decimals
+	// and only worry about the form and value.
 	gt := 1
 	lt := -1
 	if ds == -1 {
@@ -572,60 +593,23 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		lt = 1
 	}
 
-	var v int
-
-	signs := func() bool {
-		// First compare signs.
-		if ds < xs {
-			v = -1
-		} else if ds > xs {
-			v = 1
-		} else if ds == 0 && xs == 0 {
-			v = 0
+	if d.Form == Infinite {
+		if x.Form == Infinite {
+			return 0
 		} else {
-			return false
+			return gt
 		}
-		return true
+	} else if x.Form == Infinite {
+		return lt
 	}
 
-	infinite := func() bool {
-		if d.Form == Infinite {
-			if x.Form == Infinite {
-				v = 0
-			} else {
-				v = gt
-			}
-		} else if x.Form == Infinite {
-			v = lt
-		} else {
-			return false
-		}
-		return true
-	}
-
-	adjusted := func() bool {
-		// Next compare adjusted exponents.
-		dn := d.NumDigits() + int64(d.Exponent)
-		xn := x.NumDigits() + int64(x.Exponent)
-		if dn < xn {
-			v = lt
-		} else if dn > xn {
-			v = gt
-		} else {
-			return false
-		}
-		return true
-	}
-
-	funcs := []func() bool{
-		signs,
-		infinite,
-		adjusted,
-	}
-	for _, f := range funcs {
-		if f() {
-			return v
-		}
+	// Next compare adjusted exponents.
+	dn := d.NumDigits() + int64(d.Exponent)
+	xn := x.NumDigits() + int64(x.Exponent)
+	if dn < xn {
+		return lt
+	} else if dn > xn {
+		return gt
 	}
 
 	// Now have to use aligned big.Ints. This function previously used upscale to
@@ -664,26 +648,18 @@ func (d *Decimal) Cmp(x *Decimal) int {
 //	+1 if d.Negative == false
 //
 func (d *Decimal) Sign() int {
-	switch d.Form {
-	case Finite:
-		if d.Coeff.Sign() == 0 {
-			return 0
-		}
-		if d.Negative {
-			return -1
-		}
-		return 1
-	default:
-		if d.Negative {
-			return -1
-		}
-		return 1
+	if d.Form == Finite && d.Coeff.Sign() == 0 {
+		return 0
 	}
+	if d.Negative {
+		return -1
+	}
+	return 1
 }
 
 // IsZero returns true if d == 0 or -0.
 func (d *Decimal) IsZero() bool {
-	return d.Sign() == 0 && d.Form == Finite
+	return d.Sign() == 0
 }
 
 // Modf sets integ to the integral part of d and frac to the fractional part

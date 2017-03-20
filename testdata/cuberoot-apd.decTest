@@ -25,14 +25,14 @@ cbtx010 cuberoot -2 -> NaN Invalid_operation
 cbtx011 cuberoot 2 -> 1.25992105 Inexact Rounded
 cbtx012 cuberoot -2.00 -> NaN Invalid_operation
 cbtx013 cuberoot 2.00 -> 1.25992105 Inexact Rounded
-cbtx014 cuberoot -0 -> 0
-cbtx015 cuberoot -0.00 -> 0
-cbtx016 cuberoot -00.0 -> 0
-cbtx017 cuberoot -0E+9 -> 0
-cbtx018 cuberoot -0E+10 -> 0
-cbtx019 cuberoot -0E+11 -> 0
-cbtx020 cuberoot -0E+12 -> 0
-cbtx021 cuberoot -00 -> 0
+cbtx014 cuberoot -0 -> -0
+cbtx015 cuberoot -0.00 -> -0.0
+cbtx016 cuberoot -00.0 -> -0.0
+cbtx017 cuberoot -0E+9 -> -0E+3
+cbtx018 cuberoot -0E+10 -> -0E+3
+cbtx019 cuberoot -0E+11 -> -0E+3
+cbtx020 cuberoot -0E+12 -> -0E+4
+cbtx021 cuberoot -00 -> -0
 cbtx022 cuberoot 0E+5 -> 0
 cbtx023 cuberoot 8.0 -> 2.0
 cbtx024 cuberoot 8.00 -> 2.0
