@@ -71,7 +71,12 @@ func makeConstWithPrecision(strVal string) *constWithPrecision {
 	for p := uint32(1); p < maxPrec; p *= 2 {
 		var d Decimal
 
-		ctx := Context{Precision: p, Rounding: RoundHalfUp}
+		ctx := Context{
+			Precision:   p,
+			Rounding:    RoundHalfUp,
+			MaxExponent: MaxExponent,
+			MinExponent: MinExponent,
+		}
 		_, err := ctx.Round(&d, &c.unrounded)
 		if err != nil {
 			panic(err)

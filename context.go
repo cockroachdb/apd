@@ -22,15 +22,16 @@ import (
 )
 
 // Context maintains options for Decimal operations. It can safely be used
-// concurrently, but not modified concurrently.
+// concurrently, but not modified concurrently. Arguments for any method
+// can safely be used as both result and operand.
 type Context struct {
 	// Precision is the number of places to round during rounding; this is
 	// effectively the total number of digits (before and after the decimal
 	// point).
 	Precision uint32
 	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
-	// nil.
-	Rounding Rounder
+	// empty or not present in Roundings.
+	Rounding string
 	// MaxExponent specifies the largest effective exponent. The
 	// effective exponent is the value of the Decimal in scientific notation. That
 	// is, for 10e2, the effective exponent is 3 (1.0e3). Zero (0) is not a special
@@ -87,33 +88,98 @@ func (c *Context) etiny() int32 {
 	return c.MinExponent - int32(c.Precision) + 1
 }
 
+// setIfNaN sets d to the first NaNSignaling, or otherwise first NaN, of
+// vals. d' is unchanged if vals contains no NaNs. True is returned if d
+// was set to a NaN.
+func (c *Context) setIfNaN(d *Decimal, vals ...*Decimal) (bool, Condition, error) {
+	var nan *Decimal
+Loop:
+	for _, v := range vals {
+		switch v.Form {
+		case NaNSignaling:
+			nan = v
+			break Loop
+		case NaN:
+			if nan == nil {
+				nan = v
+			}
+		}
+	}
+	if nan == nil {
+		return false, 0, nil
+	}
+	d.Set(nan)
+	var res Condition
+	if nan.Form == NaNSignaling {
+		res = InvalidOperation
+		d.Form = NaN
+	}
+	_, err := c.goError(res)
+	return true, res, err
+}
+
 func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
+	if set, res, err := c.setIfNaN(d, x, y); set {
+		return res, err
+	}
+	xn := x.Negative
+	yn := y.Negative
+	if subtract {
+		if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
+			if xi && yi && xn == yn {
+				d.Set(decimalNaN)
+				return c.goError(InvalidOperation)
+			} else if xi {
+				d.Set(x)
+			} else {
+				d.Set(y)
+				d.Negative = !d.Negative
+			}
+			return 0, nil
+		}
+	} else {
+		if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
+			if xi && yi {
+				if xn != yn {
+					// -Inf + Inf
+					d.Set(decimalNaN)
+					return c.goError(InvalidOperation)
+				} else {
+					// Same sign.
+					d.Set(x)
+				}
+			} else if xi {
+				d.Set(x)
+			} else {
+				d.Set(y)
+			}
+			return 0, nil
+		}
+	}
 	a, b, s, err := upscale(x, y)
 	if err != nil {
 		return 0, errors.Wrap(err, "add")
 	}
-	xn := x.Negative
-	yn := y.Negative
 	ax := x
 	ay := y
-	if xn {
+	if xn || d == x {
 		ax = new(Decimal).Abs(x)
 	}
-	if yn {
+	if yn || d == y {
 		ay = new(Decimal).Abs(y)
 	}
 
 	if subtract {
 		yn = !yn
 	}
-	subtract = xn != yn
-	if subtract {
+	if xn == yn {
+		d.Coeff.Add(a, b)
+	} else {
 		d.Coeff.Sub(a, b)
 		d.Coeff.Abs(&d.Coeff)
-	} else {
-		d.Coeff.Add(a, b)
 	}
 	d.Exponent = s
+	d.Form = Finite
 	if !d.IsZero() {
 		if ax.Cmp(ay) > 0 {
 			d.Negative = xn
@@ -122,10 +188,9 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 		}
 	} else {
 		d.Negative = xn && yn
-		// TODO(mjibson): this is in the spec, but apparently not tested
-		// if xn != yn && c.Rounding == RoundFloor {
-		//	d.Negative = true
-		// }
+		if xn != yn && c.Rounding == RoundFloor {
+			d.Negative = true
+		}
 	}
 	return c.Round(d, d)
 }
@@ -142,35 +207,124 @@ func (c *Context) Sub(d, x, y *Decimal) (Condition, error) {
 
 // Abs sets d to |x| (the absolute value of x).
 func (c *Context) Abs(d, x *Decimal) (Condition, error) {
+	if set, res, err := c.setIfNaN(d, x); set {
+		return res, err
+	}
 	d.Abs(x)
 	return c.Round(d, d)
 }
 
 // Neg sets d to -x.
 func (c *Context) Neg(d, x *Decimal) (Condition, error) {
-	d.Neg(x)
+	if set, res, err := c.setIfNaN(d, x); set {
+		return res, err
+	}
+	if x.IsZero() {
+		d.Set(x)
+		d.Negative = false
+	} else {
+		d.Neg(x)
+	}
 	return c.Round(d, d)
 }
 
 // Mul sets d to the product x*y.
 func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
-	d.Coeff.Mul(&x.Coeff, &y.Coeff)
+	if set, res, err := c.setIfNaN(d, x, y); set {
+		return res, err
+	}
 	// The sign of the result is the exclusive or of the signs of the operands.
-	d.Negative = x.Negative != y.Negative
+	neg := x.Negative != y.Negative
+	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
+		var res Condition
+		if xi && yi {
+			d.Set(decimalInfinity)
+			d.Negative = neg
+		} else if xi {
+			if y.IsZero() {
+				d.Set(decimalNaN)
+				res = InvalidOperation
+			} else {
+				d.Set(decimalInfinity)
+				d.Negative = neg
+			}
+		} else {
+			if x.IsZero() {
+				d.Set(decimalNaN)
+				res = InvalidOperation
+			} else {
+				d.Set(decimalInfinity)
+				d.Negative = neg
+			}
+		}
+		return c.goError(res)
+	}
+
+	d.Coeff.Mul(&x.Coeff, &y.Coeff)
+	d.Negative = neg
+	d.Form = Finite
 	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
 	return c.goError(res)
+}
+
+func (c *Context) quoSpecials(d, x, y *Decimal, canClamp bool) (bool, Condition, error) {
+	if set, res, err := c.setIfNaN(d, x, y); set {
+		return true, res, err
+	}
+	// The sign of the result is the exclusive or of the signs of the operands.
+	neg := x.Negative != y.Negative
+	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
+		var res Condition
+		if xi && yi {
+			d.Set(decimalNaN)
+			res = InvalidOperation
+		} else if xi {
+			d.Set(decimalInfinity)
+			d.Negative = neg
+		} else {
+			d.SetInt64(0)
+			d.Negative = neg
+			if canClamp {
+				d.Exponent = c.etiny()
+				res = Clamped
+			}
+		}
+		res, err := c.goError(res)
+		return true, res, err
+	}
+
+	if y.IsZero() {
+		var res Condition
+		if x.IsZero() {
+			res |= DivisionUndefined
+			d.Set(decimalNaN)
+		} else {
+			res |= DivisionByZero
+			d.Set(decimalInfinity)
+			d.Negative = neg
+		}
+		res, err := c.goError(res)
+		return true, res, err
+	}
+
+	if c.Precision == 0 {
+		// 0 precision is disallowed because we compute the required number of digits
+		// during the 10**x calculation using the precision.
+		return true, 0, errors.New(errZeroPrecisionStr)
+	}
+
+	return false, 0, nil
 }
 
 // Quo sets d to the quotient x/y for y != 0. c.Precision must be > 0. If an
 // exact division is required, use a context with high precision and verify
 // it was exact by checking the Inexact flag on the return Condition.
 func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
-	if c.Precision == 0 {
-		// 0 precision is disallowed because we compute the required number of digits
-		// during the 10**x calculation using the precision.
-		return 0, errors.New(errZeroPrecisionStr)
+	if set, res, err := c.quoSpecials(d, x, y, true); set {
+		return res, err
 	}
+
 	if c.Precision > 5000 {
 		// High precision could result in a large number of iterations. Arbitrarily
 		// limit the precision to prevent runaway processes. This limit was chosen
@@ -180,16 +334,9 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return 0, errors.New("Quo requires Precision <= 5000")
 	}
 
-	if y.IsZero() {
-		// TODO(mjibson): correctly set Inf and NaN here.
-		var res Condition
-		if x.IsZero() {
-			res |= DivisionUndefined
-		} else {
-			res |= DivisionByZero
-		}
-		return c.goError(res)
-	}
+	// The sign of the result is the exclusive or of the signs of the operands.
+	neg := x.Negative != y.Negative
+
 	// An integer variable, adjust, is initialized to 0.
 	var adjust int64
 	// The result coefficient is initialized to 0.
@@ -269,10 +416,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// original exponent of the divisor and the value of adjust at the end of
 	// the coefficient calculation from the original exponent of the dividend.
 	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
-
-	// The sign of the result is the exclusive or of the signs of the operands.
-	quo.Negative = x.Negative != y.Negative
-
+	quo.Negative = neg
 	d.Set(quo)
 	return c.goError(res)
 }
@@ -280,43 +424,53 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 // QuoInteger sets d to the integer part of the quotient x/y. If the result
 // cannot fit in d.Precision digits, an error is returned.
 func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
-	var res Condition
-	if y.IsZero() {
-		// TODO(mjibson): correctly set Inf and NaN here (since this is Integer
-		// division, may be different or not apply like in Quo).
-		if x.IsZero() {
-			res |= DivisionUndefined
-		} else {
-			res |= DivisionByZero
-		}
-		return c.goError(res)
+	if set, res, err := c.quoSpecials(d, x, y, false); set {
+		return res, err
 	}
+
+	// The sign of the result is the exclusive or of the signs of the operands.
+	neg := x.Negative != y.Negative
+	var res Condition
+
 	a, b, _, err := upscale(x, y)
 	if err != nil {
 		return 0, errors.Wrap(err, "QuoInteger")
 	}
 	d.Coeff.Quo(a, b)
+	d.Form = Finite
 	if d.NumDigits() > int64(c.Precision) {
+		d.Set(decimalNaN)
 		res |= DivisionImpossible
 	}
 	d.Exponent = 0
-	// The sign of the result is the exclusive or of the signs of the operands.
-	d.Negative = x.Negative != y.Negative
+	d.Negative = neg
 	return c.goError(res)
 }
 
 // Rem sets d to the remainder part of the quotient x/y. If
 // the integer part cannot fit in d.Precision digits, an error is returned.
 func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
+	if set, res, err := c.setIfNaN(d, x, y); set {
+		return res, err
+	}
+
+	if x.Form != Finite {
+		d.Set(decimalNaN)
+		return c.goError(InvalidOperation)
+	}
+	if y.Form == Infinite {
+		d.Set(x)
+		return 0, nil
+	}
+
 	var res Condition
 	if y.IsZero() {
-		// TODO(mjibson): correctly set Inf and NaN here (since this is Remainder
-		// division, may be different or not apply like in Quo).
 		if x.IsZero() {
 			res |= DivisionUndefined
 		} else {
 			res |= InvalidOperation
 		}
+		d.Set(decimalNaN)
 		return c.goError(res)
 	}
 	a, b, s, err := upscale(x, y)
@@ -326,13 +480,42 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	tmp := new(big.Int)
 	tmp.QuoRem(a, b, &d.Coeff)
 	if NumDigits(tmp) > int64(c.Precision) {
-		res |= DivisionImpossible
+		d.Set(decimalNaN)
+		return c.goError(DivisionImpossible)
 	}
+	d.Form = Finite
 	d.Exponent = s
 	// The sign of the result is sign if the dividend.
 	d.Negative = x.Negative
 	res |= c.round(d, d)
 	return c.goError(res)
+}
+
+func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, error) {
+	if set, res, err := c.setIfNaN(d, x); set {
+		return set, res, err
+	}
+	if x.Form == Infinite {
+		if x.Negative {
+			d.Set(decimalNaN)
+			res, err := c.goError(InvalidOperation)
+			return true, res, err
+		}
+		d.Set(decimalInfinity)
+		return true, 0, nil
+	}
+
+	switch x.Sign() {
+	case -1:
+		d.Set(decimalNaN)
+		res, err := c.goError(InvalidOperation)
+		return true, res, err
+	case 0:
+		d.Set(x)
+		d.Exponent /= factor
+		return true, 0, nil
+	}
+	return false, 0, nil
 }
 
 // Sqrt sets d to the square root of x.
@@ -341,14 +524,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// and A. Abrham, ACM Transactions on Mathematical Software, Vol 11 #3,
 	// pp229–237, ACM, September 1985.
 
-	switch x.Sign() {
-	case -1:
-		res := InvalidOperation
-		return c.goError(res)
-	case 0:
-		d.SetCoefficient(0)
-		d.Exponent = 0
-		return 0, nil
+	if set, res, err := c.rootSpecials(d, x, 2); set {
+		return res, err
 	}
 
 	// Use same precision as in decNumber.
@@ -437,15 +614,8 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	// then iterate:
 	//     x_{n+1} = 1/3 * ( 2 * x_n + (d / x_n / x_n) ).
 
-	// Validate the sign of x.
-	switch x.Sign() {
-	case -1:
-		res := InvalidOperation
-		return c.goError(res)
-	case 0:
-		d.SetCoefficient(0)
-		d.Exponent = 0
-		return 0, nil
+	if set, res, err := c.rootSpecials(d, x, 3); set {
+		return res, err
 	}
 
 	z := new(Decimal).Set(x)
@@ -508,6 +678,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		}
 	}
 
+	z0.Set(x)
 	res, err := c.Round(d, z)
 
 	// Set z = d^3 to check for exactness.
@@ -519,10 +690,36 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	}
 
 	// Result is exact
-	if x.Cmp(z) == 0 {
+	if z0.Cmp(z) == 0 {
 		return 0, nil
 	}
 	return res, err
+}
+
+func (c *Context) logSpecials(d, x *Decimal) (bool, Condition, error) {
+	if set, res, err := c.setIfNaN(d, x); set {
+		return set, res, err
+	}
+	if x.Sign() < 0 {
+		d.Set(decimalNaN)
+		res, err := c.goError(InvalidOperation)
+		return true, res, err
+	}
+	if x.Form == Infinite {
+		d.Set(decimalInfinity)
+		return true, 0, nil
+	}
+	if x.Cmp(decimalZero) == 0 {
+		d.Set(decimalInfinity)
+		d.Negative = true
+		return true, 0, nil
+	}
+	if x.Cmp(decimalOne) == 0 {
+		d.Set(decimalZero)
+		return true, 0, nil
+	}
+
+	return false, 0, nil
 }
 
 // Ln sets d to the natural log of x.
@@ -531,14 +728,8 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	// Logarithm, James F. Epperson, The American Mathematical Monthly, Vol. 96,
 	// No. 9, November 1989, pp. 831-835.
 
-	if x.Sign() <= 0 {
-		res := InvalidOperation
-		return c.goError(res)
-	}
-
-	if x.Cmp(decimalOne) == 0 {
-		d.Set(decimalZero)
-		return 0, nil
+	if set, res, err := c.logSpecials(d, x); set {
+		return res, err
 	}
 
 	// The internal precision needs to be a few digits higher because errors in
@@ -704,14 +895,8 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 // Log10 sets d to the base 10 log of x.
 func (c *Context) Log10(d, x *Decimal) (Condition, error) {
-	if x.Sign() <= 0 {
-		res := InvalidOperation
-		return c.goError(res)
-	}
-
-	if x.Cmp(decimalOne) == 0 {
-		d.Set(decimalZero)
-		return 0, nil
+	if set, res, err := c.logSpecials(d, x); set {
+		return res, err
 	}
 
 	// TODO(mjibson): This is exact under some conditions.
@@ -738,6 +923,18 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	// See: Variable Precision Exponential Function, T. E. Hull and A. Abrham, ACM
 	// Transactions on Mathematical Software, Vol 12 #2, pp79-91, ACM, June 1986.
+
+	if set, res, err := c.setIfNaN(d, x); set {
+		return res, err
+	}
+	if x.Form == Infinite {
+		if x.Negative {
+			d.Set(decimalZero)
+		} else {
+			d.Set(decimalInfinity)
+		}
+		return 0, nil
+	}
 
 	if x.IsZero() {
 		d.Set(decimalOne)
@@ -771,7 +968,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 			d.SetCoefficient(0)
 			d.Exponent = c.etiny()
 		} else {
-			// TODO(mjibson): set Infinity here when supported.
+			d.Set(decimalInfinity)
 		}
 		return c.goError(res)
 	}
@@ -833,15 +1030,17 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "ki")
 	}
-	if _, err := nc.integerPower(d, sum, ki); err != nil {
+	if ires, err := nc.integerPower(d, sum, ki); err != nil {
 		return 0, errors.Wrap(err, "integer power")
+	} else {
+		res |= ires
 	}
 	nc.Precision = c.Precision
 	res |= nc.round(d, d)
 	return c.goError(res)
 }
 
-// integerPower sets d = x**y.
+// integerPower sets d = x**y. d and x must not point to the same Decimal.
 func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 	// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring.
 
@@ -883,31 +1082,50 @@ func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
 
 // Pow sets d = x**y.
 func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
-	// Check if y is of type int.
-	tmp := new(Decimal)
-	if _, err := c.Abs(tmp, y); err != nil {
-		return 0, errors.Wrap(err, "Abs")
+	if set, res, err := c.setIfNaN(d, x, y); set {
+		return res, err
 	}
+
 	integ, frac := new(Decimal), new(Decimal)
 	y.Modf(integ, frac)
 	yIsInt := frac.IsZero()
+	neg := x.Negative && y.Form == Finite && yIsInt && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0
+
+	if x.Form == Infinite {
+		var res Condition
+		if y.Sign() == 0 {
+			d.Set(decimalOne)
+		} else if x.Negative && (y.Form == Infinite || !yIsInt) {
+			d.Set(decimalNaN)
+			res = InvalidOperation
+		} else if y.Negative {
+			d.Set(decimalZero)
+		} else {
+			d.Set(decimalInfinity)
+		}
+		d.Negative = neg
+		return c.goError(res)
+	}
+
+	// Check if y is of type int.
+	tmp := new(Decimal).Abs(y)
 
 	xs := x.Sign()
 	ys := y.Sign()
 
 	if xs == 0 {
+		var res Condition
 		switch ys {
 		case 0:
-			d.Set(decimalOne)
-			return 0, nil
+			d.Set(decimalNaN)
+			res = InvalidOperation
 		case 1:
 			d.Set(decimalZero)
-			return 0, nil
 		default: // -1
-			res := InvalidOperation
-			return c.goError(res)
-
+			d.Set(decimalInfinity)
 		}
+		d.Negative = neg
+		return c.goError(res)
 	}
 	if ys == 0 {
 		d.Set(decimalOne)
@@ -915,8 +1133,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 
 	if (xs == 0 && ys == 0) || (xs < 0 && !yIsInt) {
-		res := InvalidOperation
-		return c.goError(res)
+		d.Set(decimalNaN)
+		return c.goError(InvalidOperation)
 	}
 
 	// decNumber sets the precision to be max(x digits + exponent, c.Precision)
@@ -929,16 +1147,22 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	nc := BaseContext.WithPrecision(p)
 
+	z := d
+	if z == x {
+		z = new(Decimal)
+	}
+
 	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
 	res := c.quantize(integ, integ, 0)
-	nres, err := nc.integerPower(d, x, integ.setBig(&integ.Coeff))
+	nres, err := nc.integerPower(z, x, integ.setBig(&integ.Coeff))
 	res |= nres
 	if err != nil {
+		d.Set(decimalNaN)
 		return res, err
 	}
 
 	if yIsInt {
-		res |= c.round(d, d)
+		res |= c.round(d, z)
 		return c.goError(res)
 	}
 
@@ -951,35 +1175,44 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	ed.Exp(tmp, tmp)
 
 	// Join integer and frac parts back.
-	ed.Mul(tmp, d, tmp)
-
-	if xs < 0 && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0 {
-		ed.Neg(tmp, tmp)
-	}
+	ed.Mul(tmp, z, tmp)
 
 	if err := ed.Err(); err != nil {
 		return ed.Flags, err
 	}
 	res |= c.round(d, tmp)
+	d.Negative = neg
 	res |= Inexact
 	return c.goError(res)
 }
 
-// Quantize adjusts and rounds v as necessary so it is represented with
+// Quantize adjusts and rounds x as necessary so it is represented with
 // exponent exp and stores the result in d.
-func (c *Context) Quantize(d, v *Decimal, exp int32) (Condition, error) {
-	res := c.quantize(d, v, exp)
-	if nd := d.NumDigits(); nd > int64(c.Precision) {
-		res |= InvalidOperation
+func (c *Context) Quantize(d, x *Decimal, exp int32) (Condition, error) {
+	if set, res, err := c.setIfNaN(d, x); set {
+		return res, err
 	}
-	res |= c.round(d, d)
+	if x.Form == Infinite || exp < c.etiny() {
+		d.Set(decimalNaN)
+		return c.goError(InvalidOperation)
+	}
+	res := c.quantize(d, x, exp)
+	if nd := d.NumDigits(); nd > int64(c.Precision) || exp > c.MaxExponent {
+		res = InvalidOperation
+		d.Set(decimalNaN)
+	} else {
+		res |= c.round(d, d)
+		if res.Overflow() || res.Underflow() {
+			res = InvalidOperation
+			d.Set(decimalNaN)
+		}
+	}
 	return c.goError(res)
 }
 
 func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 	diff := exp - v.Exponent
-	d.Coeff.Set(&v.Coeff)
-	d.Negative = v.Negative
+	d.Set(v)
 	var res Condition
 	if diff < 0 {
 		if diff < MinExponent {
@@ -990,7 +1223,7 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
 			if !d.IsZero() {
-				d.SetCoefficient(0)
+				d.Coeff.SetInt64(0)
 				res = Inexact | Rounded
 			}
 		} else {
@@ -1029,8 +1262,22 @@ func (c *Context) toIntegral(d, x *Decimal) Condition {
 	return res
 }
 
+func (c *Context) toIntegralSpecials(d, x *Decimal) (bool, Condition, error) {
+	if set, res, err := c.setIfNaN(d, x); set {
+		return set, res, err
+	}
+	if x.Form != Finite {
+		d.Set(x)
+		return true, 0, nil
+	}
+	return false, 0, nil
+}
+
 // ToIntegral sets d to integral value of x. Inexact and Rounded flags are ignored and removed.
 func (c *Context) ToIntegral(d, x *Decimal) (Condition, error) {
+	if set, res, err := c.toIntegralSpecials(d, x); set {
+		return res, err
+	}
 	res := c.toIntegral(d, x)
 	res &= ^(Inexact | Rounded)
 	return c.goError(res)
@@ -1038,6 +1285,9 @@ func (c *Context) ToIntegral(d, x *Decimal) (Condition, error) {
 
 // ToIntegralX sets d to integral value of x.
 func (c *Context) ToIntegralX(d, x *Decimal) (Condition, error) {
+	if set, res, err := c.toIntegralSpecials(d, x); set {
+		return res, err
+	}
 	res := c.toIntegral(d, x)
 	return c.goError(res)
 }
@@ -1064,8 +1314,14 @@ func (c *Context) Floor(d, x *Decimal) (Condition, error) {
 
 // Reduce sets d to x with all trailing zeros removed.
 func (c *Context) Reduce(d, x *Decimal) (Condition, error) {
+	if set, res, err := c.setIfNaN(d, x); set {
+		return res, err
+	}
+	neg := x.Negative
 	d.Reduce(x)
-	return c.Round(d, d)
+	d.Negative = neg
+	res, err := c.Round(d, d)
+	return res, err
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.
