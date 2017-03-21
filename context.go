@@ -455,9 +455,11 @@ func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, er
 
 	switch x.Sign() {
 	case -1:
-		d.Set(decimalNaN)
-		res, err := c.goError(InvalidOperation)
-		return true, res, err
+		if factor%2 == 0 {
+			d.Set(decimalNaN)
+			res, err := c.goError(InvalidOperation)
+			return true, res, err
+		}
 	case 0:
 		d.Set(x)
 		d.Exponent /= factor
@@ -573,7 +575,12 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		return res, err
 	}
 
-	z := new(Decimal).Set(x)
+	neg := x.Negative
+	ax := x
+	if x.Negative {
+		ax = new(Decimal).Abs(x)
+	}
+	z := new(Decimal).Set(ax)
 	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
 	ed := MakeErrDecimal(nc)
 	exp8 := 0
@@ -618,7 +625,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
 		z0.Set(z)
 		ed.Mul(z, z, z0)
-		ed.Quo(z, x, z)
+		ed.Quo(z, ax, z)
 		ed.Add(z, z, z0)
 		ed.Add(z, z, z0)
 		ed.Quo(z, z, decimalThree)
@@ -635,6 +642,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 
 	z0.Set(x)
 	res, err := c.Round(d, z)
+	d.Negative = neg
 
 	// Set z = d^3 to check for exactness.
 	ed.Mul(z, d, d)
