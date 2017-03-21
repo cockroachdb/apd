@@ -36,10 +36,11 @@ func (c *Context) round(d, x *Decimal) Condition {
 }
 
 func (c *Context) rounding() Rounder {
-	if c.Rounding == nil {
+	rounding, ok := Roundings[c.Rounding]
+	if !ok {
 		return roundHalfUp
 	}
-	return c.Rounding
+	return rounding
 }
 
 // Rounder defines a function that returns true if 1 should be added to the
@@ -107,27 +108,43 @@ func roundAddOne(b *big.Int, diff *int64) {
 }
 
 var (
+	// Roundings defines the set of Rounders used by Context. Users may add their
+	// own, but modification of this map is not safe during any other parallel
+	// Context operations.
+	Roundings = map[string]Rounder{
+		RoundDown:     roundDown,
+		RoundHalfUp:   roundHalfUp,
+		RoundHalfEven: roundHalfEven,
+		RoundCeiling:  roundCeiling,
+		RoundFloor:    roundFloor,
+		RoundHalfDown: roundHalfDown,
+		RoundUp:       roundUp,
+		Round05Up:     round05Up,
+	}
+)
+
+const (
 	// RoundDown rounds toward 0; truncate.
-	RoundDown Rounder = roundDown
+	RoundDown = "down"
 	// RoundHalfUp rounds up if the digits are >= 0.5.
-	RoundHalfUp Rounder = roundHalfUp
+	RoundHalfUp = "half_up"
 	// RoundHalfEven rounds up if the digits are > 0.5. If the digits are equal
 	// to 0.5, it rounds up if the previous digit is odd, always producing an
 	// even digit.
-	RoundHalfEven Rounder = roundHalfEven
+	RoundHalfEven = "half_even"
 	// RoundCeiling towards +Inf: rounds up if digits are > 0 and the number
 	// is positive.
-	RoundCeiling Rounder = roundCeiling
+	RoundCeiling = "ceiling"
 	// RoundFloor towards -Inf: rounds up if digits are > 0 and the number
 	// is negative.
-	RoundFloor Rounder = roundFloor
+	RoundFloor = "floor"
 	// RoundHalfDown rounds up if the digits are > 0.5.
-	RoundHalfDown Rounder = roundHalfDown
+	RoundHalfDown = "half_down"
 	// RoundUp rounds away from 0.
-	RoundUp Rounder = roundUp
+	RoundUp = "up"
 	// Round05Up rounds zero or five away from 0; same as round-up, except that
 	// rounding up only occurs if the digit to be rounded up is 0 or 5.
-	Round05Up Rounder = round05Up
+	Round05Up = "05up"
 )
 
 func roundDown(result *big.Int, neg bool, half int) bool {

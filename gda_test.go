@@ -198,6 +198,7 @@ var GDAfiles = []string{
 	"add",
 	"base",
 	"compare",
+	"comparetotal",
 	"divide",
 	"divideint",
 	"exp",
@@ -278,6 +279,9 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	case "tointegralx":
 		res, err = c.ToIntegralX(d, x)
 
+	// Below used only in benchmarks. Tests call it themselves.
+	case "comparetotal":
+		x.CmpTotal(y)
 	case "tosci":
 		x.ToSci()
 
@@ -340,15 +344,15 @@ func readGDA(t testing.TB, name string) (string, []TestCase) {
 }
 
 func (tc TestCase) Context(t testing.TB) *Context {
-	mode, ok := rounders[tc.Rounding]
-	if !ok || mode == nil {
+	_, ok := Roundings[tc.Rounding]
+	if !ok {
 		t.Fatalf("unsupported rounding mode %s", tc.Rounding)
 	}
 	c := &Context{
 		Precision:   uint32(tc.Precision),
 		MaxExponent: int32(tc.MaxExponent),
 		MinExponent: int32(tc.MinExponent),
-		Rounding:    mode,
+		Rounding:    tc.Rounding,
 		Traps:       0,
 	}
 	return c
@@ -397,8 +401,8 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			t.Logf("%s:/^%s ", path, tc.ID)
 			t.Logf("%s %s = %s (%s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, strings.Join(tc.Conditions, " "))
 			t.Logf("prec: %d, round: %s, Emax: %d, Emin: %d", tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
-			mode, ok := rounders[tc.Rounding]
-			if !ok || mode == nil {
+			_, ok := Roundings[tc.Rounding]
+			if !ok {
 				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
 			}
 			operands := make([]*Decimal, 2)
@@ -449,7 +453,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				}
 			case "quantize":
 				if operands[1].Form != Finite {
-					t.Skip("quantize requires finite operand")
+					t.Skip("quantize requires finite second operand")
 				}
 			}
 			var s string
@@ -482,6 +486,10 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 					d.Set(operands[0])
 					// Set d1 to prevent the result-equals-operand check failing.
 					d1 = d
+				case "comparetotal":
+					var c int
+					c = operands[0].CmpTotal(operands[1])
+					d.SetInt64(int64(c))
 				default:
 					var wg sync.WaitGroup
 					wg.Add(2)
@@ -527,7 +535,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				}
 			}
 			// Verify the result-equals-operand worked correctly.
-			if d.CmpTotal(d1) != 0 {
+			if d1 != nil && d.CmpTotal(d1) != 0 {
 				t.Errorf("first operand as result mismatch: got %s, expected %s", d1, d)
 			}
 			if d2 != nil && d.CmpTotal(d2) != 0 {
@@ -654,7 +662,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				if strings.HasPrefix(tc.Result, "SNAN") {
 					tc.Result = "sNaN"
 				}
-				if strings.ToUpper(s) != strings.ToUpper(tc.Result) {
+				if !strings.EqualFold(s, tc.Result) {
 					t.Fatalf("expected %s, got %s", tc.Result, s)
 				}
 				return
@@ -663,7 +671,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			var equal bool
 			if d.Form == Finite {
 				// Don't worry about trailing zeros being inequal in CmpTotal.
-				equal = d.Cmp(r) == 0
+				equal = d.Cmp(r) == 0 && d.Negative == r.Negative
 			} else {
 				equal = d.CmpTotal(r) == 0
 			}
@@ -696,17 +704,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			}
 		}
 	}
-}
-
-var rounders = map[string]Rounder{
-	"ceiling":   RoundCeiling,
-	"down":      RoundDown,
-	"floor":     RoundFloor,
-	"half_down": RoundHalfDown,
-	"half_even": RoundHalfEven,
-	"half_up":   RoundHalfUp,
-	"up":        RoundUp,
-	"05up":      Round05Up,
 }
 
 // CheckPython returns true if python outputs d for this test case. It prints
@@ -812,6 +809,17 @@ var GDAignore = map[string]bool{
 	// NaN payloads with weird digits
 	"basx725": true,
 	"basx745": true,
+
+	// NaN payloads
+	"cotx970": true,
+	"cotx973": true,
+	"cotx974": true,
+	"cotx977": true,
+	"cotx980": true,
+	"cotx983": true,
+	"cotx984": true,
+	"cotx987": true,
+	"cotx994": true,
 
 	// too large exponents, supposed to fail anyway
 	"quax525": true,

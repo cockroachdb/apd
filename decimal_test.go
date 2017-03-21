@@ -470,3 +470,75 @@ func TestQuantize(t *testing.T) {
 		})
 	}
 }
+
+func TestCmpOrder(t *testing.T) {
+	tests := []struct {
+		s     string
+		order int
+	}{
+		{s: "-NaN", order: -4},
+		{s: "-sNaN", order: -3},
+		{s: "-Infinity", order: -2},
+		{s: "-127", order: -1},
+		{s: "-1.00", order: -1},
+		{s: "-1", order: -1},
+		{s: "-0.000", order: -1},
+		{s: "-0", order: -1},
+		{s: "0", order: 1},
+		{s: "1.2300", order: 1},
+		{s: "1.23", order: 1},
+		{s: "1E+9", order: 1},
+		{s: "Infinity", order: 2},
+		{s: "sNaN", order: 3},
+		{s: "NaN", order: 4},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.s, func(t *testing.T) {
+			d, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			o := d.cmpOrder()
+			if o != tc.order {
+				t.Fatalf("got %d, expected %d", o, tc.order)
+			}
+		})
+	}
+}
+
+func TestIsZero(t *testing.T) {
+	tests := []struct {
+		s    string
+		zero bool
+	}{
+		{s: "-NaN", zero: false},
+		{s: "-sNaN", zero: false},
+		{s: "-Infinity", zero: false},
+		{s: "-127", zero: false},
+		{s: "-1.00", zero: false},
+		{s: "-1", zero: false},
+		{s: "-0.000", zero: true},
+		{s: "-0", zero: true},
+		{s: "0", zero: true},
+		{s: "1.2300", zero: false},
+		{s: "1.23", zero: false},
+		{s: "1E+9", zero: false},
+		{s: "Infinity", zero: false},
+		{s: "sNaN", zero: false},
+		{s: "NaN", zero: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.s, func(t *testing.T) {
+			d, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			z := d.IsZero()
+			if z != tc.zero {
+				t.Fatalf("got %v, expected %v", z, tc.zero)
+			}
+		})
+	}
+}
