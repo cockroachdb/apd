@@ -439,7 +439,7 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	return c.goError(res)
 }
 
-func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, error) {
+func (c *Context) rootSpecials(d, x *Decimal, factor int32, allowNegative bool) (bool, Condition, error) {
 	if set, res, err := c.setIfNaN(d, x); set {
 		return set, res, err
 	}
@@ -455,9 +455,11 @@ func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, er
 
 	switch x.Sign() {
 	case -1:
-		d.Set(decimalNaN)
-		res, err := c.goError(InvalidOperation)
-		return true, res, err
+		if !allowNegative {
+			d.Set(decimalNaN)
+			res, err := c.goError(InvalidOperation)
+			return true, res, err
+		}
 	case 0:
 		d.Set(x)
 		d.Exponent /= factor
@@ -474,7 +476,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// and A. Abrham, ACM Transactions on Mathematical Software, Vol 11 #3,
 	// pp229–237, ACM, September 1985.
 
-	if set, res, err := c.rootSpecials(d, x, 2); set {
+	if set, res, err := c.rootSpecials(d, x, 2, false); set {
 		return res, err
 	}
 
@@ -569,11 +571,17 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	// then iterate:
 	//     x_{n+1} = 1/3 * ( 2 * x_n + (d / x_n / x_n) ).
 
-	if set, res, err := c.rootSpecials(d, x, 3); set {
+	if set, res, err := c.rootSpecials(d, x, 3, true); set {
 		return res, err
 	}
 
-	z := new(Decimal).Set(x)
+	neg := x.Negative
+	ax := x
+	if x.Negative {
+		ax = new(Decimal).Set(x)
+		ax.Negative = false
+	}
+	z := new(Decimal).Set(ax)
 	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
 	ed := MakeErrDecimal(nc)
 	exp8 := 0
@@ -618,7 +626,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
 		z0.Set(z)
 		ed.Mul(z, z, z0)
-		ed.Quo(z, x, z)
+		ed.Quo(z, ax, z)
 		ed.Add(z, z, z0)
 		ed.Add(z, z, z0)
 		ed.Quo(z, z, decimalThree)
@@ -635,6 +643,7 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 
 	z0.Set(x)
 	res, err := c.Round(d, z)
+	d.Negative = neg
 
 	// Set z = d^3 to check for exactness.
 	ed.Mul(z, d, d)
