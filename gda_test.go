@@ -208,6 +208,7 @@ var GDAfiles = []string{
 	"multiply",
 	"plus",
 	"power",
+	"powersqrt",
 	"quantize",
 	"randoms",
 	"reduce",
