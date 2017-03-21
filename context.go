@@ -1087,7 +1087,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
-	if (xs == 0 && ys == 0) || (xs < 0 && !yIsInt) {
+	if xs < 0 && !yIsInt {
 		d.Set(decimalNaN)
 		return c.goError(InvalidOperation)
 	}
