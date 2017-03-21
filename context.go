@@ -236,28 +236,13 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	// The sign of the result is the exclusive or of the signs of the operands.
 	neg := x.Negative != y.Negative
 	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
-		var res Condition
-		if xi && yi {
-			d.Set(decimalInfinity)
-			d.Negative = neg
-		} else if xi {
-			if y.IsZero() {
-				d.Set(decimalNaN)
-				res = InvalidOperation
-			} else {
-				d.Set(decimalInfinity)
-				d.Negative = neg
-			}
-		} else {
-			if x.IsZero() {
-				d.Set(decimalNaN)
-				res = InvalidOperation
-			} else {
-				d.Set(decimalInfinity)
-				d.Negative = neg
-			}
+		if x.IsZero() || y.IsZero() {
+			d.Set(decimalNaN)
+			return c.goError(InvalidOperation)
 		}
-		return c.goError(res)
+		d.Set(decimalInfinity)
+		d.Negative = neg
+		return 0, nil
 	}
 
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
