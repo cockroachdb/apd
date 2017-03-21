@@ -123,75 +123,38 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 		return res, err
 	}
 	xn := x.Negative
-	yn := y.Negative
-	if subtract {
-		if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
-			if xi && yi && xn == yn {
-				d.Set(decimalNaN)
-				return c.goError(InvalidOperation)
-			} else if xi {
-				d.Set(x)
-			} else {
-				d.Set(y)
-				d.Negative = !d.Negative
-			}
-			return 0, nil
+	yn := y.Negative != subtract
+	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
+		if xi && yi && xn != yn {
+			d.Set(decimalNaN)
+			return c.goError(InvalidOperation)
+		} else if xi {
+			d.Set(x)
+		} else {
+			d.Set(decimalInfinity)
+			d.Negative = yn
 		}
-	} else {
-		if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
-			if xi && yi {
-				if xn != yn {
-					// -Inf + Inf
-					d.Set(decimalNaN)
-					return c.goError(InvalidOperation)
-				} else {
-					// Same sign.
-					d.Set(x)
-				}
-			} else if xi {
-				d.Set(x)
-			} else {
-				d.Set(y)
-			}
-			return 0, nil
-		}
+		return 0, nil
 	}
 	a, b, s, err := upscale(x, y)
 	if err != nil {
 		return 0, errors.Wrap(err, "add")
 	}
-	ax := x
-	ay := y
-	if xn || d == x {
-		ax = new(Decimal).Abs(x)
-	}
-	if yn || d == y {
-		ay = new(Decimal).Abs(y)
-	}
-
-	if subtract {
-		yn = !yn
-	}
+	d.Negative = xn
 	if xn == yn {
 		d.Coeff.Add(a, b)
 	} else {
 		d.Coeff.Sub(a, b)
-		d.Coeff.Abs(&d.Coeff)
+		switch d.Coeff.Sign() {
+		case -1:
+			d.Negative = !d.Negative
+			d.Coeff.Neg(&d.Coeff)
+		case 0:
+			d.Negative = c.Rounding == RoundFloor
+		}
 	}
 	d.Exponent = s
 	d.Form = Finite
-	if !d.IsZero() {
-		if ax.Cmp(ay) > 0 {
-			d.Negative = xn
-		} else {
-			d.Negative = yn
-		}
-	} else {
-		d.Negative = xn && yn
-		if xn != yn && c.Rounding == RoundFloor {
-			d.Negative = true
-		}
-	}
 	return c.Round(d, d)
 }
 
