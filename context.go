@@ -531,25 +531,6 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	nc.Precision = workp
-	dp := int32(c.Precision)
-	approxsubhalf := new(Decimal)
-	ed.Sub(approxsubhalf, approx, New(5, -1-dp))
-	nc.Rounding = RoundUp
-	ed.Mul(approxsubhalf, approxsubhalf, approxsubhalf)
-	if approxsubhalf.Cmp(f) > 0 {
-		// TODO(mjibson): this branch is never taken in tests, why? Can it be removed?
-		ed.Sub(approx, approx, New(1, -dp))
-	} else {
-		approxaddhalf := new(Decimal)
-		ed.Add(approxaddhalf, approx, New(5, -1-dp))
-		nc.Rounding = RoundDown
-		ed.Mul(approxaddhalf, approxaddhalf, approxaddhalf)
-		if approxaddhalf.Cmp(f) < 0 {
-			ed.Add(approx, approx, New(1, -dp))
-		}
-	}
-
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
