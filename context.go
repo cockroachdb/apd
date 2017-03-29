@@ -1266,16 +1266,17 @@ func (c *Context) Floor(d, x *Decimal) (Condition, error) {
 	return 0, nil
 }
 
-// Reduce sets d to x with all trailing zeros removed.
-func (c *Context) Reduce(d, x *Decimal) (Condition, error) {
+// Reduce sets d to x with all trailing zeros removed and returns the number
+// of zeros removed.
+func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 	if set, res, err := c.setIfNaN(d, x); set {
-		return res, err
+		return 0, res, err
 	}
 	neg := x.Negative
-	d.Reduce(x)
+	_, n := d.Reduce(x)
 	d.Negative = neg
 	res, err := c.Round(d, d)
-	return res, err
+	return n, res, err
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.

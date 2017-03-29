@@ -542,3 +542,40 @@ func TestIsZero(t *testing.T) {
 		})
 	}
 }
+
+func TestReduce(t *testing.T) {
+	tests := map[string]int{
+		"-0":        0,
+		"0":         0,
+		"0.0":       0,
+		"00":        0,
+		"0.00":      0,
+		"-01000":    3,
+		"01000":     3,
+		"-1":        0,
+		"1":         0,
+		"-10.000E4": 4,
+		"10.000E4":  4,
+		"-10.00":    3,
+		"10.00":     3,
+		"-10":       1,
+		"10":        1,
+		"-143200000000000000000000000000000000000000000000000000000000": 56,
+		"143200000000000000000000000000000000000000000000000000000000":  56,
+		"Inf": 0,
+		"NaN": 0,
+	}
+
+	for s, n := range tests {
+		t.Run(s, func(t *testing.T) {
+			d, _, err := NewFromString(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, got := d.Reduce(d)
+			if n != got {
+				t.Fatalf("got %v, expected %v", got, n)
+			}
+		})
+	}
+}

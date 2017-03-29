@@ -145,9 +145,16 @@ func (e *ErrDecimal) QuoInteger(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.QuoInteger)
 }
 
-// Reduce performs e.Ctx.Reduce(d, x) and returns d.
-func (e *ErrDecimal) Reduce(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Reduce)
+// Reduce performs e.Ctx.Reduce(d, x) and returns the number of zeros removed
+// and d.
+func (e *ErrDecimal) Reduce(d, x *Decimal) (int, *Decimal) {
+	if e.Err() != nil {
+		return 0, d
+	}
+	n, res, err := e.Ctx.Reduce(d, x)
+	e.Flags |= res
+	e.err = err
+	return n, d
 }
 
 // Rem performs e.Ctx.Rem(d, x, y) and returns d.

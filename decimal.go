@@ -710,18 +710,21 @@ func (d *Decimal) Abs(x *Decimal) *Decimal {
 	return d
 }
 
-// Reduce sets d to x with all trailing zeros removed and returns d.
-func (d *Decimal) Reduce(x *Decimal) *Decimal {
+// Reduce sets d to x with all trailing zeros removed and returns d and the
+// number of zeros removed.
+func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 	if x.Form != Finite {
 		d.Set(x)
-		return d
+		return d, 0
 	}
+	var nd int
 	neg := false
 	switch x.Sign() {
 	case 0:
+		nd = int(d.NumDigits())
 		d.SetCoefficient(0)
 		d.Exponent = 0
-		return d
+		return d, nd - 1
 	case -1:
 		neg = true
 	}
@@ -730,21 +733,20 @@ func (d *Decimal) Reduce(x *Decimal) *Decimal {
 	// Use a uint64 for the division if possible.
 	if d.Coeff.BitLen() <= 64 {
 		i := d.Coeff.Uint64()
-		e := d.Exponent
 		for i >= 10000 && i%10000 == 0 {
 			i /= 10000
-			e += 4
+			nd += 4
 		}
 		for i%10 == 0 {
 			i /= 10
-			e++
+			nd++
 		}
-		if e != d.Exponent {
-			d.Exponent = e
+		if nd != 0 {
+			d.Exponent += int32(nd)
 			d.Coeff.SetUint64(i)
 			d.Negative = neg
 		}
-		return d
+		return d, nd
 	}
 
 	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
@@ -755,10 +757,11 @@ func (d *Decimal) Reduce(x *Decimal) *Decimal {
 		z.QuoRem(&d.Coeff, bigTen, r)
 		if r.Sign() == 0 {
 			d.Coeff.Set(z)
-			d.Exponent++
+			nd++
 		} else {
 			break
 		}
 	}
-	return d
+	d.Exponent += int32(nd)
+	return d, nd
 }
