@@ -533,7 +533,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		// approx = 0.5 * (approx + f / approx)
 		ed.Mul(approx, tmp, decimalHalf)
 	}
-	
+
 	// At this point the paper says: "approx is now within 1 ulp of the properly
 	// rounded square root off; to ensure proper rounding, compare squares of
 	// (approx - l/2 ulp) and (approx + l/2 ulp) with f." We originally implemented
@@ -542,7 +542,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// since we use workp + 5 instead of the + 2 as described in the paper,
 	// we are more accurate than this section needed to account for. Thus,
 	// we have removed the block from this implementation.
-	
+
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
@@ -1212,7 +1212,6 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 
 func (c *Context) toIntegral(d, x *Decimal) Condition {
 	res := c.quantize(d, x, 0)
-	// TODO(mjibson): trim here, once trim is in
 	return res
 }
 
