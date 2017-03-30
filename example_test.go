@@ -100,3 +100,35 @@ func ExampleErrDecimal() {
 	// Infinity, err: division by zero
 	// Infinity, err: division by zero
 }
+
+// ExampleToIntegralX demonstrates how to use ToIntegralX to check if a
+// number is an integer or not. Note the variations between integer (which
+// allows zeros after the decimal point) and strict (which does not). See
+// the documentation on Inexact and Rounded.
+func ExampleContext_ToIntegralX() {
+	inputs := []string{
+		"123.4",
+		"123.0",
+		"123",
+		"12E1",
+		"120E-1",
+		"120E-2",
+	}
+	for _, input := range inputs {
+		d, _, _ := apd.NewFromString(input)
+		res, _ := apd.BaseContext.ToIntegralX(d, d)
+		integer := !res.Inexact()
+		strict := !res.Rounded()
+		fmt.Printf("input: % 6s, ToIntegralX: % 3s, integer: % 5t, strict: % 5t, res:", input, d, integer, strict)
+		if res != 0 {
+			fmt.Printf(" %s", res)
+		}
+		fmt.Println()
+	}
+	// Output: input:  123.4, ToIntegralX: 123, integer: false, strict: false, res: inexact, rounded
+	// input:  123.0, ToIntegralX: 123, integer:  true, strict: false, res: rounded
+	// input:    123, ToIntegralX: 123, integer:  true, strict:  true, res:
+	// input:   12E1, ToIntegralX: 120, integer:  true, strict:  true, res:
+	// input: 120E-1, ToIntegralX:  12, integer:  true, strict: false, res: rounded
+	// input: 120E-2, ToIntegralX:   1, integer: false, strict: false, res: inexact, rounded
+}
