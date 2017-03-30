@@ -28,29 +28,31 @@ const (
 	SystemOverflow Condition = 1 << iota
 	// SystemUnderflow is raised when an exponent is less than MinExponent.
 	SystemUnderflow
-	// Overflow is raised when an exponent is greater than Context.MaxExponent.
+	// Overflow is raised when the exponent of a result is too large to be
+	// represented.
 	Overflow
-	// Underflow is raised when an exponent is less than Context.MinExponent.
+	// Underflow is raised when a result is both subnormal and inexact.
 	Underflow
-	// Inexact is raised when an operation is not exact.
+	// Inexact is raised when a result is not exact (one or more non-zero
+	// coefficient digits were discarded during rounding).
 	Inexact
-	// Subnormal is raised when an operation's adjusted exponent is less than
-	// Context.MinExponent.
+	// Subnormal is raised when a result is subnormal (its adjusted exponent is
+	// less than Emin), before any rounding.
 	Subnormal
-	// Rounded is raised when rounding occurs.
+	// Rounded is raised when a result has been rounded (that is, some zero or
+	// non-zero coefficient digits were discarded).
 	Rounded
 	// DivisionUndefined is raised when both division operands are 0.
 	DivisionUndefined
-	// DivisionByZero is raised when the divisor is zero.
+	// DivisionByZero is raised when a non-zero dividend is divided by zero.
 	DivisionByZero
 	// DivisionImpossible is raised when integer division cannot be exactly
 	// represented with the given precision.
 	DivisionImpossible
-	// InvalidOperation is raised during an invalid operation.
+	// InvalidOperation is raised when a result would be undefined or impossible.
 	InvalidOperation
 	// Clamped is raised when the exponent of a result has been altered or
-	// constrained in order to fit the constraints of a specific concrete
-	// representation.
+	// constrained in order to fit the constraints of the Decimal representation.
 	Clamped
 )
 
