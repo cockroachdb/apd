@@ -215,6 +215,11 @@ func TestInt64(t *testing.T) {
 		{x: "1e-1", err: true},
 		{x: "1e2", i: 100},
 		{x: "1", i: 1},
+		{x: "NaN", err: true},
+		{x: "Inf", err: true},
+		{x: "9223372036854775807", i: 9223372036854775807},
+		{x: "-9223372036854775808", i: -9223372036854775808},
+		{x: "9223372036854775808", err: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.x, func(t *testing.T) {
