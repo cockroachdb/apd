@@ -19,6 +19,7 @@ import (
 	"math"
 	"math/big"
 	"testing"
+	"unsafe"
 )
 
 var (
@@ -582,5 +583,14 @@ func TestReduce(t *testing.T) {
 				t.Fatalf("got %v, expected %v", got, n)
 			}
 		})
+	}
+}
+
+// TestSizeof is meant to catch changes that unexpectedly increase
+// the size of the Decimal struct.
+func TestSizeof(t *testing.T) {
+	var d Decimal
+	if s := unsafe.Sizeof(d); s != 48 {
+		t.Errorf("sizeof(Decimal) changed: %d", s)
 	}
 }

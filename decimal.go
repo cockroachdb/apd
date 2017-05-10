@@ -33,8 +33,8 @@ import (
 type Decimal struct {
 	Form     Form
 	Negative bool
-	Coeff    big.Int
 	Exponent int32
+	Coeff    big.Int
 }
 
 type Form int
