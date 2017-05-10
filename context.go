@@ -29,9 +29,6 @@ type Context struct {
 	// effectively the total number of digits (before and after the decimal
 	// point).
 	Precision uint32
-	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
-	// empty or not present in Roundings.
-	Rounding string
 	// MaxExponent specifies the largest effective exponent. The
 	// effective exponent is the value of the Decimal in scientific notation. That
 	// is, for 10e2, the effective exponent is 3 (1.0e3). Zero (0) is not a special
@@ -43,6 +40,9 @@ type Context struct {
 	// Traps are the conditions which will trigger an error result if the
 	// corresponding Flag condition occurred.
 	Traps Condition
+	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
+	// empty or not present in Roundings.
+	Rounding string
 }
 
 const (

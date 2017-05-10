@@ -593,4 +593,8 @@ func TestSizeof(t *testing.T) {
 	if s := unsafe.Sizeof(d); s != 48 {
 		t.Errorf("sizeof(Decimal) changed: %d", s)
 	}
+	var c Context
+	if s := unsafe.Sizeof(c); s != 32 {
+		t.Errorf("sizeof(Context) changed: %d", s)
+	}
 }
