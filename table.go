@@ -25,12 +25,9 @@ import "math/big"
 // Using this proof, for a given digit count, the map will return the lower number
 // of decimal digits (k) the binary digit count could represent, along with the
 // value of the border between the two decimal digit counts (10^k).
-const (
-	digitsTableSize = 128
-	digitsTableLen  = digitsTableSize + 1
-)
+const digitsTableSize = 128
 
-var digitsLookupTable [digitsTableLen]tableVal
+var digitsLookupTable [digitsTableSize + 1]tableVal
 
 type tableVal struct {
 	digits  int64
@@ -68,8 +65,17 @@ func NumDigits(b *big.Int) int64 {
 		return 1
 	}
 
-	if bl < digitsTableLen {
+	if bl <= digitsTableSize {
 		val := digitsLookupTable[bl]
+		// In general, we either have val.digits or val.digits+1 digits and we have
+		// to compare with the border value. But that's not true for all values of
+		// bl: in particular, if bl+1 maps to the same number of digits, then we
+		// know for sure we have val.digits and we can skip the comparison.
+		// This is the case for about 2 out of 3 values.
+		if bl < digitsTableSize && digitsLookupTable[bl+1].digits == val.digits {
+			return val.digits
+		}
+
 		switch b.Sign() {
 		case 1:
 			if b.Cmp(&val.border) < 0 {
