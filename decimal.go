@@ -606,6 +606,14 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		return lt
 	}
 
+	if d.Exponent == x.Exponent {
+		cmp := d.Coeff.Cmp(&x.Coeff)
+		if ds < 0 {
+			cmp = -cmp
+		}
+		return cmp
+	}
+
 	// Next compare adjusted exponents.
 	dn := d.NumDigits() + int64(d.Exponent)
 	xn := x.NumDigits() + int64(x.Exponent)
@@ -623,20 +631,22 @@ func (d *Decimal) Cmp(x *Decimal) int {
 	// more difficult, so we are assuming the user is already comfortable with
 	// slowness in those operations.
 
-	// Convert to int64 to guarantee the following arithmetic will succeed.
-	diff := int64(d.Exponent) - int64(x.Exponent)
-	if diff < 0 {
-		diff = -diff
-	}
-	e := tableExp10(diff, nil)
-	db := d.setBig(new(big.Int))
-	xb := x.setBig(new(big.Int))
-	if d.Exponent > x.Exponent {
-		db.Mul(db, e)
+	var cmp int
+	if d.Exponent < x.Exponent {
+		var xScaled big.Int
+		xScaled.Set(&x.Coeff)
+		xScaled.Mul(&xScaled, tableExp10(int64(x.Exponent)-int64(d.Exponent), nil))
+		cmp = d.Coeff.Cmp(&xScaled)
 	} else {
-		xb.Mul(xb, e)
+		var dScaled big.Int
+		dScaled.Set(&d.Coeff)
+		dScaled.Mul(&dScaled, tableExp10(int64(d.Exponent)-int64(x.Exponent), nil))
+		cmp = dScaled.Cmp(&x.Coeff)
 	}
-	return db.Cmp(xb)
+	if ds < 0 {
+		cmp = -cmp
+	}
+	return cmp
 }
 
 // Sign returns, if d is Finite:
