@@ -70,6 +70,15 @@ func NumDigits(b *big.Int) int64 {
 
 	if bl < digitsTableLen {
 		val := digitsLookupTable[bl]
+		// In general, we either have val.digits or val.digits+1 digits and we have
+		// to compare with the border value. But that's not true for all values of
+		// bl: in particular, if bl+1 maps to the same number of digits, then we
+		// know for sure we have val.digits and we can skip the comparison.
+		// This is the case for about 2 out of 3 values.
+		if bl+1 < digitsTableLen && digitsLookupTable[bl+1].digits == val.digits {
+			return val.digits
+		}
+
 		switch b.Sign() {
 		case 1:
 			if b.Cmp(&val.border) < 0 {
