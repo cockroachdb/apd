@@ -984,11 +984,11 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "ki")
 	}
-	if ires, err := nc.integerPower(d, sum, ki); err != nil {
+	ires, err := nc.integerPower(d, sum, ki)
+	if err != nil {
 		return 0, errors.Wrap(err, "integer power")
-	} else {
-		res |= ires
 	}
+	res |= ires
 	nc.Precision = c.Precision
 	res |= nc.round(d, d)
 	return c.goError(res)

@@ -12,7 +12,8 @@
 // implied. See the License for the specific language governing
 // permissions and limitations under the License.
 
-/* Package apd implements arbitrary-precision decimals.
+/*
+Package apd implements arbitrary-precision decimals.
 
 apd implements much of the decimal specification from the General
 Decimal Arithmetic (http://speleotrove.com/decimal/) description. This

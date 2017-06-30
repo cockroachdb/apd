@@ -38,17 +38,21 @@ type Decimal struct {
 	Coeff    big.Int
 }
 
+// Form specifies the form of a Decimal.
 type Form int
 
 const (
 	// These constants must be in the following order. CmpTotal assumes that
 	// the order of these constants reflects the total order on decimals.
 
+	// Finite is the finite form.
 	Finite Form = iota
+	// Infinite is the infinite form.
 	Infinite
-	// NaNSignaling will always raise the InvalidOperation condition during
-	// an operation.
+	// NaNSignaling is the signaling NaN form. It will always raise the
+	// InvalidOperation condition during an operation.
 	NaNSignaling
+	// NaN is the NaN form.
 	NaN
 )
 
@@ -600,9 +604,8 @@ func (d *Decimal) Cmp(x *Decimal) int {
 	if d.Form == Infinite {
 		if x.Form == Infinite {
 			return 0
-		} else {
-			return gt
 		}
+		return gt
 	} else if x.Form == Infinite {
 		return lt
 	}
