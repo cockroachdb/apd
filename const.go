@@ -62,7 +62,7 @@ func makeConstWithPrecision(strVal string) *constWithPrecision {
 	if _, _, err := c.unrounded.SetString(strVal); err != nil {
 		panic(err)
 	}
-	// The length of the string might be one higher than the availble precision
+	// The length of the string might be one higher than the available precision
 	// (because of the decimal point), but that's ok.
 	maxPrec := uint32(len(strVal))
 	for p := uint32(1); p < maxPrec; p *= 2 {
