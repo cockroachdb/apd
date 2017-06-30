@@ -49,7 +49,9 @@ func (c *Context) newLoop(name string, arg *Decimal, precision uint32, maxItersP
 // done reports whether the loop is done. If it does not converge
 // after the maximum number of iterations, it returns an error.
 func (l *loop) done(z *Decimal) (bool, error) {
-	l.c.Sub(l.delta, l.prevZ, z)
+	if _, err := l.c.Sub(l.delta, l.prevZ, z); err != nil {
+		return false, err
+	}
 	sign := l.delta.Sign()
 	if sign == 0 {
 		return true, nil
