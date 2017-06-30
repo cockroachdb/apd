@@ -22,7 +22,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -34,7 +33,6 @@ import (
 const testDir = "testdata"
 
 var (
-	flagPython     = flag.Bool("python", false, "check if apd's results are identical to python; print an ignore line if they are")
 	flagFailFast   = flag.Bool("fast", false, "stop work after first error; disables parallel testing")
 	flagIgnore     = flag.Bool("ignore", false, "print ignore lines on errors")
 	flagNoParallel = flag.Bool("noparallel", false, "disables parallel testing")
@@ -630,22 +628,12 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				if err != nil {
 					return
 				}
-				if *flagPython {
-					if tc.CheckPython(t, d) {
-						return
-					}
-				}
 				t.Fatalf("expected error, got %s", d)
 			}
 			if err != nil {
 				testExponentError(t, err)
 				if tc.Operation == "power" && (res.Overflow() || res.Underflow()) {
 					t.Skip("power overflow")
-				}
-				if *flagPython {
-					if tc.CheckPython(t, d) {
-						return
-					}
 				}
 				t.Fatalf("%+v", err)
 			}
@@ -689,11 +677,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 						return
 					}
 				}
-				if *flagPython {
-					if tc.CheckPython(t, d) {
-						return
-					}
-				}
 				t.Fatalf("unexpected result")
 			} else {
 				t.Logf("got: %s (%#v)", d, d)
@@ -705,79 +688,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			}
 		}
 	}
-}
-
-// CheckPython returns true if python outputs d for this test case. It prints
-// an ignore line if true.
-func (tc TestCase) CheckPython(t *testing.T, d *Decimal) (ok bool) {
-	const tmpl = `from decimal import *
-c = getcontext()
-c.prec=%d
-c.rounding='ROUND_%s'
-c.Emax=%d
-c.Emin=%d
-print %s`
-
-	var op string
-	switch tc.Operation {
-	case "abs":
-		op = "abs"
-	case "add":
-		op = "+"
-	case "divide":
-		op = "/"
-	case "divideint":
-		op = "//"
-	case "exp":
-		op = "exp"
-	case "ln":
-		op = "ln"
-	case "log10":
-		op = "log10"
-	case "multiply":
-		op = "*"
-	case "power":
-		op = "**"
-	case "remainder":
-		op = "%"
-	case "squareroot":
-		op = "sqrt"
-	case "subtract":
-		op = "-"
-	case "tosci":
-		op = "to_sci_string"
-	default:
-		t.Fatalf("unknown operator: %s", tc.Operation)
-	}
-	var line string
-	// TODO(mjibson): use a context with high precision but correct exponents
-	// during operand creation.
-	switch len(tc.Operands) {
-	case 1:
-		line = fmt.Sprintf("c.%s(Decimal('%s'))", op, tc.Operands[0])
-	case 2:
-		line = fmt.Sprintf("Decimal('%s') %s Decimal('%s')", tc.Operands[0], op, tc.Operands[1])
-	default:
-		t.Fatalf("unknown operands: %d", len(tc.Operands))
-	}
-
-	script := fmt.Sprintf(tmpl, tc.Precision, strings.ToUpper(tc.Rounding), tc.MaxExponent, tc.MinExponent, line)
-	t.Logf("python script: %s", strings.Replace(script, "\n", "; ", -1))
-	out, err := exec.Command("python", "-c", script).CombinedOutput()
-	if err != nil {
-		t.Fatalf("%s: %s", err, out)
-	}
-	so := strings.TrimSpace(string(out))
-	r := newDecimal(t, testCtx, so)
-	c := d.CmpTotal(r)
-	if c != 0 {
-		t.Errorf("python's result: %s", so)
-	} else {
-		// python and apd agree, print ignore line
-		tc.PrintIgnore()
-	}
-
-	return c == 0
 }
 
 func (tc TestCase) PrintIgnore() {
