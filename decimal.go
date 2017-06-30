@@ -15,6 +15,7 @@
 package apd
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"math/big"
@@ -777,4 +778,31 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 	}
 	d.Exponent += int32(nd)
 	return d, nd
+}
+
+// Value implements the database/sql/driver.Valuer interface. It converts d to a
+// string.
+func (d Decimal) Value() (driver.Value, error) {
+	return d.String(), nil
+}
+
+// Scan implements the database/sql.Scanner interface. It supports string,
+// []byte, int64, float64.
+func (d *Decimal) Scan(src interface{}) error {
+	switch src := src.(type) {
+	case []byte:
+		_, _, err := d.SetString(string(src))
+		return err
+	case string:
+		_, _, err := d.SetString(src)
+		return err
+	case int64:
+		d.SetInt64(src)
+		return nil
+	case float64:
+		_, err := d.SetFloat64(src)
+		return err
+	default:
+		return errors.Errorf("could not convert %T to Decimal", src)
+	}
 }

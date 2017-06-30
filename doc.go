@@ -46,6 +46,9 @@ condition. apd supports traps which will trigger an error on any of these
 conditions. This makes it possible to guarantee exactness in computations,
 if needed.
 
+SQL scan and value methods are implemented. This allows the use of Decimals as
+placeholder parameters and row result Scan destinations.
+
 Usage
 
 apd has two main types. The first is Decimal which holds the values of
