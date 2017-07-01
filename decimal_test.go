@@ -199,8 +199,22 @@ func TestModf(t *testing.T) {
 			if frac.Exponent > 0 {
 				t.Fatal(frac.Exponent)
 			}
+
+			integ2, frac2 := new(Decimal), new(Decimal)
+			x.Modf(integ2, nil)
+			x.Modf(nil, frac2)
+			if integ.CmpTotal(integ2) != 0 {
+				t.Fatalf("got %s, expected %s", integ2, integ)
+			}
+			if frac.CmpTotal(frac2) != 0 {
+				t.Fatalf("got %s, expected %s", frac2, frac)
+			}
 		})
 	}
+
+	// Ensure we don't panic on both nil.
+	a := new(Decimal)
+	a.Modf(nil, nil)
 }
 
 func TestInt64(t *testing.T) {
