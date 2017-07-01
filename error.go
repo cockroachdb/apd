@@ -177,12 +177,12 @@ func (e *ErrDecimal) Sub(d, x, y *Decimal) *Decimal {
 	return e.op3(d, x, y, e.Ctx.Sub)
 }
 
-// ToIntegral performs e.Ctx.ToIntegral(d, x) and returns d.
-func (e *ErrDecimal) ToIntegral(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.ToIntegral)
+// RoundToIntegralValue performs e.Ctx.RoundToIntegralValue(d, x) and returns d.
+func (e *ErrDecimal) RoundToIntegralValue(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.RoundToIntegralValue)
 }
 
-// ToIntegralX performs e.Ctx.ToIntegralX(d, x) and returns d.
-func (e *ErrDecimal) ToIntegralX(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.ToIntegralX)
+// RoundToIntegralExact performs e.Ctx.RoundToIntegralExact(d, x) and returns d.
+func (e *ErrDecimal) RoundToIntegralExact(d, x *Decimal) *Decimal {
+	return e.op2(d, x, e.Ctx.RoundToIntegralExact)
 }

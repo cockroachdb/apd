@@ -680,37 +680,65 @@ func (d *Decimal) IsZero() bool {
 }
 
 // Modf sets integ to the integral part of d and frac to the fractional part
-// such that d = integ+frac. If d is negative, both integ or frac will be
-// either 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be
-// <= 0.
+// such that d = integ+frac. If d is negative, both integ or frac will be either
+// 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be <= 0.
+// Either argument can be nil, preventing it from being set.
 func (d *Decimal) Modf(integ, frac *Decimal) {
+	if integ == nil && frac == nil {
+		return
+	}
+
 	neg := d.Negative
 
 	// No fractional part.
 	if d.Exponent > 0 {
-		frac.Negative = neg
-		frac.Exponent = 0
-		frac.Coeff.SetInt64(0)
-		integ.Set(d)
+		if frac != nil {
+			frac.Negative = neg
+			frac.Exponent = 0
+			frac.Coeff.SetInt64(0)
+		}
+		if integ != nil {
+			integ.Set(d)
+		}
 		return
 	}
 	nd := d.NumDigits()
 	exp := -int64(d.Exponent)
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {
-		integ.Negative = neg
-		integ.Exponent = 0
-		integ.Coeff.SetInt64(0)
-		frac.Set(d)
+		if integ != nil {
+			integ.Negative = neg
+			integ.Exponent = 0
+			integ.Coeff.SetInt64(0)
+		}
+		if frac != nil {
+			frac.Set(d)
+		}
 		return
 	}
 
 	e := tableExp10(exp, nil)
-	integ.Coeff.QuoRem(&d.Coeff, e, &frac.Coeff)
-	integ.Exponent = 0
-	frac.Exponent = d.Exponent
-	frac.Negative = neg
-	integ.Negative = neg
+
+	var icoeff *big.Int
+	if integ != nil {
+		icoeff = &integ.Coeff
+		integ.Exponent = 0
+		integ.Negative = neg
+	} else {
+		// This is the integ == nil branch, and we already checked if both integ and
+		// frac were nil above, so frac can never be nil in this branch.
+		icoeff = new(big.Int)
+	}
+
+	if frac != nil {
+		icoeff.QuoRem(&d.Coeff, e, &frac.Coeff)
+		frac.Exponent = d.Exponent
+		frac.Negative = neg
+	} else {
+		// This is the frac == nil, which means integ must not be nil since they both
+		// can't be due to the check above.
+		icoeff.Quo(&d.Coeff, e)
+	}
 }
 
 // Neg sets d to -x and returns d.

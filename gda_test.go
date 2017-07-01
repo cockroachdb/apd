@@ -274,9 +274,9 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	case "subtract":
 		res, err = c.Sub(d, x, y)
 	case "tointegral":
-		res, err = c.ToIntegral(d, x)
+		res, err = c.RoundToIntegralValue(d, x)
 	case "tointegralx":
-		res, err = c.ToIntegralX(d, x)
+		res, err = c.RoundToIntegralExact(d, x)
 
 	// Below used only in benchmarks. Tests call it themselves.
 	case "comparetotal":
