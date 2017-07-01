@@ -16,7 +16,6 @@ package apd
 
 import (
 	"database/sql/driver"
-	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -198,11 +197,6 @@ func (c *Context) SetString(d *Decimal, s string) (*Decimal, Condition, error) {
 	return d, res, err
 }
 
-// String is a wrapper of ToSci.
-func (d *Decimal) String() string {
-	return d.ToSci()
-}
-
 func (d *Decimal) strSpecials() (bool, string) {
 	switch d.Form {
 	case NaN:
@@ -216,65 +210,6 @@ func (d *Decimal) strSpecials() (bool, string) {
 	default:
 		return true, "unknown"
 	}
-}
-
-// ToSci returns d in scientific notation if an exponent is needed.
-func (d *Decimal) ToSci() string {
-	// See: http://speleotrove.com/decimal/daconvs.html#reftostr
-	const adjExponentLimit = -6
-
-	set, s := d.strSpecials()
-	if !set {
-		s = d.Coeff.String()
-		adj := int(d.Exponent) + (len(s) - 1)
-		if d.Exponent <= 0 && adj >= adjExponentLimit {
-			if d.Exponent < 0 {
-				if left := -int(d.Exponent) - len(s); left > 0 {
-					s = "0." + strings.Repeat("0", left) + s
-				} else if left < 0 {
-					offset := -left
-					s = s[:offset] + "." + s[offset:]
-				} else {
-					s = "0." + s
-				}
-			}
-		} else {
-			dot := ""
-			if len(s) > 1 {
-				dot = "." + s[1:]
-			}
-			s = fmt.Sprintf("%s%sE%+d", s[:1], dot, adj)
-		}
-	}
-	if d.Negative {
-		s = "-" + s
-	}
-	return s
-}
-
-// ToStandard converts d to a standard notation string (i.e., no exponent
-// part). This can result in long strings given large exponents.
-func (d *Decimal) ToStandard() string {
-	set, s := d.strSpecials()
-	if !set {
-		s = d.Coeff.String()
-		if d.Exponent < 0 {
-			if left := -int(d.Exponent) - len(s); left > 0 {
-				s = "0." + strings.Repeat("0", left) + s
-			} else if left < 0 {
-				offset := -left
-				s = s[:offset] + "." + s[offset:]
-			} else {
-				s = "0." + s
-			}
-		} else if d.Exponent > 0 {
-			s += strings.Repeat("0", int(d.Exponent))
-		}
-	}
-	if d.Negative {
-		s = "-" + s
-	}
-	return s
 }
 
 // Set sets d's fields to the values of x and returns d.

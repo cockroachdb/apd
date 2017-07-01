@@ -282,7 +282,7 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	case "comparetotal":
 		x.CmpTotal(y)
 	case "tosci":
-		x.ToSci()
+		_ = x.String()
 
 	default:
 		done <- fmt.Errorf("unknown operation: %s", tc.Operation)
@@ -476,7 +476,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			go func() {
 				switch tc.Operation {
 				case "tosci":
-					s = operands[0].ToSci()
+					s = operands[0].String()
 					// non-extended tests don't retain exponents for 0
 					if !tc.Extended && operands[0].IsZero() {
 						s = "0"
