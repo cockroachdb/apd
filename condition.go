@@ -152,15 +152,15 @@ func (r Condition) String() string {
 
 // negateOverflowFlags converts Overflow and SystemOverflow flags into their
 // equivalent Underflows.
-func (c Condition) negateOverflowFlags() Condition {
-	if c.Overflow() {
+func (r Condition) negateOverflowFlags() Condition {
+	if r.Overflow() {
 		// Underflow always also means Subnormal. See GDA definition.
-		c |= Underflow | Subnormal
-		c &= ^Overflow
+		r |= Underflow | Subnormal
+		r &= ^Overflow
 	}
-	if c.SystemOverflow() {
-		c |= SystemUnderflow
-		c &= ^SystemOverflow
+	if r.SystemOverflow() {
+		r |= SystemUnderflow
+		r &= ^SystemOverflow
 	}
-	return c
+	return r
 }

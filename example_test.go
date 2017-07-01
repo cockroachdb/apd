@@ -119,7 +119,7 @@ func ExampleContext_ToIntegralX() {
 		res, _ := apd.BaseContext.ToIntegralX(d, d)
 		integer := !res.Inexact()
 		strict := !res.Rounded()
-		fmt.Printf("input: % 6s, ToIntegralX: % 3s, integer: % 5t, strict: % 5t, res:", input, d, integer, strict)
+		fmt.Printf("input: % 6s, ToIntegralX: % 3s, integer: %5t, strict: %5t, res:", input, d, integer, strict)
 		if res != 0 {
 			fmt.Printf(" %s", res)
 		}
