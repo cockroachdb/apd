@@ -388,28 +388,159 @@ func TestFloor(t *testing.T) {
 	}
 }
 
-func TestToStandard(t *testing.T) {
-	tests := map[string]string{
-		"0":           "0",
-		"0.0":         "0.0",
-		"0E2":         "000",
-		"0E-2":        "0.00",
-		"123.456E10":  "1234560000000",
-		".9":          "0.9",
-		"-.9":         "-0.9",
-		"-123.456E10": "-1234560000000",
-		"-0E-2":       "-0.00",
+func TestFormat(t *testing.T) {
+	tests := map[string]struct {
+		e, E, f, g, G string
+	}{
+		"NaN":       {},
+		"Infinity":  {},
+		"-Infinity": {},
+		"sNaN":      {},
+		"0": {
+			e: "0e+0",
+			E: "0E+0",
+		},
+		"-0": {
+			e: "-0e+0",
+			E: "-0E+0",
+		},
+		"0.0": {
+			e: "0e-1",
+			E: "0E-1",
+		},
+		"-0.0": {
+			e: "-0e-1",
+			E: "-0E-1",
+		},
+		"0E+2": {
+			e: "0e+2",
+			f: "000",
+			g: "0e+2",
+		},
 	}
+	verbs := []string{"%e", "%E", "%f", "%g", "%G"}
 
-	for c, r := range tests {
-		t.Run(c, func(t *testing.T) {
-			d, _, err := NewFromString(c)
+	for input, tc := range tests {
+		t.Run(input, func(t *testing.T) {
+			d, _, err := NewFromString(input)
 			if err != nil {
 				t.Fatal(err)
 			}
-			s := d.ToStandard()
-			if s != r {
-				t.Fatalf("got %v, expected %v", s, r)
+			for i, s := range []string{tc.e, tc.E, tc.f, tc.g, tc.G} {
+				if s == "" {
+					s = input
+				}
+				v := verbs[i]
+				t.Run(v, func(t *testing.T) {
+					out := fmt.Sprintf(v, d)
+					if out != s {
+						t.Fatalf("expected %s, got %s", s, out)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestFormatFlags(t *testing.T) {
+	const stdD = "1.23E+56"
+	tests := []struct {
+		d   string
+		fmt string
+		out string
+	}{
+		{
+			d:   stdD,
+			fmt: "%3G",
+			out: "1.23E+56",
+		},
+		{
+			d:   stdD,
+			fmt: "%010G",
+			out: "001.23E+56",
+		},
+		{
+			d:   stdD,
+			fmt: "%10G",
+			out: "  1.23E+56",
+		},
+		{
+			d:   stdD,
+			fmt: "%+G",
+			out: "+1.23E+56",
+		},
+		{
+			d:   stdD,
+			fmt: "% G",
+			out: " 1.23E+56",
+		},
+		{
+			d:   stdD,
+			fmt: "%-10G",
+			out: "1.23E+56  ",
+		},
+		{
+			d:   stdD,
+			fmt: "%-010G",
+			out: "1.23E+56  ",
+		},
+		{
+			d:   "nan",
+			fmt: "%-10G",
+			out: "NaN       ",
+		},
+		{
+			d:   "nan",
+			fmt: "%10G",
+			out: "       NaN",
+		},
+		{
+			d:   "nan",
+			fmt: "%010G",
+			out: "       NaN",
+		},
+		{
+			d:   "inf",
+			fmt: "%-10G",
+			out: "Infinity  ",
+		},
+		{
+			d:   "inf",
+			fmt: "%10G",
+			out: "  Infinity",
+		},
+		{
+			d:   "inf",
+			fmt: "%010G",
+			out: "  Infinity",
+		},
+		{
+			d:   "-inf",
+			fmt: "%-10G",
+			out: "-Infinity ",
+		},
+		{
+			d:   "-inf",
+			fmt: "%10G",
+			out: " -Infinity",
+		},
+		{
+			d:   "-inf",
+			fmt: "%010G",
+			out: " -Infinity",
+		},
+		{
+			d:   "0",
+			fmt: "%d",
+			out: "%!d(*apd.Decimal=0)",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %s", tc.d, tc.fmt), func(t *testing.T) {
+			d := newDecimal(t, &BaseContext, tc.d)
+			s := fmt.Sprintf(tc.fmt, d)
+			if s != tc.out {
+				t.Fatalf("expected %q, got %q", tc.out, s)
 			}
 		})
 	}

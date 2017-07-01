@@ -119,7 +119,7 @@ func ExampleContext_RoundToIntegralExact() {
 		res, _ := apd.BaseContext.RoundToIntegralExact(d, d)
 		integer := !res.Inexact()
 		strict := !res.Rounded()
-		fmt.Printf("input: % 6s, output: % 3s, integer: %5t, strict: %5t, res:", input, d, integer, strict)
+		fmt.Printf("input: % 6s, output: %3s, integer: %5t, strict: %5t, res:", input, d, integer, strict)
 		if res != 0 {
 			fmt.Printf(" %s", res)
 		}
