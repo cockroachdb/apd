@@ -32,7 +32,7 @@ var (
 
 	decimalCbrtC1 = makeConst(strCbrtC1)
 	decimalCbrtC2 = makeConst(strCbrtC2)
-	decimalCbrtC3 = makeConst(strCbrtC2)
+	decimalCbrtC3 = makeConst(strCbrtC3)
 
 	// ln(10)
 	decimalLn10 = makeConstWithPrecision(strLn10)
@@ -118,4 +118,5 @@ const (
 	// https://people.freebsd.org/~lstewart/references/apple_tr_kt32_cuberoot.pdf
 	strCbrtC1 = "-0.46946116"
 	strCbrtC2 = "1.072302"
+	strCbrtC3 = "0.3812513"
 )
