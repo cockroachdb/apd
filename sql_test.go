@@ -38,7 +38,10 @@ func TestSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec("create table if not exists d (v decimal); delete from d"); err != nil {
+	if _, err := db.Exec("drop table if exists d"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("create table d (v decimal)"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec("insert into d values ($1)", a); err != nil {
@@ -48,16 +51,27 @@ func TestSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var b, c, d Decimal
-	if err := db.QueryRow("select v, v::text, v::int, v::float from d").Scan(a, &b, &c, &d); err != nil {
+	var nd NullDecimal
+	if err := db.QueryRow("select v, v::text, v::int, v::float, v from d").Scan(a, &b, &c, &d, &nd); err != nil {
 		t.Fatal(err)
 	}
 	want, _, err := NewFromString("123556700")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, v := range []*Decimal{a, &b, &c, &d} {
+	for i, v := range []*Decimal{a, &b, &c, &d, &nd.Decimal} {
 		if v.Cmp(want) != 0 {
-			t.Fatalf("%d: unexpected: %s, want: %s", i, v.ToStandard(), want.ToStandard())
+			t.Fatalf("%d: unexpected: %s, want: %s", i, v.String(), want.String())
 		}
+	}
+
+	if _, err := db.Exec("update d set v = NULL"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow("select v from d").Scan(&nd); err != nil {
+		t.Fatal(err)
+	}
+	if nd.Valid {
+		t.Fatal("expected null")
 	}
 }
