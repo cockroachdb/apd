@@ -772,3 +772,38 @@ func (d *Decimal) Scan(src interface{}) error {
 		return errors.Errorf("could not convert %T to Decimal", src)
 	}
 }
+
+// NullDecimal represents a string that may be null. NullDecimal implements
+// the database/sql.Scanner interface so it can be used as a scan destination:
+//
+//  var d NullDecimal
+//  err := db.QueryRow("SELECT num FROM foo WHERE id=?", id).Scan(&d)
+//  ...
+//  if d.Valid {
+//     // use d.Decimal
+//  } else {
+//     // NULL value
+//  }
+//
+type NullDecimal struct {
+	Decimal Decimal
+	Valid   bool // Valid is true if Decimal is not NULL
+}
+
+// Scan implements the database/sql.Scanner interface.
+func (nd *NullDecimal) Scan(value interface{}) error {
+	if value == nil {
+		nd.Valid = false
+		return nil
+	}
+	nd.Valid = true
+	return nd.Decimal.Scan(value)
+}
+
+// Value implements the database/sql/driver.Valuer interface.
+func (nd NullDecimal) Value() (driver.Value, error) {
+	if !nd.Valid {
+		return nil, nil
+	}
+	return nd.Decimal.Value()
+}
