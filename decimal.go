@@ -774,18 +774,6 @@ func (d *Decimal) Scan(src interface{}) error {
 	}
 }
 
-var jsonNull = []byte("null")
-
-// UnmarshalJSON implements the encoding/json.Unmarshaler interface.
-// Adheres to the convention where []byte("null") is a no-op.
-func (d *Decimal) UnmarshalJSON(b []byte) error {
-	if bytes.Compare(b, jsonNull) == 0 {
-		return nil
-	}
-	_, _, err := d.SetString(string(b))
-	return err
-}
-
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (d *Decimal) UnmarshalText(b []byte) error {
 	_, _, err := d.SetString(string(b))
@@ -819,15 +807,20 @@ func (nd *NullDecimal) Scan(value interface{}) error {
 	return nd.Decimal.Scan(value)
 }
 
-// UnmarshalJSON implements the encoding/json.Unmarshaler interface.
-func (nd *NullDecimal) UnmarshalJSON(b []byte) error {
+var jsonNull = []byte("null")
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (nd *NullDecimal) UnmarshalText(b []byte) error {
 	if bytes.Compare(b, jsonNull) == 0 {
 		nd.Valid = false
 		return nil
 	}
+	if err := nd.Decimal.UnmarshalText(b); err != nil {
+		nd.Valid = false
+		return err
+	}
 	nd.Valid = true
-	_, _, err := nd.Decimal.SetString(string(b))
-	return err
+	return nil
 }
 
 // Value implements the database/sql/driver.Valuer interface.
