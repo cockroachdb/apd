@@ -15,6 +15,7 @@
 package apd
 
 import (
+	"bytes"
 	"database/sql/driver"
 	"math"
 	"math/big"
@@ -773,6 +774,24 @@ func (d *Decimal) Scan(src interface{}) error {
 	}
 }
 
+var jsonNull = []byte("null")
+
+// UnmarshalJSON implements the encoding/json.Unmarshaler interface.
+// Adheres to the convention where []byte("null") is a no-op.
+func (d *Decimal) UnmarshalJSON(b []byte) error {
+	if bytes.Compare(b, jsonNull) == 0 {
+		return nil
+	}
+	_, _, err := d.SetString(string(b))
+	return err
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (d *Decimal) UnmarshalText(b []byte) error {
+	_, _, err := d.SetString(string(b))
+	return err
+}
+
 // NullDecimal represents a string that may be null. NullDecimal implements
 // the database/sql.Scanner interface so it can be used as a scan destination:
 //
@@ -798,6 +817,17 @@ func (nd *NullDecimal) Scan(value interface{}) error {
 	}
 	nd.Valid = true
 	return nd.Decimal.Scan(value)
+}
+
+// UnmarshalJSON implements the encoding/json.Unmarshaler interface.
+func (nd *NullDecimal) UnmarshalJSON(b []byte) error {
+	if bytes.Compare(b, jsonNull) == 0 {
+		nd.Valid = false
+		return nil
+	}
+	nd.Valid = true
+	_, _, err := nd.Decimal.SetString(string(b))
+	return err
 }
 
 // Value implements the database/sql/driver.Valuer interface.

@@ -743,3 +743,101 @@ func TestSizeof(t *testing.T) {
 		t.Errorf("sizeof(Context) changed: %d", s)
 	}
 }
+
+func TestUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		s         string
+		expectedD *Decimal
+		expectedE string
+	}{
+		{s: "1.1", expectedD: New(11, -1)},
+		{s: "null", expectedD: &Decimal{}},
+		{s: "", expectedE: "parse mantissa: "},
+		{s: "foo", expectedE: "parse mantissa: foo"},
+		{s: "1.1.1", expectedE: "parse mantissa: 11.1"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.s, func(t *testing.T) {
+			d := Decimal{}
+			err := d.UnmarshalJSON([]byte(tc.s))
+			if tc.expectedE != "" {
+				if err == nil {
+					t.Errorf("Expected error %s but got no error", tc.expectedE)
+				} else if err.Error() != tc.expectedE {
+					t.Errorf("Expected error %s but got %s instead", tc.expectedE, err.Error())
+				}
+			}
+			if err == nil && d.Cmp(tc.expectedD) != 0 {
+				t.Errorf("Failed to correctly unmarshal JSON: %v != %v", d, tc.expectedD)
+			}
+		})
+	}
+}
+
+func TestUnmarshalText(t *testing.T) {
+	tests := []struct {
+		s         string
+		expectedD *Decimal
+		expectedE string
+	}{
+		{s: "1.1", expectedD: New(11, -1)},
+		{s: "null", expectedE: "parse mantissa: null"},
+		{s: "", expectedE: "parse mantissa: "},
+		{s: "foo", expectedE: "parse mantissa: foo"},
+		{s: "1.1.1", expectedE: "parse mantissa: 11.1"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.s, func(t *testing.T) {
+			d := Decimal{}
+			err := d.UnmarshalText([]byte(tc.s))
+			if tc.expectedE != "" {
+				if err == nil {
+					t.Errorf("Expected error %s but got no error", tc.expectedE)
+				} else if err.Error() != tc.expectedE {
+					t.Errorf("Expected error %s but got %s instead", tc.expectedE, err.Error())
+				}
+			}
+			if err == nil && d.Cmp(tc.expectedD) != 0 {
+				t.Errorf("Failed to correctly unmarshal JSON: %v != %v", d, tc.expectedD)
+			}
+		})
+	}
+}
+
+func TestNullDecimalUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		s          string
+		expectedND *NullDecimal
+		expectedE  string
+	}{
+		{s: "1.1", expectedND: &NullDecimal{Valid: true, Decimal: *New(11, -1)}},
+		{s: "null", expectedND: &NullDecimal{Valid: false}},
+		{s: "", expectedE: "parse mantissa: "},
+		{s: "foo", expectedE: "parse mantissa: foo"},
+		{s: "1.1.1", expectedE: "parse mantissa: 11.1"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.s, func(t *testing.T) {
+			nd := NullDecimal{}
+			err := nd.UnmarshalJSON([]byte(tc.s))
+			if tc.expectedE != "" {
+				if err == nil {
+					t.Errorf("Expected error %s but got no error", tc.expectedE)
+				} else if err.Error() != tc.expectedE {
+					t.Errorf("Expected error %s but got %s instead", tc.expectedE, err.Error())
+				}
+			}
+			if err == nil {
+				if nd.Valid != tc.expectedND.Valid {
+					t.Errorf("Failed to correctly unmarshal JSON: %v != %v", nd.Valid, tc.expectedND.Valid)
+				}
+				if nd.Decimal.Cmp(&tc.expectedND.Decimal) != 0 {
+					t.Errorf("Failed to correctly unmarshal JSON: %v != %v", nd.Decimal, tc.expectedND.Decimal)
+				}
+			}
+		})
+	}
+}
