@@ -761,15 +761,19 @@ func TestUnmarshalText(t *testing.T) {
 		t.Run(tc.s, func(t *testing.T) {
 			d := Decimal{}
 			err := d.UnmarshalText([]byte(tc.s))
-			if tc.expectedE != "" {
-				if err == nil {
+			if err == nil {
+				if tc.expectedE != "" {
 					t.Errorf("Expected error %s but got no error", tc.expectedE)
+				}
+				if d.Cmp(tc.expectedD) != 0 {
+					t.Errorf("Failed to correctly unmarshal JSON: %v != %v", d, tc.expectedD)
+				}
+			} else {
+				if tc.expectedE == "" {
+					t.Error("Got unexpected error:", err)
 				} else if err.Error() != tc.expectedE {
 					t.Errorf("Expected error %s but got %s instead", tc.expectedE, err.Error())
 				}
-			}
-			if err == nil && d.Cmp(tc.expectedD) != 0 {
-				t.Errorf("Failed to correctly unmarshal JSON: %v != %v", d, tc.expectedD)
 			}
 		})
 	}
@@ -792,19 +796,21 @@ func TestNullDecimalUnmarshalText(t *testing.T) {
 		t.Run(tc.s, func(t *testing.T) {
 			nd := NullDecimal{}
 			err := nd.UnmarshalText([]byte(tc.s))
-			if tc.expectedE != "" {
-				if err == nil {
-					t.Errorf("Expected error %s but got no error", tc.expectedE)
-				} else if err.Error() != tc.expectedE {
-					t.Errorf("Expected error %s but got %s instead", tc.expectedE, err.Error())
-				}
-			}
 			if err == nil {
+				if tc.expectedE != "" {
+					t.Errorf("Expected error %s but got no error", tc.expectedE)
+				}
 				if nd.Valid != tc.expectedND.Valid {
 					t.Errorf("Failed to correctly unmarshal JSON: %v != %v", nd.Valid, tc.expectedND.Valid)
 				}
 				if nd.Decimal.Cmp(&tc.expectedND.Decimal) != 0 {
 					t.Errorf("Failed to correctly unmarshal JSON: %v != %v", nd.Decimal, tc.expectedND.Decimal)
+				}
+			} else {
+				if tc.expectedE == "" {
+					t.Error("Got unexpected error:", err)
+				} else if err.Error() != tc.expectedE {
+					t.Errorf("Expected error %s but got %s instead", tc.expectedE, err.Error())
 				}
 			}
 		})
