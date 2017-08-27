@@ -780,6 +780,11 @@ func (d *Decimal) UnmarshalText(b []byte) error {
 	return err
 }
 
+// MarshalText implements the encoding.TextMarshaler interface.
+func (d *Decimal) MarshalText() ([]byte, error) {
+	return []byte(d.String()), nil
+}
+
 // NullDecimal represents a string that may be null. NullDecimal implements
 // the database/sql.Scanner interface so it can be used as a scan destination:
 //
@@ -821,6 +826,14 @@ func (nd *NullDecimal) UnmarshalText(b []byte) error {
 	}
 	nd.Valid = true
 	return nil
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+func (nd *NullDecimal) MarshalText() ([]byte, error) {
+	if nd.Valid {
+		return nd.Decimal.MarshalText()
+	}
+	return []byte("null"), nil
 }
 
 // Value implements the database/sql/driver.Valuer interface.

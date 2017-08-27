@@ -816,3 +816,52 @@ func TestNullDecimalUnmarshalText(t *testing.T) {
 		})
 	}
 }
+
+func TestMarshalText(t *testing.T) {
+	tests := []struct {
+		d         *Decimal
+		expectedS string
+	}{
+		{d: New(11, -1), expectedS: "1.1"},
+		{d: New(11, -10), expectedS: "1.1E-9"},
+		{d: New(11, 10), expectedS: "1.1E+11"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.d.String(), func(t *testing.T) {
+			b, err := tc.d.MarshalText()
+			if err != nil {
+				t.Fatal("Unexpected error marshaling to text:", err)
+			}
+			s := string(b)
+			if s != tc.expectedS {
+				t.Errorf("MarshalText() test failed. %s != %s", s, tc.expectedS)
+			}
+		})
+	}
+}
+
+func TestNullDecimalMarshalText(t *testing.T) {
+	tests := []struct {
+		nd        *NullDecimal
+		expectedS string
+	}{
+		{nd: &NullDecimal{Valid: true, Decimal: *New(11, -1)}, expectedS: "1.1"},
+		{nd: &NullDecimal{Valid: true, Decimal: *New(11, -10)}, expectedS: "1.1E-9"},
+		{nd: &NullDecimal{Valid: true, Decimal: *New(11, 10)}, expectedS: "1.1E+11"},
+		{nd: &NullDecimal{}, expectedS: "null"},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%v %s", tc.nd.Valid, tc.nd.Decimal.String()), func(t *testing.T) {
+			b, err := tc.nd.MarshalText()
+			if err != nil {
+				t.Fatal("Unexpected error marshaling to text:", err)
+			}
+			s := string(b)
+			if s != tc.expectedS {
+				t.Errorf("MarshalText() test failed. %s != %s", s, tc.expectedS)
+			}
+		})
+	}
+}
