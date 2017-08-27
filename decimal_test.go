@@ -15,6 +15,7 @@
 package apd
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -863,5 +864,75 @@ func TestNullDecimalMarshalText(t *testing.T) {
 				t.Errorf("MarshalText() test failed. %s != %s", s, tc.expectedS)
 			}
 		})
+	}
+}
+
+var encodingTests = []string{
+	"0",
+	"1",
+	"2",
+	"10",
+	"1000",
+	"1234567890",
+	"298472983472983471903246121093472394872319615612417471234712061",
+}
+
+func TestJSONEncoding(t *testing.T) {
+	for _, test := range encodingTests {
+		for _, sign := range []string{"", "+", "-"} {
+			x := sign + test
+			var tx Decimal
+			tx.SetString(x)
+			b, err := json.Marshal(&tx)
+			if err != nil {
+				t.Errorf("marshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			var rx Decimal
+			if err := json.Unmarshal(b, &rx); err != nil {
+				t.Errorf("unmarshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			if rx.CmpTotal(&tx) != 0 {
+				t.Errorf("JSON encoding of %s failed: got %s want %s", &tx, &rx, &tx)
+			}
+		}
+	}
+}
+
+func TestNullDecimalJSONEncoding(t *testing.T) {
+	for _, test := range encodingTests {
+		for _, sign := range []string{"", "+", "-"} {
+			x := sign + test
+			tx := NullDecimal{Valid: true}
+			tx.Decimal.SetString(x)
+			b, err := json.Marshal(&tx)
+			if err != nil {
+				t.Errorf("marshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			var rx NullDecimal
+			if err := json.Unmarshal(b, &rx); err != nil {
+				t.Errorf("unmarshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			if rx.Decimal.CmpTotal(&tx.Decimal) != 0 {
+				t.Errorf("JSON encoding of %s failed: got %s want %s", &tx, &rx, &tx)
+			}
+		}
+	}
+
+	// Test specific to NullDecimal
+	tx := NullDecimal{}
+	b, err := json.Marshal(&tx)
+	if err != nil {
+		t.Errorf("marshaling of %s failed: %s", &tx, err)
+	}
+	rx := NullDecimal{Valid: true}
+	if err := json.Unmarshal(b, &rx); err != nil {
+		t.Errorf("unmarshaling of %s failed: %s", &tx, err)
+	}
+	if tx.Valid != rx.Valid {
+		t.Error("Failed to correctly unmarshal null value")
 	}
 }
