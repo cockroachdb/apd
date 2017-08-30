@@ -15,7 +15,6 @@
 package apd
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"math"
 	"math/big"
@@ -810,30 +809,6 @@ func (nd *NullDecimal) Scan(value interface{}) error {
 	}
 	nd.Valid = true
 	return nd.Decimal.Scan(value)
-}
-
-var jsonNull = []byte("null")
-
-// UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (nd *NullDecimal) UnmarshalText(b []byte) error {
-	if bytes.Compare(b, jsonNull) == 0 {
-		nd.Valid = false
-		return nil
-	}
-	if err := nd.Decimal.UnmarshalText(b); err != nil {
-		nd.Valid = false
-		return err
-	}
-	nd.Valid = true
-	return nil
-}
-
-// MarshalText implements the encoding.TextMarshaler interface.
-func (nd *NullDecimal) MarshalText() ([]byte, error) {
-	if nd.Valid {
-		return nd.Decimal.MarshalText()
-	}
-	return []byte("null"), nil
 }
 
 // Value implements the database/sql/driver.Valuer interface.
