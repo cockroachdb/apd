@@ -781,6 +781,9 @@ func (d *Decimal) UnmarshalText(b []byte) error {
 
 // MarshalText implements the encoding.TextMarshaler interface.
 func (d *Decimal) MarshalText() ([]byte, error) {
+	if d == nil {
+		return []byte("<nil>"), nil
+	}
 	return []byte(d.String()), nil
 }
 

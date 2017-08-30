@@ -788,10 +788,15 @@ func TestMarshalText(t *testing.T) {
 		{d: New(11, -1), expectedS: "1.1"},
 		{d: New(11, -10), expectedS: "1.1E-9"},
 		{d: New(11, 10), expectedS: "1.1E+11"},
+		{d: nil, expectedS: "<nil>"},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.d.String(), func(t *testing.T) {
+		subTestName := "nil"
+		if tc.d != nil {
+			subTestName = tc.d.String()
+		}
+		t.Run(subTestName, func(t *testing.T) {
 			b, err := tc.d.MarshalText()
 			if err != nil {
 				t.Fatal("Unexpected error marshaling to text:", err)
