@@ -15,6 +15,7 @@
 package apd
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -741,5 +742,45 @@ func TestSizeof(t *testing.T) {
 	var c Context
 	if s := unsafe.Sizeof(c); s != 32 {
 		t.Errorf("sizeof(Context) changed: %d", s)
+	}
+}
+
+func TestJSONEncoding(t *testing.T) {
+	var encodingTests = []string{
+		"0",
+		"1",
+		"2",
+		"10",
+		"1000",
+		"1234567890",
+		"298472983472983471903246121093472394872319615612417471234712061",
+		"0.0",
+		"NaN",
+		"Inf",
+		"123.456",
+		"1E1",
+		"1E-1",
+		"1.2E3",
+	}
+
+	for _, test := range encodingTests {
+		for _, sign := range []string{"", "+", "-"} {
+			x := sign + test
+			var tx Decimal
+			tx.SetString(x)
+			b, err := json.Marshal(&tx)
+			if err != nil {
+				t.Errorf("marshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			var rx Decimal
+			if err := json.Unmarshal(b, &rx); err != nil {
+				t.Errorf("unmarshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			if rx.CmpTotal(&tx) != 0 {
+				t.Errorf("JSON encoding of %s failed: got %s want %s", &tx, &rx, &tx)
+			}
+		}
 	}
 }

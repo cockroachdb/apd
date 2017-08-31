@@ -773,6 +773,20 @@ func (d *Decimal) Scan(src interface{}) error {
 	}
 }
 
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (d *Decimal) UnmarshalText(b []byte) error {
+	_, _, err := d.SetString(string(b))
+	return err
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+func (d *Decimal) MarshalText() ([]byte, error) {
+	if d == nil {
+		return []byte("<nil>"), nil
+	}
+	return []byte(d.String()), nil
+}
+
 // NullDecimal represents a string that may be null. NullDecimal implements
 // the database/sql.Scanner interface so it can be used as a scan destination:
 //
