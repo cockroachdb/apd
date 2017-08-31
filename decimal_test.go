@@ -745,17 +745,24 @@ func TestSizeof(t *testing.T) {
 	}
 }
 
-var encodingTests = []string{
-	"0",
-	"1",
-	"2",
-	"10",
-	"1000",
-	"1234567890",
-	"298472983472983471903246121093472394872319615612417471234712061",
-}
-
 func TestJSONEncoding(t *testing.T) {
+	var encodingTests = []string{
+		"0",
+		"1",
+		"2",
+		"10",
+		"1000",
+		"1234567890",
+		"298472983472983471903246121093472394872319615612417471234712061",
+		"0.0",
+		"NaN",
+		"Inf",
+		"123.456",
+		"1E1",
+		"1E-1",
+		"1.2E3",
+	}
+
 	for _, test := range encodingTests {
 		for _, sign := range []string{"", "+", "-"} {
 			x := sign + test
