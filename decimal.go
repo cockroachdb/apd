@@ -16,6 +16,7 @@ package apd
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"math"
 	"math/big"
 	"strconv"
@@ -773,10 +774,27 @@ func (d *Decimal) Scan(src interface{}) error {
 	}
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (d *Decimal) UnmarshalJSON(b []byte) error {
+	var n json.Number
+	if err := json.Unmarshal(b, &n); err != nil {
+		return err
+	}
+	if _, _, err := d.SetString(n.String()); err != nil {
+		return err
+	}
+	return nil
+}
+
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (d *Decimal) UnmarshalText(b []byte) error {
 	_, _, err := d.SetString(string(b))
 	return err
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (d *Decimal) MarshalJSON() ([]byte, error) {
+	return []byte(d.String()), nil
 }
 
 // MarshalText implements the encoding.TextMarshaler interface.

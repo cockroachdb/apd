@@ -745,7 +745,7 @@ func TestSizeof(t *testing.T) {
 	}
 }
 
-func TestJSONEncoding(t *testing.T) {
+func TestTextEncoding(t *testing.T) {
 	var encodingTests = []string{
 		"0",
 		"1",
@@ -768,19 +768,66 @@ func TestJSONEncoding(t *testing.T) {
 			x := sign + test
 			var tx Decimal
 			tx.SetString(x)
-			b, err := json.Marshal(&tx)
+			b, err := tx.MarshalText()
 			if err != nil {
 				t.Errorf("marshaling of %s failed: %s", &tx, err)
 				continue
 			}
 			var rx Decimal
-			if err := json.Unmarshal(b, &rx); err != nil {
+			if err := rx.UnmarshalText(b); err != nil {
 				t.Errorf("unmarshaling of %s failed: %s", &tx, err)
 				continue
 			}
 			if rx.CmpTotal(&tx) != 0 {
-				t.Errorf("JSON encoding of %s failed: got %s want %s", &tx, &rx, &tx)
+				t.Errorf("text encoding of %s failed: got %s want %s", &tx, &rx, &tx)
 			}
 		}
+	}
+}
+
+func TestJSONUnmarshaling(t *testing.T) {
+	type unmarshalTest struct {
+		name     string
+		value    string
+		expected Decimal
+	}
+	unmarshalTests := []unmarshalTest{
+		unmarshalTest{name: "unmarshal unquoted", value: "1.1", expected: *New(11, -1)},
+		unmarshalTest{name: "unmarshal quoted", value: `"1.1"`, expected: *New(11, -1)},
+	}
+	for _, test := range unmarshalTests {
+		t.Run(test.name, func(t *testing.T) {
+			var d Decimal
+			if err := json.Unmarshal([]byte(test.value), &d); err != nil {
+				t.Fatalf("failed to unmarshal %s. %s", test.value, err)
+			}
+			if test.expected.CmpTotal(&d) != 0 {
+				t.Errorf("failed to properly unmarshal %s. %s != %s", test.expected.String(), d.String(), test.expected.String())
+			}
+		})
+	}
+}
+
+func TestJSONMarshaling(t *testing.T) {
+	type marshalTest struct {
+		name     string
+		value    *Decimal
+		expected string
+	}
+	marshalTests := []marshalTest{
+		marshalTest{name: "marshal *Decimal", value: New(11, -1), expected: "1.1"},
+		marshalTest{name: "marshal nil *Decimal", value: nil, expected: "null"},
+	}
+	for _, test := range marshalTests {
+		t.Run(test.name, func(t *testing.T) {
+			v, err := json.Marshal(test.value)
+			if err != nil {
+				t.Fatalf("failed to marshal %s. %s", test.value, err)
+			}
+			s := string(v)
+			if s != test.expected {
+				t.Errorf("failed to properly marshal %v. %s != %s", test.value, s, test.expected)
+			}
+		})
 	}
 }
