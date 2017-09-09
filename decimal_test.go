@@ -787,22 +787,30 @@ func TestTextEncoding(t *testing.T) {
 
 func TestJSONUnmarshaling(t *testing.T) {
 	type unmarshalTest struct {
-		name     string
-		value    string
-		expected Decimal
+		name      string
+		value     string
+		expected  *Decimal
+		expectErr bool
 	}
 	unmarshalTests := []unmarshalTest{
-		unmarshalTest{name: "unmarshal unquoted", value: "1.1", expected: *New(11, -1)},
-		unmarshalTest{name: "unmarshal quoted", value: `"1.1"`, expected: *New(11, -1)},
+		unmarshalTest{name: "unmarshal unquoted", value: "1.1", expectErr: false, expected: New(11, -1)},
+		unmarshalTest{name: "unmarshal quoted", value: `"1.1"`, expectErr: true, expected: &Decimal{Form: NaN}},
+		unmarshalTest{name: "unmarshal null", value: "null", expectErr: false, expected: nil},
 	}
 	for _, test := range unmarshalTests {
 		t.Run(test.name, func(t *testing.T) {
-			var d Decimal
-			if err := json.Unmarshal([]byte(test.value), &d); err != nil {
+			var d *Decimal
+			if err := json.Unmarshal([]byte(test.value), &d); err != nil && !test.expectErr {
 				t.Fatalf("failed to unmarshal %s. %s", test.value, err)
 			}
-			if test.expected.CmpTotal(&d) != 0 {
-				t.Errorf("failed to properly unmarshal %s. %s != %s", test.expected.String(), d.String(), test.expected.String())
+			if test.expected == nil {
+				if d != nil {
+					t.Error("failed to properly unmarshal null")
+				}
+			} else {
+				if test.expected.CmpTotal(d) != 0 {
+					t.Errorf("failed to properly unmarshal %s. %s != %s", test.expected.String(), d.String(), test.expected.String())
+				}
 			}
 		})
 	}
