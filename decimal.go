@@ -15,7 +15,6 @@
 package apd
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"math"
 	"math/big"
@@ -774,11 +773,11 @@ func (d *Decimal) Scan(src interface{}) error {
 	}
 }
 
-var jsonNull = []byte("null")
+const jsonNull string = "null"
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (d *Decimal) UnmarshalJSON(b []byte) error {
-	if bytes.Compare(b, jsonNull) == 0 {
+	if string(b) == jsonNull {
 		return nil
 	}
 	return d.UnmarshalText(b)
