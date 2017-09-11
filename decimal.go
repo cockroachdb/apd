@@ -773,10 +773,25 @@ func (d *Decimal) Scan(src interface{}) error {
 	}
 }
 
+const jsonNull string = "null"
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (d *Decimal) UnmarshalJSON(b []byte) error {
+	if string(b) == jsonNull {
+		return nil
+	}
+	return d.UnmarshalText(b)
+}
+
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (d *Decimal) UnmarshalText(b []byte) error {
 	_, _, err := d.SetString(string(b))
 	return err
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (d *Decimal) MarshalJSON() ([]byte, error) {
+	return d.MarshalText()
 }
 
 // MarshalText implements the encoding.TextMarshaler interface.
