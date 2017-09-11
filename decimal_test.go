@@ -16,6 +16,7 @@ package apd
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"math"
 	"math/big"
@@ -745,7 +746,45 @@ func TestSizeof(t *testing.T) {
 	}
 }
 
-func TestTextEncoding(t *testing.T) {
+func TestJSONEncoding(t *testing.T) {
+	var encodingTests = []string{
+		"0",
+		"1",
+		"2",
+		"10",
+		"1000",
+		"1234567890",
+		"298472983472983471903246121093472394872319615612417471234712061",
+		"0.0",
+		"123.456",
+		"1E1",
+		"1E-1",
+		"1.2E3",
+	}
+
+	for _, test := range encodingTests {
+		for _, sign := range []string{"", "+", "-"} {
+			x := sign + test
+			var tx Decimal
+			tx.SetString(x)
+			b, err := json.Marshal(&tx)
+			if err != nil {
+				t.Errorf("marshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			var rx Decimal
+			if err := json.Unmarshal(b, &rx); err != nil {
+				t.Errorf("unmarshaling of %s failed: %s", &tx, err)
+				continue
+			}
+			if rx.CmpTotal(&tx) != 0 {
+				t.Errorf("text encoding of %s failed: got %s want %s", &tx, &rx, &tx)
+			}
+		}
+	}
+}
+
+func TestXMLEncoding(t *testing.T) {
 	var encodingTests = []string{
 		"0",
 		"1",
@@ -768,13 +807,13 @@ func TestTextEncoding(t *testing.T) {
 			x := sign + test
 			var tx Decimal
 			tx.SetString(x)
-			b, err := tx.MarshalText()
+			b, err := xml.Marshal(&tx)
 			if err != nil {
 				t.Errorf("marshaling of %s failed: %s", &tx, err)
 				continue
 			}
 			var rx Decimal
-			if err := rx.UnmarshalText(b); err != nil {
+			if err := xml.Unmarshal(b, &rx); err != nil {
 				t.Errorf("unmarshaling of %s failed: %s", &tx, err)
 				continue
 			}
@@ -782,60 +821,5 @@ func TestTextEncoding(t *testing.T) {
 				t.Errorf("text encoding of %s failed: got %s want %s", &tx, &rx, &tx)
 			}
 		}
-	}
-}
-
-func TestJSONUnmarshaling(t *testing.T) {
-	type unmarshalTest struct {
-		name      string
-		value     string
-		expected  *Decimal
-		expectErr bool
-	}
-	unmarshalTests := []unmarshalTest{
-		unmarshalTest{name: "unmarshal unquoted", value: "1.1", expectErr: false, expected: New(11, -1)},
-		unmarshalTest{name: "unmarshal quoted", value: `"1.1"`, expectErr: true, expected: &Decimal{Form: NaN}},
-		unmarshalTest{name: "unmarshal null", value: "null", expectErr: false, expected: nil},
-	}
-	for _, test := range unmarshalTests {
-		t.Run(test.name, func(t *testing.T) {
-			var d *Decimal
-			if err := json.Unmarshal([]byte(test.value), &d); err != nil && !test.expectErr {
-				t.Fatalf("failed to unmarshal %s. %s", test.value, err)
-			}
-			if test.expected == nil {
-				if d != nil {
-					t.Error("failed to properly unmarshal null")
-				}
-			} else {
-				if test.expected.CmpTotal(d) != 0 {
-					t.Errorf("failed to properly unmarshal %s. %s != %s", test.expected.String(), d.String(), test.expected.String())
-				}
-			}
-		})
-	}
-}
-
-func TestJSONMarshaling(t *testing.T) {
-	type marshalTest struct {
-		name     string
-		value    *Decimal
-		expected string
-	}
-	marshalTests := []marshalTest{
-		marshalTest{name: "marshal *Decimal", value: New(11, -1), expected: "1.1"},
-		marshalTest{name: "marshal nil *Decimal", value: nil, expected: "null"},
-	}
-	for _, test := range marshalTests {
-		t.Run(test.name, func(t *testing.T) {
-			v, err := json.Marshal(test.value)
-			if err != nil {
-				t.Fatalf("failed to marshal %s. %s", test.value, err)
-			}
-			s := string(v)
-			if s != test.expected {
-				t.Errorf("failed to properly marshal %v. %s != %s", test.value, s, test.expected)
-			}
-		})
 	}
 }
