@@ -412,16 +412,21 @@ func (d *Decimal) setBig(b *big.Int) *big.Int {
 	return b
 }
 
-// CmpTotal compares d and x and returns:
+// CmpTotal compares d and x using their abstract representation rather
+// than their numerical value. A total ordering is defined for all possible
+// abstract representations, as described below. If the first operand is
+// lower in the total order than the second operand then the result is -1,
+// if the operands have the same abstract representation then the result is
+// 0, and if the first operand is higher in the total order than the second
+// operand then the result is 1.
 //
-//   -1 if d <  x
-//    0 if d == x
-//   +1 if d >  x
+// Numbers (representations which are not NaNs) are ordered such that a
+// larger numerical value is higher in the ordering. If two representations
+// have the same numerical value then the exponent is taken into account;
+// larger (more positive) exponents are higher in the ordering.
 //
-// This comparison uses a total ordering that is defined to compare all
-// finite and non-finite (special) values.
-//
-// For example, the following values are ordered from lowest to highest:
+// For example, the following values are ordered from lowest to highest. Note
+// the difference in ordering between 1.2300 and 1.23.
 //
 //   -NaN
 //   -NaNSignaling
