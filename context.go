@@ -298,68 +298,151 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return c.goError(res)
 	}
 
-	nc := BaseContext.WithPrecision(c.Precision + 3)
-	ed := MakeErrDecimal(nc)
-	N := new(Decimal).Set(x)
-	D := new(Decimal).Set(y)
-	N.Negative = false
-	D.Negative = false
-	exp2 := 0
-	for D.Cmp(decimalHalf) < 0 {
-		exp2--
-		ed.Mul(D, D, decimalTwo)
-		ed.Mul(N, N, decimalTwo)
-	}
-	for D.Cmp(decimalOne) > 0 {
-		exp2++
-		ed.Mul(D, D, decimalHalf)
-		ed.Mul(N, N, decimalHalf)
-	}
+	if true {
+		nc := BaseContext.WithPrecision(c.Precision + 3)
+		ed := MakeErrDecimal(nc)
+		N := new(Decimal).Set(x)
+		D := new(Decimal).Set(y)
+		N.Negative = false
+		D.Negative = false
+		exp2 := 0
+		for D.Cmp(decimalHalf) < 0 {
+			exp2--
+			ed.Mul(D, D, decimalTwo)
+			ed.Mul(N, N, decimalTwo)
+		}
+		for D.Cmp(decimalOne) > 0 {
+			exp2++
+			ed.Mul(D, D, decimalHalf)
+			ed.Mul(N, N, decimalHalf)
+		}
 
-	X := new(Decimal)
-	// TODO(mjibson): use makeConstWithPrecision
-	ed.Mul(X, decimalQuoC2.get(c.Precision), D)
-	ed.Sub(X, decimalQuoC1.get(c.Precision), X)
-	X0 := new(Decimal)
-	for loop := nc.newLoop("quo", X, c.Precision, 1); ; {
-		// X = X + X * (1 - D * X)
-		X0.Set(X)
-		ed.Mul(X, X0, D)
-		ed.Sub(X, decimalOne, X)
-		ed.Mul(X, X0, X)
-		ed.Add(X, X0, X)
+		X := new(Decimal)
+		// TODO(mjibson): use makeConstWithPrecision
+		ed.Mul(X, decimalQuoC2.get(c.Precision), D)
+		ed.Sub(X, decimalQuoC1.get(c.Precision), X)
+		X0 := new(Decimal)
+		for loop := nc.newLoop("quo", X, c.Precision, 1); ; {
+			// X = X + X * (1 - D * X)
+			X0.Set(X)
+			ed.Mul(X, X0, D)
+			ed.Sub(X, decimalOne, X)
+			ed.Mul(X, X0, X)
+			ed.Add(X, X0, X)
 
+			if err := ed.Err(); err != nil {
+				return 0, err
+			}
+			if done, err := loop.done(X); err != nil {
+				return 0, err
+			} else if done {
+				break
+			}
+		}
+		ed.Mul(quo, N, X)
 		if err := ed.Err(); err != nil {
 			return 0, err
 		}
-		if done, err := loop.done(X); err != nil {
+		quo.Negative = neg
+		res, err := c.Round(quo, quo)
+		quo.Reduce(quo)
+
+		// Set X = quo * y to check for exactness.
+		ed.Mul(X, quo, y)
+		if err := ed.Err(); err != nil {
 			return 0, err
-		} else if done {
-			break
 		}
-	}
-	ed.Mul(quo, N, X)
-	if err := ed.Err(); err != nil {
-		return 0, err
-	}
-	quo.Negative = neg
-	res, err := c.Round(quo, quo)
-	quo.Reduce(quo)
 
-	// Set X = quo * y to check for exactness.
-	ed.Mul(X, quo, y)
-	if err := ed.Err(); err != nil {
-		return 0, err
-	}
+		// Result is exact
+		if X.Cmp(x) == 0 {
+			res = 0
+			err = nil
+		}
+		d.Set(quo)
+		return res, err
+	} else {
+		// An integer variable, adjust, is initialized to 0.
+		var adjust int64
+		// The result coefficient is initialized to 0.
+		quo := new(Decimal)
+		var res Condition
+		var diff int64
 
-	// Result is exact
-	if X.Cmp(x) == 0 {
-		res = 0
-		err = nil
-	}
-	d.Set(quo)
-	return res, err
+		dividend := new(big.Int).Abs(&x.Coeff)
+		divisor := new(big.Int).Abs(&y.Coeff)
 
+		// The operand coefficients are adjusted so that the coefficient of the
+		// dividend is greater than or equal to the coefficient of the divisor and
+		// is also less than ten times the coefficient of the divisor, thus:
+
+		// While the coefficient of the dividend is less than the coefficient of
+		// the divisor it is multiplied by 10 and adjust is incremented by 1.
+		for dividend.Cmp(divisor) < 0 {
+			dividend.Mul(dividend, bigTen)
+			adjust++
+		}
+
+		// While the coefficient of the dividend is greater than or equal to ten
+		// times the coefficient of the divisor the coefficient of the divisor is
+		// multiplied by 10 and adjust is decremented by 1.
+		for tmp := new(big.Int); ; {
+			tmp.Mul(divisor, bigTen)
+			if dividend.Cmp(tmp) < 0 {
+				break
+			}
+			divisor.Set(tmp)
+			adjust--
+		}
+
+		prec := int64(c.Precision)
+
+		// The following steps are then repeated until the division is complete:
+		for {
+			// While the coefficient of the divisor is smaller than or equal to the
+			// coefficient of the dividend the former is subtracted from the latter and
+			// the coefficient of the result is incremented by 1.
+			for divisor.Cmp(dividend) <= 0 {
+				dividend.Sub(dividend, divisor)
+				quo.Coeff.Add(&quo.Coeff, bigOne)
+			}
+
+			// If the coefficient of the dividend is now 0 and adjust is greater than
+			// or equal to 0, or if the coefficient of the result has precision digits,
+			// the division is complete.
+			if (dividend.Sign() == 0 && adjust >= 0) || quo.NumDigits() == prec {
+				break
+			}
+
+			// Otherwise, the coefficients of the result and the dividend are multiplied
+			// by 10 and adjust is incremented by 1.
+			quo.Coeff.Mul(&quo.Coeff, bigTen)
+			dividend.Mul(dividend, bigTen)
+			adjust++
+		}
+
+		// Use the adjusted exponent to determine if we are Subnormal. If so,
+		// don't round.
+		adj := int64(x.Exponent) + int64(-y.Exponent) - adjust + quo.NumDigits() - 1
+		// Any remainder (the final coefficient of the dividend) is recorded and
+		// taken into account for rounding.
+		if dividend.Sign() != 0 && adj >= int64(c.MinExponent) {
+			res |= Inexact | Rounded
+			dividend.Mul(dividend, bigTwo)
+			half := dividend.Cmp(divisor)
+			rounding := c.rounding()
+			if rounding(&quo.Coeff, quo.Negative, half) {
+				roundAddOne(&quo.Coeff, &diff)
+			}
+		}
+
+		// The exponent of the result is computed by subtracting the sum of the
+		// original exponent of the divisor and the value of adjust at the end of
+		// the coefficient calculation from the original exponent of the dividend.
+		res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
+		quo.Negative = neg
+		d.Set(quo)
+		return c.goError(res)
+	}
 }
 
 // QuoInteger sets d to the integer part of the quotient x/y. If the result

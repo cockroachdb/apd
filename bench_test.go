@@ -29,8 +29,9 @@ import (
 //                 10^inScale and 10^(inScale+1)
 //   inNumDigits:  number of digits in the input decimal; if negative the number
 //                 will be negative and the number of digits are the absolute value.
+//   numDecs:      number of decimals to generate for fn.
 func runBenches(
-	b *testing.B, precision, inScale, inNumDigits []int, fn func(*testing.B, *Context, *Decimal),
+	b *testing.B, precision, inScale, inNumDigits []int, numDecs int, fn func(*testing.B, *Context, []*Decimal),
 ) {
 	for _, p := range precision {
 		ctx := BaseContext.WithPrecision(uint32(p))
@@ -48,7 +49,7 @@ func runBenches(
 				}
 
 				// Generate some random numbers with the given number of digits.
-				nums := make([]Decimal, 20)
+				nums := make([]*Decimal, 500)
 				for i := range nums {
 					var buf bytes.Buffer
 					if negative {
@@ -58,6 +59,7 @@ func runBenches(
 					for j := 1; j < numDigits; j++ {
 						buf.WriteByte('0' + byte(rand.Intn(10)))
 					}
+					nums[i] = new(Decimal)
 					if _, _, err := nums[i].SetString(buf.String()); err != nil {
 						b.Fatal(err)
 					}
@@ -67,11 +69,29 @@ func runBenches(
 					fmt.Sprintf("P%d/S%d/D%d", p, s, d),
 					func(b *testing.B) {
 						for i := 0; i <= b.N; i++ {
-							fn(b, ctx, &nums[i%len(nums)])
+							fn(b, ctx, nums[i%(len(nums)-numDecs+1):])
 						}
 					},
 				)
 			}
+		}
+	}
+}
+
+func BenchmarkQuo(b *testing.B) {
+	r := new(Decimal)
+	D, _, err := NewFromString("1")
+	if err != nil {
+		b.Fatal(err)
+	}
+	N, _, err := NewFromString("0.52903485723890475982347598237457890234759238904758923489057892347957238945789023748905728903475897293475")
+	if err != nil {
+		b.Fatal(err)
+	}
+	ctx := BaseContext.WithPrecision(200)
+	for i := 0; i < b.N; i++ {
+		if _, err := ctx.Quo(r, N, D); err != nil {
+			b.Fatal(err)
 		}
 	}
 }
@@ -81,9 +101,9 @@ func BenchmarkExp(b *testing.B) {
 	scale := []int{-4, -1, 2}
 	digits := []int{-100, -10, -2, 2, 10, 100}
 	runBenches(
-		b, precision, scale, digits,
-		func(b *testing.B, ctx *Context, x *Decimal) {
-			if _, err := ctx.Exp(&Decimal{}, x); err != nil {
+		b, precision, scale, digits, 1,
+		func(b *testing.B, ctx *Context, x []*Decimal) {
+			if _, err := ctx.Exp(&Decimal{}, x[0]); err != nil {
 				b.Fatal(err)
 			}
 		},
@@ -95,9 +115,9 @@ func BenchmarkLn(b *testing.B) {
 	scale := []int{-100, -10, -2, 2, 10, 100}
 	digits := []int{2, 10, 100}
 	runBenches(
-		b, precision, scale, digits,
-		func(b *testing.B, ctx *Context, x *Decimal) {
-			if _, err := ctx.Ln(&Decimal{}, x); err != nil {
+		b, precision, scale, digits, 1,
+		func(b *testing.B, ctx *Context, x []*Decimal) {
+			if _, err := ctx.Ln(&Decimal{}, x[0]); err != nil {
 				b.Fatal(err)
 			}
 		},
