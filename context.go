@@ -298,7 +298,62 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return c.goError(res)
 	}
 
-	if true {
+	if true { // Goldschmidt
+		nc := BaseContext.WithPrecision(c.Precision*2 + 2)
+		ed := MakeErrDecimal(nc)
+		N := new(Decimal).Set(x)
+		D := new(Decimal).Set(y)
+		N.Negative = false
+		D.Negative = false
+		for D.Cmp(decimalHalf) < 0 {
+			ed.Mul(D, D, decimalTwo)
+			ed.Mul(N, N, decimalTwo)
+		}
+		for D.Cmp(decimalOne) > 0 {
+			ed.Mul(D, D, decimalHalf)
+			ed.Mul(N, N, decimalHalf)
+		}
+
+		X := new(Decimal)
+		ed.Sub(X, decimalOne, D) // x = 1 - D
+		// D is no longer needed so we can use it as a temp var now.
+		for loop := nc.newLoop("quo", N, c.Precision, 1); ; {
+			if loop.i != 0 {
+				ed.Mul(X, X, X)
+			}
+			ed.Add(D, decimalOne, X)
+			ed.Mul(N, N, D)
+
+			if err := ed.Err(); err != nil {
+				return 0, err
+			}
+			if done, err := loop.done(N); err != nil {
+				return 0, err
+			} else if done {
+				break
+			}
+		}
+		if err := ed.Err(); err != nil {
+			return 0, err
+		}
+		res, err := c.Round(quo, N)
+		quo.Negative = neg
+		quo.Reduce(quo)
+
+		// Set X = quo * y to check for exactness.
+		ed.Mul(X, quo, y)
+		if err := ed.Err(); err != nil {
+			return 0, err
+		}
+
+		// Result is exact
+		if X.Cmp(x) == 0 {
+			res = 0
+			err = nil
+		}
+		d.Set(quo)
+		return res, err
+	} else if false { // Newton-Raphson
 		nc := BaseContext.WithPrecision(c.Precision + 3)
 		ed := MakeErrDecimal(nc)
 		N := new(Decimal).Set(x)
@@ -360,7 +415,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		}
 		d.Set(quo)
 		return res, err
-	} else {
+	} else { // Long
 		// An integer variable, adjust, is initialized to 0.
 		var adjust int64
 		// The result coefficient is initialized to 0.
