@@ -18,9 +18,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/big"
 	"testing"
 	"unsafe"
+
+	"github.com/cockroachdb/apd/int10"
 )
 
 var (
@@ -56,15 +57,15 @@ func newDecimal(t *testing.T, c *Context, s string) *Decimal {
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal
-		a, b *big.Int
+		a, b int10.Int
 		s    int32
 	}{
-		{x: New(1, 0), y: New(100, -1), a: big.NewInt(10), b: big.NewInt(100), s: -1},
-		{x: New(1, 0), y: New(10, -1), a: big.NewInt(10), b: big.NewInt(10), s: -1},
-		{x: New(1, 0), y: New(10, 0), a: big.NewInt(1), b: big.NewInt(10), s: 0},
-		{x: New(1, 1), y: New(1, 0), a: big.NewInt(10), b: big.NewInt(1), s: 0},
-		{x: New(10, -2), y: New(1, -1), a: big.NewInt(10), b: big.NewInt(10), s: -2},
-		{x: New(1, -2), y: New(100, 1), a: big.NewInt(1), b: big.NewInt(100000), s: -2},
+		{x: New(1, 0), y: New(100, -1), a: int10.NewInt(10), b: int10.NewInt(100), s: -1},
+		{x: New(1, 0), y: New(10, -1), a: int10.NewInt(10), b: int10.NewInt(10), s: -1},
+		{x: New(1, 0), y: New(10, 0), a: int10.NewInt(1), b: int10.NewInt(10), s: 0},
+		{x: New(1, 1), y: New(1, 0), a: int10.NewInt(10), b: int10.NewInt(1), s: 0},
+		{x: New(10, -2), y: New(1, -1), a: int10.NewInt(10), b: int10.NewInt(10), s: -2},
+		{x: New(1, -2), y: New(100, 1), a: int10.NewInt(1), b: int10.NewInt(100000), s: -2},
 	}
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {

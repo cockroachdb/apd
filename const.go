@@ -14,13 +14,13 @@
 
 package apd
 
-import "math/big"
+import "github.com/cockroachdb/apd/int10"
 
 var (
-	bigOne  = big.NewInt(1)
-	bigTwo  = big.NewInt(2)
-	bigFive = big.NewInt(5)
-	bigTen  = big.NewInt(10)
+	bigOne  = int10.NewInt(1)
+	bigTwo  = int10.NewInt(2)
+	bigFive = int10.NewInt(5)
+	bigTen  = int10.NewInt(10)
 
 	decimalZero      = New(0, 0)
 	decimalOneEighth = New(125, -3)

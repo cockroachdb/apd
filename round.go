@@ -14,9 +14,7 @@
 
 package apd
 
-import (
-	"math/big"
-)
+import "github.com/cockroachdb/apd/int10"
 
 // Round sets d to rounded x, rounded to the precision specified by c. If c
 // has zero precision, no rounding will occur. If c has no Rounding specified,
@@ -47,7 +45,7 @@ func (c *Context) rounding() Rounder {
 // absolute value of a number being rounded. result is the result to which
 // the 1 would be added. neg is true if the number is negative. half is -1
 // if the discarded digits are < 0.5, 0 if = 0.5, or 1 if > 0.5.
-type Rounder func(result *big.Int, neg bool, half int) bool
+type Rounder func(result int10.Int, neg bool, half int) bool
 
 // Round sets d to rounded x.
 func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
@@ -66,6 +64,7 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 	}
 
 	diff := nd - int64(c.Precision)
+	var m int10.Int
 	if diff > 0 {
 		if diff > MaxExponent {
 			return SystemOverflow | Overflow
@@ -74,18 +73,29 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			return SystemUnderflow | Underflow
 		}
 		res |= Rounded
-		y := new(big.Int)
-		e := tableExp10(diff, y)
-		m := new(big.Int)
-		y.QuoRem(&d.Coeff, e, m)
-		if m.Sign() != 0 {
+		var y int10.Int
+		y, m = d.Coeff.Split(int(diff))
+		if !m.Zero() {
 			res |= Inexact
-			discard := NewWithBigInt(m, int32(-diff))
-			if r(y, x.Negative, discard.Cmp(decimalHalf)) {
-				roundAddOne(y, &diff)
+			half := 0
+			if high := m.High(); high > 5 {
+				half = 1
+			} else if high < 5 {
+				half = -1
+			} else {
+				// high == 5, check if rest are zeros.
+				for _, d := range m[:len(m)-1] {
+					if d != 0 {
+						half = 1
+						break
+					}
+				}
+			}
+			if r(y, x.Negative, half) {
+				roundAddOne(&y, &diff)
 			}
 		}
-		d.Coeff = *y
+		d.Coeff = y
 	} else {
 		diff = 0
 	}
@@ -94,15 +104,12 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 }
 
 // roundAddOne adds 1 to abs(b).
-func roundAddOne(b *big.Int, diff *int64) {
-	if b.Sign() < 0 {
-		panic("unexpected negative")
-	}
-	nd := NumDigits(b)
-	b.Add(b, bigOne)
-	nd2 := NumDigits(b)
+func roundAddOne(b *int10.Int, diff *int64) {
+	nd := NumDigits(*b)
+	b.Add(*b, bigOne)
+	nd2 := NumDigits(*b)
 	if nd2 > nd {
-		b.Quo(b, bigTen)
+		b.Mul10(-1)
 		*diff++
 	}
 }
@@ -147,46 +154,41 @@ const (
 	Round05Up = "05up"
 )
 
-func roundDown(result *big.Int, neg bool, half int) bool {
+func roundDown(result int10.Int, neg bool, half int) bool {
 	return false
 }
 
-func roundUp(result *big.Int, neg bool, half int) bool {
+func roundUp(result int10.Int, neg bool, half int) bool {
 	return true
 }
 
-func round05Up(result *big.Int, neg bool, half int) bool {
-	z := new(big.Int)
-	z.Rem(result, bigFive)
-	if z.Sign() == 0 {
-		return true
-	}
-	z.Rem(result, bigTen)
-	return z.Sign() == 0
+func round05Up(result int10.Int, neg bool, half int) bool {
+	digit := result.Low()
+	return digit == 0 || digit == 5
 }
 
-func roundHalfUp(result *big.Int, neg bool, half int) bool {
+func roundHalfUp(result int10.Int, neg bool, half int) bool {
 	return half >= 0
 }
 
-func roundHalfEven(result *big.Int, neg bool, half int) bool {
+func roundHalfEven(result int10.Int, neg bool, half int) bool {
 	if half > 0 {
 		return true
 	}
 	if half < 0 {
 		return false
 	}
-	return result.Bit(0) == 1
+	return result.Low()%2 == 1
 }
 
-func roundHalfDown(result *big.Int, neg bool, half int) bool {
+func roundHalfDown(result int10.Int, neg bool, half int) bool {
 	return half > 0
 }
 
-func roundFloor(result *big.Int, neg bool, half int) bool {
+func roundFloor(result int10.Int, neg bool, half int) bool {
 	return neg
 }
 
-func roundCeiling(result *big.Int, neg bool, half int) bool {
+func roundCeiling(result int10.Int, neg bool, half int) bool {
 	return !neg
 }

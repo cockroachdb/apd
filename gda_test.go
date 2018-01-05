@@ -490,6 +490,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 					c = operands[0].CmpTotal(operands[1])
 					d.SetInt64(int64(c))
 				default:
+					res, err = tc.Run(c, done, d, operands[0], operands[1])
 					var wg sync.WaitGroup
 					wg.Add(2)
 					// Check that the result is correct even if it is either argument. Use some
@@ -506,7 +507,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 						}
 						wg.Done()
 					}()
-					res, err = tc.Run(c, done, d, operands[0], operands[1])
 					wg.Wait()
 				}
 				done <- nil
@@ -518,9 +518,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				}
 			case <-time.After(time.Second * 5):
 				t.Fatalf("timeout")
-			}
-			if d.Coeff.Sign() < 0 {
-				t.Fatalf("negative coeff: %s", d.Coeff.String())
 			}
 			// Make sure the bogus Form above got cleared.
 			if d.Form < 0 {
@@ -660,7 +657,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			var equal bool
 			if d.Form == Finite {
 				// Don't worry about trailing zeros being inequal in CmpTotal.
-				equal = d.Cmp(r) == 0 && d.Negative == r.Negative
+				equal = d.Cmp(r) == 0 && d.Negative == r.Negative && d.Exponent == r.Exponent
 			} else {
 				equal = d.CmpTotal(r) == 0
 			}

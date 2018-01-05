@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cockroachdb/apd/int10"
 	"github.com/pkg/errors"
 )
 
@@ -34,7 +35,7 @@ type Decimal struct {
 	Form     Form
 	Negative bool
 	Exponent int32
-	Coeff    big.Int
+	Coeff    int10.Int
 }
 
 // Form specifies the form of a Decimal.
@@ -65,7 +66,7 @@ var (
 const (
 	// TODO(mjibson): MaxExponent is set because both upscale and Round
 	// perform a calculation of 10^x, where x is an exponent. This is done by
-	// big.Int.Exp. This restriction could be lifted if better algorithms were
+	// int10.Int.Exp. This restriction could be lifted if better algorithms were
 	// determined during upscale and Round that don't need to perform Exp.
 
 	// MaxExponent is the highest exponent supported. Exponents near this range will
@@ -80,17 +81,17 @@ const (
 func New(coeff int64, exponent int32) *Decimal {
 	d := &Decimal{
 		Negative: coeff < 0,
-		Coeff:    *big.NewInt(coeff),
+		Coeff:    int10.NewInt64(coeff),
 		Exponent: exponent,
 	}
-	d.Coeff.Abs(&d.Coeff)
 	return d
 }
 
 // NewWithBigInt creates a new decimal with the given coefficient and exponent.
 func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
 	return &Decimal{
-		Coeff:    *coeff,
+		Negative: coeff.Sign() == -1,
+		Coeff:    int10.NewIntBig(coeff),
 		Exponent: exponent,
 	}
 }
@@ -156,7 +157,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		exps = append(exps, -exp)
 		s = s[:i] + s[i+1:]
 	}
-	if _, ok := d.Coeff.SetString(s, 10); !ok {
+	if !d.Coeff.SetString(s) {
 		return 0, errors.Errorf("parse mantissa: %s", s)
 	}
 	// No parse errors, can now flag as finite.
@@ -236,7 +237,6 @@ func (d *Decimal) SetInt64(x int64) *Decimal {
 func (d *Decimal) SetCoefficient(x int64) *Decimal {
 	d.Negative = x < 0
 	d.Coeff.SetInt64(x)
-	d.Coeff.Abs(&d.Coeff)
 	d.Form = Finite
 	return d
 }
@@ -336,7 +336,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			// fractional parts and do operations similar Round. We avoid calling Round
 			// directly because it calls setExponent and modifies the result's exponent
 			// and coeff in ways that would be wrong here.
-			b := new(big.Int).Set(&d.Coeff)
+			b := new(int10.Int).Set(&d.Coeff)
 			tmp := &Decimal{
 				Coeff:    *b,
 				Exponent: r - Etiny,
@@ -346,8 +346,8 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			frac.Abs(frac)
 			if !frac.IsZero() {
 				res |= Inexact
-				if c.rounding()(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
-					integ.Coeff.Add(&integ.Coeff, bigOne)
+				if c.rounding()(integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
+					integ.Coeff.Add(integ.Coeff, bigOne)
 				}
 			}
 			if integ.IsZero() {
@@ -375,12 +375,12 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 	return res
 }
 
-// upscale converts a and b to big.Ints with the same scaling. It returns
+// upscale converts a and b to int10.Ints with the same scaling. It returns
 // them with this scaling, along with the scaling. An error can be produced
 // if the resulting scale factor is out of range.
-func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
+func upscale(a, b *Decimal) (int10.Int, int10.Int, int32, error) {
 	if a.Exponent == b.Exponent {
-		return &a.Coeff, &b.Coeff, a.Exponent, nil
+		return a.Coeff, b.Coeff, a.Exponent, nil
 	}
 	swapped := false
 	if a.Exponent < b.Exponent {
@@ -388,28 +388,16 @@ func upscale(a, b *Decimal) (*big.Int, *big.Int, int32, error) {
 		b, a = a, b
 	}
 	s := int64(a.Exponent) - int64(b.Exponent)
-	// TODO(mjibson): figure out a better way to upscale numbers with highly
-	// differing exponents.
 	if s > MaxExponent {
 		return nil, nil, 0, errors.New(errExponentOutOfRangeStr)
 	}
-	x := new(big.Int)
-	e := tableExp10(s, x)
-	x.Mul(&a.Coeff, e)
-	y := &b.Coeff
+	var x int10.Int
+	x.Set(&a.Coeff).Mul10(int(s))
+	y := b.Coeff
 	if swapped {
 		x, y = y, x
 	}
 	return x, y, b.Exponent, nil
-}
-
-// setBig sets b to d's coefficient with negative.
-func (d *Decimal) setBig(b *big.Int) *big.Int {
-	b.Set(&d.Coeff)
-	if d.Negative {
-		b.Neg(b)
-	}
-	return b
 }
 
 // CmpTotal compares d and x using their abstract representation rather
@@ -482,7 +470,7 @@ func (d *Decimal) CmpTotal(x *Decimal) int {
 		return 0
 
 	default:
-		return d.Coeff.Cmp(&x.Coeff)
+		return d.Coeff.Cmp(x.Coeff)
 	}
 }
 
@@ -551,7 +539,7 @@ func (d *Decimal) Cmp(x *Decimal) int {
 	}
 
 	if d.Exponent == x.Exponent {
-		cmp := d.Coeff.Cmp(&x.Coeff)
+		cmp := d.Coeff.Cmp(x.Coeff)
 		if ds < 0 {
 			cmp = -cmp
 		}
@@ -567,7 +555,7 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		return gt
 	}
 
-	// Now have to use aligned big.Ints. This function previously used upscale to
+	// Now have to use aligned int10.Ints. This function previously used upscale to
 	// align in all cases, but that requires an error in the return value. upscale
 	// does that so that it can fail if it needs to take the Exp of too-large a
 	// number, which is very slow. The only way for that to happen here is for d
@@ -577,15 +565,15 @@ func (d *Decimal) Cmp(x *Decimal) int {
 
 	var cmp int
 	if d.Exponent < x.Exponent {
-		var xScaled big.Int
+		var xScaled int10.Int
 		xScaled.Set(&x.Coeff)
-		xScaled.Mul(&xScaled, tableExp10(int64(x.Exponent)-int64(d.Exponent), nil))
-		cmp = d.Coeff.Cmp(&xScaled)
+		xScaled.Mul10(int(x.Exponent - d.Exponent))
+		cmp = d.Coeff.Cmp(xScaled)
 	} else {
-		var dScaled big.Int
+		var dScaled int10.Int
 		dScaled.Set(&d.Coeff)
-		dScaled.Mul(&dScaled, tableExp10(int64(d.Exponent)-int64(x.Exponent), nil))
-		cmp = dScaled.Cmp(&x.Coeff)
+		dScaled.Mul10(int(d.Exponent - x.Exponent))
+		cmp = dScaled.Cmp(x.Coeff)
 	}
 	if ds < 0 {
 		cmp = -cmp
@@ -605,7 +593,7 @@ func (d *Decimal) Cmp(x *Decimal) int {
 //	+1 if d.Negative == false
 //
 func (d *Decimal) Sign() int {
-	if d.Form == Finite && d.Coeff.Sign() == 0 {
+	if d.Form == Finite && d.Coeff.Zero() {
 		return 0
 	}
 	if d.Negative {
@@ -633,9 +621,8 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	// No fractional part.
 	if d.Exponent > 0 {
 		if frac != nil {
+			frac.SetInt64(0)
 			frac.Negative = neg
-			frac.Exponent = 0
-			frac.Coeff.SetInt64(0)
 		}
 		if integ != nil {
 			integ.Set(d)
@@ -647,9 +634,8 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {
 		if integ != nil {
+			integ.SetInt64(0)
 			integ.Negative = neg
-			integ.Exponent = 0
-			integ.Coeff.SetInt64(0)
 		}
 		if frac != nil {
 			frac.Set(d)
@@ -657,27 +643,18 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 		return
 	}
 
-	e := tableExp10(exp, nil)
-
-	var icoeff *big.Int
+	i, f := d.Coeff.Split(int(exp))
 	if integ != nil {
-		icoeff = &integ.Coeff
 		integ.Exponent = 0
 		integ.Negative = neg
-	} else {
-		// This is the integ == nil branch, and we already checked if both integ and
-		// frac were nil above, so frac can never be nil in this branch.
-		icoeff = new(big.Int)
+		integ.Coeff = append(integ.Coeff[:0], i...)
+		integ.Form = Finite
 	}
-
 	if frac != nil {
-		icoeff.QuoRem(&d.Coeff, e, &frac.Coeff)
 		frac.Exponent = d.Exponent
 		frac.Negative = neg
-	} else {
-		// This is the frac == nil, which means integ must not be nil since they both
-		// can't be due to the check above.
-		icoeff.Quo(&d.Coeff, e)
+		frac.Coeff = append(frac.Coeff[:0], f...)
+		frac.Form = Finite
 	}
 }
 
@@ -703,51 +680,53 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 		return d, 0
 	}
 	var nd int
-	neg := false
-	switch x.Sign() {
-	case 0:
-		nd = int(d.NumDigits())
-		d.SetCoefficient(0)
-		d.Exponent = 0
-		return d, nd - 1
-	case -1:
-		neg = true
-	}
-	d.Set(x)
+	/*
+		neg := false
+		switch x.Sign() {
+		case 0:
+			nd = int(d.NumDigits())
+			d.SetCoefficient(0)
+			d.Exponent = 0
+			return d, nd - 1
+		case -1:
+			neg = true
+		}
+		d.Set(x)
 
-	// Use a uint64 for the division if possible.
-	if d.Coeff.BitLen() <= 64 {
-		i := d.Coeff.Uint64()
-		for i >= 10000 && i%10000 == 0 {
-			i /= 10000
-			nd += 4
-		}
-		for i%10 == 0 {
-			i /= 10
-			nd++
-		}
-		if nd != 0 {
+				// Use a uint64 for the division if possible.
+				if d.Coeff.BitLen() <= 64 {
+					i := d.Coeff.Uint64()
+					for i >= 10000 && i%10000 == 0 {
+						i /= 10000
+						nd += 4
+					}
+					for i%10 == 0 {
+						i /= 10
+						nd++
+					}
+					if nd != 0 {
+						d.Exponent += int32(nd)
+						d.Coeff.SetUint64(i)
+						d.Negative = neg
+					}
+					return d, nd
+				}
+
+			// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
+			// faster than converting to a string and trimming the 0s from the end.
+			z := d.setBig(new(int10.Int))
+			r := new(int10.Int)
+			for {
+				z.QuoRem(&d.Coeff, bigTen, r)
+				if r.Sign() == 0 {
+					d.Coeff.Set(z)
+					nd++
+				} else {
+					break
+				}
+			}
 			d.Exponent += int32(nd)
-			d.Coeff.SetUint64(i)
-			d.Negative = neg
-		}
-		return d, nd
-	}
-
-	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
-	// faster than converting to a string and trimming the 0s from the end.
-	z := d.setBig(new(big.Int))
-	r := new(big.Int)
-	for {
-		z.QuoRem(&d.Coeff, bigTen, r)
-		if r.Sign() == 0 {
-			d.Coeff.Set(z)
-			nd++
-		} else {
-			break
-		}
-	}
-	d.Exponent += int32(nd)
+	*/
 	return d, nd
 }
 

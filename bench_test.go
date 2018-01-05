@@ -103,3 +103,31 @@ func BenchmarkLn(b *testing.B) {
 		},
 	)
 }
+
+func BenchmarkModf(b *testing.B) {
+	precision := []int{2, 10, 100}
+	scale := []int{-100, -10, -2, 2, 10, 100}
+	digits := []int{2, 10, 100}
+	integ, frac := new(Decimal), new(Decimal)
+	runBenches(
+		b, precision, scale, digits,
+		func(b *testing.B, ctx *Context, x *Decimal) {
+			x.Modf(integ, frac)
+		},
+	)
+}
+
+func BenchmarkAdd(b *testing.B) {
+	precision := []int{10, 100}
+	scale := []int{2, 10, 100}
+	digits := []int{10, 100}
+	runBenches(
+		b, precision, scale, digits,
+		func(b *testing.B, ctx *Context, x *Decimal) {
+			var a Decimal
+			if _, err := ctx.Add(&a, x, x); err != nil {
+				b.Fatal(err)
+			}
+		},
+	)
+}

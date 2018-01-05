@@ -16,8 +16,8 @@ package apd
 
 import (
 	"math"
-	"math/big"
 
+	"github.com/cockroachdb/apd/int10"
 	"github.com/pkg/errors"
 )
 
@@ -144,12 +144,10 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	if xn == yn {
 		d.Coeff.Add(a, b)
 	} else {
-		d.Coeff.Sub(a, b)
-		switch d.Coeff.Sign() {
-		case -1:
+		borrow := d.Coeff.Diff(a, b)
+		if borrow {
 			d.Negative = !d.Negative
-			d.Coeff.Neg(&d.Coeff)
-		case 0:
+		} else if d.Coeff.Zero() {
 			d.Negative = c.Rounding == RoundFloor
 		}
 	}
@@ -160,7 +158,8 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 
 // Add sets d to the sum x+y.
 func (c *Context) Add(d, x, y *Decimal) (Condition, error) {
-	return c.add(d, x, y, false)
+	res, err := c.add(d, x, y, false)
+	return res, err
 }
 
 // Sub sets d to the difference x-y.
@@ -208,7 +207,7 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
-	d.Coeff.Mul(&x.Coeff, &y.Coeff)
+	//d.Coeff.Mul(&x.Coeff, &y.Coeff)
 	d.Negative = neg
 	d.Form = Finite
 	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
@@ -292,8 +291,9 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	var res Condition
 	var diff int64
 	if !x.IsZero() {
-		dividend := new(big.Int).Abs(&x.Coeff)
-		divisor := new(big.Int).Abs(&y.Coeff)
+		var dividend, divisor int10.Int
+		dividend.Set(&x.Coeff)
+		divisor.Set(&y.Coeff)
 
 		// The operand coefficients are adjusted so that the coefficient of the
 		// dividend is greater than or equal to the coefficient of the divisor and
@@ -302,19 +302,19 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		// While the coefficient of the dividend is less than the coefficient of
 		// the divisor it is multiplied by 10 and adjust is incremented by 1.
 		for dividend.Cmp(divisor) < 0 {
-			dividend.Mul(dividend, bigTen)
+			dividend = dividend.Mul(bigTen)
 			adjust++
 		}
 
 		// While the coefficient of the dividend is greater than or equal to ten
 		// times the coefficient of the divisor the coefficient of the divisor is
 		// multiplied by 10 and adjust is decremented by 1.
-		for tmp := new(big.Int); ; {
-			tmp.Mul(divisor, bigTen)
+		for tmp := int10.NewInt(0); ; {
+			tmp = divisor.Mul(bigTen)
 			if dividend.Cmp(tmp) < 0 {
 				break
 			}
-			divisor.Set(tmp)
+			divisor.Set(&tmp)
 			adjust--
 		}
 
@@ -327,20 +327,20 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			// the coefficient of the result is incremented by 1.
 			for divisor.Cmp(dividend) <= 0 {
 				dividend.Sub(dividend, divisor)
-				quo.Coeff.Add(&quo.Coeff, bigOne)
+				//quo.Coeff.Add(&quo.Coeff, bigOne)
 			}
 
 			// If the coefficient of the dividend is now 0 and adjust is greater than
 			// or equal to 0, or if the coefficient of the result has precision digits,
 			// the division is complete.
-			if (dividend.Sign() == 0 && adjust >= 0) || quo.NumDigits() == prec {
+			if (dividend.Zero() && adjust >= 0) || quo.NumDigits() == prec {
 				break
 			}
 
 			// Otherwise, the coefficients of the result and the dividend are multiplied
 			// by 10 and adjust is incremented by 1.
-			quo.Coeff.Mul(&quo.Coeff, bigTen)
-			dividend.Mul(dividend, bigTen)
+			//quo.Coeff.Mul(&quo.Coeff, bigTen)
+			dividend = dividend.Mul(bigTen)
 			adjust++
 		}
 
@@ -349,14 +349,16 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		adj := int64(x.Exponent) + int64(-y.Exponent) - adjust + quo.NumDigits() - 1
 		// Any remainder (the final coefficient of the dividend) is recorded and
 		// taken into account for rounding.
-		if dividend.Sign() != 0 && adj >= int64(c.MinExponent) {
+		if !dividend.Zero() && adj >= int64(c.MinExponent) {
 			res |= Inexact | Rounded
-			dividend.Mul(dividend, bigTwo)
-			half := dividend.Cmp(divisor)
-			rounding := c.rounding()
-			if rounding(&quo.Coeff, quo.Negative, half) {
-				roundAddOne(&quo.Coeff, &diff)
-			}
+			dividend = dividend.Mul(bigTwo)
+			/*
+				half := dividend.Cmp(divisor)
+				rounding := c.rounding()
+					if rounding(&quo.Coeff, quo.Negative, half) {
+						roundAddOne(&quo.Coeff, &diff)
+					}
+			*/
 		}
 	}
 
@@ -380,16 +382,18 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	neg := x.Negative != y.Negative
 	var res Condition
 
-	a, b, _, err := upscale(x, y)
-	if err != nil {
-		return 0, errors.Wrap(err, "QuoInteger")
-	}
-	d.Coeff.Quo(a, b)
-	d.Form = Finite
-	if d.NumDigits() > int64(c.Precision) {
-		d.Set(decimalNaN)
-		res |= DivisionImpossible
-	}
+	/*
+		a, b, _, err := upscale(x, y)
+		if err != nil {
+			return 0, errors.Wrap(err, "QuoInteger")
+		}
+		d.Coeff.Quo(a, b)
+		d.Form = Finite
+		if d.NumDigits() > int64(c.Precision) {
+			d.Set(decimalNaN)
+			res |= DivisionImpossible
+		}
+	*/
 	d.Exponent = 0
 	d.Negative = neg
 	return c.goError(res)
@@ -421,18 +425,20 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 		d.Set(decimalNaN)
 		return c.goError(res)
 	}
-	a, b, s, err := upscale(x, y)
-	if err != nil {
-		return 0, errors.Wrap(err, "Rem")
-	}
-	tmp := new(big.Int)
-	tmp.QuoRem(a, b, &d.Coeff)
-	if NumDigits(tmp) > int64(c.Precision) {
-		d.Set(decimalNaN)
-		return c.goError(DivisionImpossible)
-	}
-	d.Form = Finite
-	d.Exponent = s
+	/*
+		a, b, s, err := upscale(x, y)
+		if err != nil {
+			return 0, errors.Wrap(err, "Rem")
+		}
+		var tmp int10.Int
+		tmp.QuoRem(a, b, &d.Coeff)
+		if NumDigits(tmp) > int64(c.Precision) {
+			d.Set(decimalNaN)
+			return c.goError(DivisionImpossible)
+		}
+		d.Form = Finite
+		d.Exponent = s
+	*/
 	// The sign of the result is sign if the dividend.
 	d.Negative = x.Negative
 	res |= c.round(d, d)
@@ -782,7 +788,8 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		ed.Add(tmp3, tmp2, tmp2)
 		tmp1.Set(tmp3)
 
-		eps := Decimal{Coeff: *bigOne, Exponent: -int32(p)}
+		//eps := Decimal{Coeff: *bigOne, Exponent: -int32(p)}
+		var eps Decimal
 		for n := 1; ; n++ {
 
 			// tmp3 *= (x / (x+2))^2
@@ -980,7 +987,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	}
 
 	// sum ** k
-	ki, err := exp10(int64(t))
+	ki, err := exp10(int(t))
 	if err != nil {
 		return 0, errors.Wrap(err, "ki")
 	}
@@ -995,43 +1002,39 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 }
 
 // integerPower sets d = x**y. d and x must not point to the same Decimal.
-func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
+func (c *Context) integerPower(d, x *Decimal, y int10.Int) (Condition, error) {
 	// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring.
 
-	b := new(big.Int).Set(y)
-	neg := b.Sign() < 0
-	if neg {
-		b.Abs(b)
-	}
+	/*
+			b := new(int10.Int).Set(&y)
 
-	n, z := new(Decimal), d
-	n.Set(x)
-	z.Set(decimalOne)
-	ed := MakeErrDecimal(c)
-	for b.Sign() > 0 {
-		if b.Bit(0) == 1 {
-			ed.Mul(z, z, n)
-		}
-		b.Rsh(b, 1)
+			n, z := new(Decimal), d
+			n.Set(x)
+			z.Set(decimalOne)
+			ed := MakeErrDecimal(c)
+				for !b.Zero() {
+					if b.Bit(0) == 1 {
+						ed.Mul(z, z, n)
+					}
+					b.Rsh(b, 1)
 
-		// Only compute the next n if we are going to use it. Otherwise n can overflow
-		// on the last iteration causing this to error.
-		if b.Sign() > 0 {
-			ed.Mul(n, n, n)
-		}
-		if err := ed.Err(); err != nil {
-			// In the negative case, convert overflow to underflow.
-			if neg {
-				ed.Flags = ed.Flags.negateOverflowFlags()
-			}
-			return ed.Flags, err
-		}
-	}
+					// Only compute the next n if we are going to use it. Otherwise n can overflow
+					// on the last iteration causing this to error.
+					if b.Sign() > 0 {
+						ed.Mul(n, n, n)
+					}
+					if err := ed.Err(); err != nil {
+						// In the negative case, convert overflow to underflow.
+						if neg {
+							ed.Flags = ed.Flags.negateOverflowFlags()
+						}
+						return ed.Flags, err
+					}
+				}
 
-	if neg {
-		ed.Quo(z, decimalOne, z)
-	}
-	return ed.Flags, ed.Err()
+		return ed.Flags, ed.Err()
+	*/
+	return 0, nil
 }
 
 // Pow sets d = x**y.
@@ -1043,7 +1046,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	integ, frac := new(Decimal), new(Decimal)
 	y.Modf(integ, frac)
 	yIsInt := frac.IsZero()
-	neg := x.Negative && y.Form == Finite && yIsInt && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0
+	//neg := x.Negative && y.Form == Finite && yIsInt && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0
+	neg := false
 
 	if x.Form == Infinite {
 		var res Condition
@@ -1108,7 +1112,9 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 
 	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
 	res := c.quantize(integ, integ, 0)
-	nres, err := nc.integerPower(z, x, integ.setBig(&integ.Coeff))
+	//nres, err := nc.integerPower(z, x, integ.setBig(&integ.Coeff))
+	var nres Condition
+	var err error
 	res |= nres
 	if err != nil {
 		d.Set(decimalNaN)
@@ -1172,12 +1178,12 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 		if diff < MinExponent {
 			return SystemUnderflow | Underflow
 		}
-		d.Coeff.Mul(&d.Coeff, tableExp10(-int64(diff), nil))
+		//d.Coeff.Mul(&d.Coeff, tableExp10(-int64(diff), nil))
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
 			if !d.IsZero() {
-				d.Coeff.SetInt64(0)
+				//d.Coeff.SetInt64(0)
 				res = Inexact | Rounded
 			}
 		} else {
@@ -1202,7 +1208,7 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 			res = nc.rounding().Round(nc, d, d)
 			// Adjust for 0.9 -> 1.0 rollover.
 			if d.Exponent > 0 {
-				d.Coeff.Mul(&d.Coeff, bigTen)
+				//d.Coeff.Mul(&d.Coeff, bigTen)
 			}
 		}
 	}
@@ -1280,7 +1286,7 @@ func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.
-func exp10(x int64) (exp *big.Int, err error) {
+func exp10(x int) (exp int10.Int, err error) {
 	if x > MaxExponent || x < MinExponent {
 		return nil, errors.New(errExponentOutOfRangeStr)
 	}
