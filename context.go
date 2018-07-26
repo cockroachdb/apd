@@ -182,12 +182,7 @@ func (c *Context) Neg(d, x *Decimal) (Condition, error) {
 	if set, res, err := c.setIfNaN(d, x); set {
 		return res, err
 	}
-	if x.IsZero() {
-		d.Set(x)
-		d.Negative = false
-	} else {
-		d.Neg(x)
-	}
+	d.Neg(x)
 	return c.Round(d, d)
 }
 
