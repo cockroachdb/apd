@@ -684,7 +684,11 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 // Neg sets d to -x and returns d.
 func (d *Decimal) Neg(x *Decimal) *Decimal {
 	d.Set(x)
-	d.Negative = !d.Negative
+	if d.IsZero() {
+		d.Negative = false
+	} else {
+		d.Negative = !d.Negative
+	}
 	return d
 }
 

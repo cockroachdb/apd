@@ -695,6 +695,30 @@ func TestIsZero(t *testing.T) {
 	}
 }
 
+func TestNeg(t *testing.T) {
+	tests := map[string]string{
+		"0":          "0",
+		"-0":         "0",
+		"-0.000":     "0.000",
+		"-00.000100": "0.000100",
+	}
+
+	for tc, expect := range tests {
+		t.Run(tc, func(t *testing.T) {
+			d, _, err := NewFromString(tc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var z Decimal
+			z.Neg(d)
+			s := z.String()
+			if s != expect {
+				t.Fatalf("expected %s, got %s", expect, s)
+			}
+		})
+	}
+}
+
 func TestReduce(t *testing.T) {
 	tests := map[string]int{
 		"-0":        0,
