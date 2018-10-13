@@ -231,25 +231,24 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 
 // SetInt64 sets d to x and returns d.
 func (d *Decimal) SetInt64(x int64) *Decimal {
-	d.SetCoefficient(x)
-	d.Exponent = 0
+	return d.SetFinite(x, 0)
+}
+
+// SetFinite sets d to x with exponent e and returns d.
+func (d *Decimal) SetFinite(x int64, e int32) *Decimal {
+	d.setCoefficient(x)
+	d.Exponent = e
 	return d
 }
 
-// SetCoefficient sets d's coefficient and negative value to x, its Form to
-// Finite, and returns d. The exponent is not changed.
-func (d *Decimal) SetCoefficient(x int64) *Decimal {
+// setCoefficient sets d's coefficient and negative value to x and its Form
+// to Finite The exponent is not changed. Since the exponent is not changed
+// (and this is thus easy to misuse), this is unexported for internal use only.
+func (d *Decimal) setCoefficient(x int64) {
 	d.Negative = x < 0
 	d.Coeff.SetInt64(x)
 	d.Coeff.Abs(&d.Coeff)
 	d.Form = Finite
-	return d
-}
-
-// SetExponent sets d's Exponent value to x and returns d.
-func (d *Decimal) SetExponent(x int32) *Decimal {
-	d.Exponent = x
-	return d
 }
 
 // SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
@@ -716,8 +715,7 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 	switch x.Sign() {
 	case 0:
 		nd = int(d.NumDigits())
-		d.SetCoefficient(0)
-		d.Exponent = 0
+		d.SetInt64(0)
 		return d, nd - 1
 	case -1:
 		neg = true

@@ -496,13 +496,13 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	// is odd or even.
 	approx := new(Decimal)
 	if e%2 == 0 {
-		approx.SetCoefficient(819).SetExponent(-3)
+		approx.SetFinite(819, -3)
 		ed.Mul(approx, approx, f)
 		ed.Add(approx, approx, New(259, -3))
 	} else {
 		f.Exponent--
 		e++
-		approx.SetCoefficient(259).SetExponent(-2)
+		approx.SetFinite(259, -2)
 		ed.Mul(approx, approx, f)
 		ed.Add(approx, approx, New(819, -4))
 	}
@@ -723,7 +723,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	// tmp1 = z - 1
 	ed.Sub(tmp1, z, decimalOne)
 	// tmp3 = 0.1
-	tmp3.SetCoefficient(1).SetExponent(-1)
+	tmp3.SetFinite(1, -1)
 
 	usePowerSeries := false
 
@@ -737,7 +737,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		// We multiplied the input by 10^-expDelta, we will need to add
 		//   ln(10^expDelta) = expDelta * ln(10)
 		// to the result.
-		resAdjust.SetCoefficient(int64(expDelta))
+		resAdjust.setCoefficient(int64(expDelta))
 		ed.Mul(resAdjust, resAdjust, decimalLn10.get(p))
 
 		// tmp1 = z - 1
@@ -785,7 +785,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 			ed.Mul(tmp3, tmp3, tmp2)
 
 			// tmp4 = 2n+1
-			tmp4.SetCoefficient(int64(2*n + 1)).SetExponent(0)
+			tmp4.SetFinite(int64(2*n+1), 0)
 
 			ed.Quo(tmp4, tmp3, tmp4)
 
@@ -914,15 +914,14 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 		if x.Sign() < 0 {
 			res = res.negateOverflowFlags()
 			res |= Clamped
-			d.SetCoefficient(0)
-			d.Exponent = c.etiny()
+			d.SetFinite(0, c.etiny())
 		} else {
 			d.Set(decimalInfinity)
 		}
 		return c.goError(res)
 	}
 	// if abs(x) <= setexp(.9, -currentprecision); then result 1
-	tmp2.SetCoefficient(9).SetExponent(int32(-cp) - 1)
+	tmp2.SetFinite(9, int32(-cp)-1)
 	if tmp1.Cmp(tmp2) <= 0 {
 		d.Set(decimalOne)
 		return c.goError(res)
@@ -962,7 +961,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	sum := New(1, 0)
 	tmp2.Exponent = 0
 	for i := n - 1; i > 0; i-- {
-		tmp2.SetCoefficient(i)
+		tmp2.setCoefficient(i)
 		// tmp1 = r / i
 		ed.Quo(tmp1, r, tmp2)
 		// sum = sum * r / i
