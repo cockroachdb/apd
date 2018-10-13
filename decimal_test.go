@@ -53,6 +53,38 @@ func newDecimal(t *testing.T, c *Context, s string) *Decimal {
 	return d
 }
 
+func TestNewWithBigInt(t *testing.T) {
+	tests := []struct {
+		d string
+		b string
+	}{
+		{d: "0", b: "0"},
+		{d: "1", b: "1"},
+		{d: "-1", b: "-1"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.d, func(t *testing.T) {
+			expect, _, err := new(Decimal).SetString(tc.d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, ok := new(big.Int).SetString(tc.b, 10)
+			if !ok {
+				t.Fatal("bad bigint")
+			}
+			d := NewWithBigInt(b, 0)
+			if d.Coeff.Sign() < 0 {
+				t.Fatal("unexpected negative coeff")
+			}
+			// Verify that changing b doesn't change d.
+			b.Set(big.NewInt(1234))
+			if d.CmpTotal(expect) != 0 {
+				t.Fatalf("expected %s, got %s", expect, d)
+			}
+		})
+	}
+}
+
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal

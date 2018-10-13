@@ -89,10 +89,15 @@ func New(coeff int64, exponent int32) *Decimal {
 
 // NewWithBigInt creates a new decimal with the given coefficient and exponent.
 func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
-	return &Decimal{
-		Coeff:    *coeff,
+	d := &Decimal{
 		Exponent: exponent,
 	}
+	d.Coeff.Set(coeff)
+	if d.Coeff.Sign() < 0 {
+		d.Negative = true
+		d.Coeff.Abs(&d.Coeff)
+	}
+	return d
 }
 
 func consumePrefix(s, prefix string) (string, bool) {
