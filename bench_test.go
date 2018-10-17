@@ -61,7 +61,7 @@ func runBenches(
 					if _, _, err := nums[i].SetString(buf.String()); err != nil {
 						b.Fatal(err)
 					}
-					nums[i].SetExponent(int32(s - numDigits))
+					nums[i].Exponent = int32(s - numDigits)
 				}
 				b.Run(
 					fmt.Sprintf("P%d/S%d/D%d", p, s, d),
