@@ -54,21 +54,18 @@ func newDecimal(t *testing.T, c *Context, s string) *Decimal {
 }
 
 func TestNewWithBigInt(t *testing.T) {
-	tests := []struct {
-		d string
-		b string
-	}{
-		{d: "0", b: "0"},
-		{d: "1", b: "1"},
-		{d: "-1", b: "-1"},
+	tests := []string{
+		"0",
+		"1",
+		"-1",
 	}
 	for _, tc := range tests {
-		t.Run(tc.d, func(t *testing.T) {
-			expect, _, err := new(Decimal).SetString(tc.d)
+		t.Run(tc, func(t *testing.T) {
+			expect, _, err := new(Decimal).SetString(tc)
 			if err != nil {
 				t.Fatal(err)
 			}
-			b, ok := new(big.Int).SetString(tc.b, 10)
+			b, ok := new(big.Int).SetString(tc, 10)
 			if !ok {
 				t.Fatal("bad bigint")
 			}
