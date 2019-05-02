@@ -14,9 +14,7 @@
 
 package apd
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // decomposer composes or decomposes a decimal value to and from individual parts.
 // There are four separate parts: a boolean negative flag, a form byte with three possible states
@@ -47,6 +45,8 @@ type decomposer interface {
 	// the same arguments should result in the same decimal value.
 	Compose(form byte, negative bool, coefficient []byte, exponent int32) error
 }
+
+var _ decomposer = &Decimal{}
 
 // Decompose returns the internal decimal state into parts.
 // If the provided buf has sufficient capacity, buf may be returned as the coefficient with
