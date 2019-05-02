@@ -202,21 +202,6 @@ func (c *Context) SetString(d *Decimal, s string) (*Decimal, Condition, error) {
 	return d, res, err
 }
 
-func (d *Decimal) strSpecials() (bool, string) {
-	switch d.Form {
-	case NaN:
-		return true, "NaN"
-	case NaNSignaling:
-		return true, "sNaN"
-	case Infinite:
-		return true, "Infinity"
-	case Finite:
-		return false, ""
-	default:
-		return true, "unknown"
-	}
-}
-
 // Set sets d's fields to the values of x and returns d.
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	if d == x {
