@@ -18,7 +18,7 @@ import "fmt"
 
 // decomposer composes or decomposes a decimal value to and from individual parts.
 // There are four separate parts: a boolean negative flag, a form byte with three possible states
-// (finite=0, infinite=1, NaN=2),  a base-2 little-endian integer
+// (finite=0, infinite=1, NaN=2),  a base-2 big-endian integer
 // coefficient (also known as a significand) as a []byte, and an int32 exponent.
 // These are composed into a final value as "decimal = (neg) (form=finite) coefficient * 10 ^ exponent".
 // A zero length coefficient is a zero value.
@@ -69,17 +69,7 @@ func (d *Decimal) Decompose(buf []byte) (form byte, negative bool, coefficient [
 	// Finite form.
 	negative = d.Negative
 	exponent = d.Exponent
-	// Return big-endian, but need little-endian.
-	// Returned []byte is a new and can be safely modified in place.
 	coefficient = d.Coeff.Bytes()
-
-	i := 0
-	j := len(coefficient) - 1
-	for i < j {
-		coefficient[i], coefficient[j] = coefficient[j], coefficient[i]
-		i++
-		j--
-	}
 	return
 }
 
@@ -103,14 +93,7 @@ func (d *Decimal) Compose(form byte, negative bool, coefficient []byte, exponent
 	}
 	// Finite form.
 	d.Negative = negative
-
-	// coefficient is a little-endian, reverse copy for big-endian when copying
-	// to c2 to avoid modifying coefficient.
-	c2 := make([]byte, len(coefficient))
-	for i := len(c2); i > 0; i-- {
-		c2[i-1] = coefficient[len(c2)-i]
-	}
-	d.Coeff.SetBytes(c2)
+	d.Coeff.SetBytes(coefficient)
 	d.Exponent = exponent
 	return nil
 }
