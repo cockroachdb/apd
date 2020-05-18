@@ -21,5 +21,4 @@ The second main type is [`Context`](https://godoc.org/github.com/cockroachdb/apd
 See the [examples](https://godoc.org/github.com/cockroachdb/apd#pkg-examples) for some operations that were previously difficult to perform in Go.
 
 ## Documentation
-
-https://godoc.org/github.com/cockroachdb/apd
+https://pkg.go.dev/github.com/cockroachdb/apd/v2?tab=doc
