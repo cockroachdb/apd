@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/pkg/errors"
 )
@@ -782,6 +783,13 @@ func (d *Decimal) MarshalText() ([]byte, error) {
 		return []byte("<nil>"), nil
 	}
 	return []byte(d.String()), nil
+}
+
+const sizeOfDecimal = unsafe.Sizeof(Decimal{})
+
+// Size returns the total memory footprint of d in bytes.
+func (d *Decimal) Size() uintptr {
+	return sizeOfDecimal + uintptr((d.Coeff.BitLen()-1)/8+1)
 }
 
 // NullDecimal represents a string that may be null. NullDecimal implements
