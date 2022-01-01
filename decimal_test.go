@@ -789,7 +789,7 @@ func TestReduce(t *testing.T) {
 // the size of the Decimal struct.
 func TestSizeof(t *testing.T) {
 	var d Decimal
-	if s := unsafe.Sizeof(d); s != 48 {
+	if s := unsafe.Sizeof(d); s != 40 {
 		t.Errorf("sizeof(Decimal) changed: %d", s)
 	}
 	var c Context
