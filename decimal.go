@@ -325,11 +325,7 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			// fractional parts and do operations similar Round. We avoid calling Round
 			// directly because it calls setExponent and modifies the result's exponent
 			// and coeff in ways that would be wrong here.
-			b := new(big.Int).Set(&d.Coeff)
-			tmp := &Decimal{
-				Coeff:    *b,
-				Exponent: r - Etiny,
-			}
+			tmp := NewWithBigInt(&d.Coeff, r-Etiny)
 			integ, frac := new(Decimal), new(Decimal)
 			tmp.Modf(integ, frac)
 			frac.Abs(frac)
