@@ -23,44 +23,50 @@ import (
 )
 
 func BenchmarkNumDigitsLookup(b *testing.B) {
-	b.StopTimer()
-	runTest := func(start string, c byte) {
+	prep := func(start string, c byte) []*Decimal {
+		var ds []*Decimal
 		buf := bytes.NewBufferString(start)
 		for i := 1; i < digitsTableSize; i++ {
 			buf.WriteByte(c)
 			d, _, _ := NewFromString(buf.String())
-
-			b.StartTimer()
-			d.NumDigits()
-			b.StopTimer()
+			ds = append(ds, d)
 		}
+		return ds
 	}
+	var ds []*Decimal
+	ds = append(ds, prep("", '9')...)
+	ds = append(ds, prep("1", '0')...)
+	ds = append(ds, prep("-", '9')...)
+	ds = append(ds, prep("-1", '0')...)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		runTest("", '9')
-		runTest("1", '0')
-		runTest("-", '9')
-		runTest("-1", '0')
+		for _, d := range ds {
+			d.NumDigits()
+		}
 	}
 }
 
 func BenchmarkNumDigitsFull(b *testing.B) {
-	b.StopTimer()
-	runTest := func(start string, c byte) {
+	prep := func(start string, c byte) []*Decimal {
+		var ds []*Decimal
 		buf := bytes.NewBufferString(start)
 		for i := 1; i < 1000; i++ {
 			buf.WriteByte(c)
 			d, _, _ := NewFromString(buf.String())
-
-			b.StartTimer()
-			d.NumDigits()
-			b.StopTimer()
+			ds = append(ds, d)
 		}
+		return ds
 	}
+	var ds []*Decimal
+	ds = append(ds, prep("", '9')...)
+	ds = append(ds, prep("1", '0')...)
+	ds = append(ds, prep("-", '9')...)
+	ds = append(ds, prep("-1", '0')...)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		runTest("", '9')
-		runTest("1", '0')
-		runTest("-", '9')
-		runTest("-1", '0')
+		for _, d := range ds {
+			d.NumDigits()
+		}
 	}
 }
 
