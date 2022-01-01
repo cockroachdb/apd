@@ -296,32 +296,52 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 func BenchmarkGDA(b *testing.B) {
 	for _, fname := range GDAfiles {
 		b.Run(fname, func(b *testing.B) {
-			b.StopTimer()
+			type benchCase struct {
+				tc  TestCase
+				ctx *Context
+				ops [2]*Decimal
+			}
 			_, tcs := readGDA(b, fname)
-			res := new(Decimal)
+			bcs := make([]benchCase, 0, len(tcs))
+		Loop:
+			for _, tc := range tcs {
+				if GDAignore[tc.ID] || tc.Result == "?" || tc.HasNull() {
+					continue
+				}
+				switch tc.Operation {
+				case "apply", "toeng":
+					continue
+				}
+				bc := benchCase{
+					tc:  tc,
+					ctx: tc.Context(b),
+				}
+				for i, o := range tc.Operands {
+					d, _, err := NewFromString(o)
+					if err != nil {
+						continue Loop
+					}
+					bc.ops[i] = d
+				}
+				bcs = append(bcs, bc)
+			}
+
+			// Translate inputs and outputs to Decimal vectors.
+			op1s := make([]Decimal, len(bcs))
+			op2s := make([]Decimal, len(bcs))
+			res := make([]Decimal, b.N*len(bcs))
+			for i, bc := range bcs {
+				op1s[i].Set(bc.ops[0])
+				if bc.ops[1] != nil {
+					op2s[i].Set(bc.ops[1])
+				}
+			}
+
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-			Loop:
-				for _, tc := range tcs {
-					if GDAignore[tc.ID] || tc.Result == "?" || tc.HasNull() {
-						continue
-					}
-					switch tc.Operation {
-					case "apply", "toeng":
-						continue
-					}
-					operands := make([]*Decimal, 2)
-					for i, o := range tc.Operands {
-						d, _, err := NewFromString(o)
-						if err != nil {
-							continue Loop
-						}
-						operands[i] = d
-					}
-					c := tc.Context(b)
-					b.StartTimer()
+				for j, bc := range bcs {
 					// Ignore errors here because the full tests catch them.
-					_, _ = tc.Run(c, nil, res, operands[0], operands[1])
-					b.StopTimer()
+					_, _ = bc.tc.Run(bc.ctx, nil, &res[i*len(bcs)+j], &op1s[j], &op2s[j])
 				}
 			}
 		})
