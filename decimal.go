@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/pkg/errors"
 )
@@ -31,10 +32,11 @@ import (
 // Coeff must be positive. If it is negative results may be incorrect and
 // apd may panic.
 type Decimal struct {
-	Form     Form
-	Negative bool
-	Exponent int32
-	Coeff    big.Int
+	Form        Form
+	Negative    bool
+	Exponent    int32
+	Coeff       big.Int
+	coeffInline [inlineCoeffCap]big.Word
 }
 
 // Form specifies the form of a Decimal.
@@ -54,6 +56,17 @@ const (
 	// NaN is the NaN form.
 	NaN
 )
+
+// Each Decimal maintains (through big.Int) an internal reference to a
+// variable-length coefficient, which is represented by a []big.Word. The
+// coeffInline field and the lazyInit method combine to allow us to inline this
+// coefficient within the Decimal struct when its value is sufficiently small.
+// In lazyInit, we point the Coeff field's backing slice at the coeffInline
+// array. big.Int will avoid re-allocating this array until it is provided with
+// a value that exceeds the initial capacity. We set this initial capacity to
+// accommodate any coefficient that would fit in a 64-bit integer (i.e. values
+// up to 2^64).
+const inlineCoeffCap = unsafe.Sizeof(uint64(0)) / unsafe.Sizeof(big.Word(0))
 
 var (
 	decimalNaN      = &Decimal{Form: NaN}
@@ -78,26 +91,32 @@ const (
 
 // New creates a new decimal with the given coefficient and exponent.
 func New(coeff int64, exponent int32) *Decimal {
-	d := &Decimal{
-		Negative: coeff < 0,
-		Coeff:    *big.NewInt(coeff),
-		Exponent: exponent,
-	}
-	d.Coeff.Abs(&d.Coeff)
+	d := new(Decimal)
+	d.SetFinite(coeff, exponent)
 	return d
 }
 
 // NewWithBigInt creates a new decimal with the given coefficient and exponent.
 func NewWithBigInt(coeff *big.Int, exponent int32) *Decimal {
-	d := &Decimal{
-		Exponent: exponent,
-	}
+	d := new(Decimal)
+	d.lazyInit()
 	d.Coeff.Set(coeff)
 	if d.Coeff.Sign() < 0 {
 		d.Negative = true
 		d.Coeff.Abs(&d.Coeff)
 	}
+	d.Exponent = exponent
 	return d
+}
+
+// lazyInit lazily initializes a zero Decimal value. Use of the method is not
+// required for correctness, but can improve performance by avoiding a separate
+// heap allocation within the Coeff field.
+func (d *Decimal) lazyInit() {
+	if d.Coeff.Bits() == nil {
+		d.coeffInline = [inlineCoeffCap]big.Word{} // zero, to be safe
+		d.Coeff.SetBits(d.coeffInline[:0])
+	}
 }
 
 func consumePrefix(s, prefix string) (string, bool) {
@@ -114,6 +133,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		s, _ = consumePrefix(s, "+")
 	}
 	s = strings.ToLower(s)
+	d.lazyInit()
 	d.Exponent = 0
 	d.Coeff.SetInt64(0)
 	// Until there are no parse errors, leave as NaN.
@@ -207,6 +227,7 @@ func (d *Decimal) Set(x *Decimal) *Decimal {
 	if d == x {
 		return d
 	}
+	d.lazyInit()
 	d.Negative = x.Negative
 	d.Coeff.Set(&x.Coeff)
 	d.Exponent = x.Exponent
@@ -230,6 +251,7 @@ func (d *Decimal) SetFinite(x int64, e int32) *Decimal {
 // to Finite The exponent is not changed. Since the exponent is not changed
 // (and this is thus easy to misuse), this is unexported for internal use only.
 func (d *Decimal) setCoefficient(x int64) {
+	d.lazyInit()
 	d.Negative = x < 0
 	d.Coeff.SetInt64(x)
 	d.Coeff.Abs(&d.Coeff)
@@ -243,7 +265,17 @@ func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
 	return d, err
 }
 
-// Int64 returns the int64 representation of x. If x cannot be represented in an int64, an error is returned.
+// CoeffRef returns a reference to d's Coefficient. This can be used by clients
+// who want direct mutable access to a Decimal's coefficient field.
+//
+// WARNING: Use with care. The coefficient must not be set to a negative value.
+func (d *Decimal) CoeffRef() *big.Int {
+	d.lazyInit()
+	return &d.Coeff
+}
+
+// Int64 returns the int64 representation of x. If x cannot be represented in an
+// int64, an error is returned.
 func (d *Decimal) Int64() (int64, error) {
 	if d.Form != Finite {
 		return 0, errors.Errorf("%s is not finite", d)
@@ -618,6 +650,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	// No fractional part.
 	if d.Exponent > 0 {
 		if frac != nil {
+			frac.lazyInit()
 			frac.Negative = neg
 			frac.Exponent = 0
 			frac.Coeff.SetInt64(0)
@@ -632,6 +665,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {
 		if integ != nil {
+			integ.lazyInit()
 			integ.Negative = neg
 			integ.Exponent = 0
 			integ.Coeff.SetInt64(0)
@@ -646,9 +680,10 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 
 	var icoeff *big.Int
 	if integ != nil {
-		icoeff = &integ.Coeff
+		integ.lazyInit()
 		integ.Exponent = 0
 		integ.Negative = neg
+		icoeff = &integ.Coeff
 	} else {
 		// This is the integ == nil branch, and we already checked if both integ and
 		// frac were nil above, so frac can never be nil in this branch.
@@ -656,9 +691,10 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	}
 
 	if frac != nil {
-		icoeff.QuoRem(&d.Coeff, e, &frac.Coeff)
+		frac.lazyInit()
 		frac.Exponent = d.Exponent
 		frac.Negative = neg
+		icoeff.QuoRem(&d.Coeff, e, &frac.Coeff)
 	} else {
 		// This is the frac == nil, which means integ must not be nil since they both
 		// can't be due to the check above.

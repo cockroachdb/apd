@@ -92,6 +92,7 @@ func (d *Decimal) Compose(form byte, negative bool, coefficient []byte, exponent
 		return nil
 	}
 	// Finite form.
+	d.lazyInit()
 	d.Negative = negative
 	d.Coeff.SetBytes(coefficient)
 	d.Exponent = exponent

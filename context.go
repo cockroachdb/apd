@@ -140,6 +140,7 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "add")
 	}
+	d.lazyInit()
 	d.Negative = xn
 	if xn == yn {
 		d.Coeff.Add(a, b)
@@ -203,6 +204,7 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 		return 0, nil
 	}
 
+	d.lazyInit()
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
 	d.Negative = neg
 	d.Form = Finite
@@ -284,6 +286,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	var adjust int64
 	// The result coefficient is initialized to 0.
 	quo := new(Decimal)
+	quo.lazyInit()
 	var res Condition
 	var diff int64
 	if !x.IsZero() {
@@ -379,6 +382,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "QuoInteger")
 	}
+	d.lazyInit()
 	d.Coeff.Quo(a, b)
 	d.Form = Finite
 	if d.NumDigits() > int64(c.Precision) {
@@ -420,6 +424,7 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "Rem")
 	}
+	d.lazyInit()
 	tmp := new(big.Int)
 	tmp.QuoRem(a, b, &d.Coeff)
 	if NumDigits(tmp) > int64(c.Precision) {
