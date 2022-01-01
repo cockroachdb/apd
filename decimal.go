@@ -38,7 +38,7 @@ type Decimal struct {
 }
 
 // Form specifies the form of a Decimal.
-type Form int
+type Form int8
 
 const (
 	// These constants must be in the following order. CmpTotal assumes that
