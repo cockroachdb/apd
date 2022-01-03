@@ -16,7 +16,6 @@ package apd
 
 import (
 	"bytes"
-	"math/big"
 	"math/rand"
 	"strings"
 	"testing"
@@ -98,13 +97,13 @@ func TestNumDigits(t *testing.T) {
 
 func TestDigitsLookupTable(t *testing.T) {
 	// Make sure all elements in table make sense.
-	min := new(big.Int)
-	prevBorder := big.NewInt(0)
+	min := new(BigInt)
+	prevBorder := NewBigInt(0)
 	for i := 1; i <= digitsTableSize; i++ {
-		elem := digitsLookupTable[i]
+		elem := &digitsLookupTable[i]
 
 		min.SetInt64(2)
-		min.Exp(min, big.NewInt(int64(i-1)), nil)
+		min.Exp(min, NewBigInt(int64(i-1)), nil)
 		if minLen := int64(len(min.String())); minLen != elem.digits {
 			t.Errorf("expected 2^%d to have %d digits, found %d", i, elem.digits, minLen)
 		}
@@ -129,11 +128,11 @@ func TestDigitsLookupTable(t *testing.T) {
 	// digit lengths line up.
 	const randomTrials = 100
 	for i := 0; i < randomTrials; i++ {
-		a := big.NewInt(rand.Int63())
-		b := big.NewInt(rand.Int63())
+		a := NewBigInt(rand.Int63())
+		b := NewBigInt(rand.Int63())
 		a.Mul(a, b)
 
-		d := &Decimal{Coeff: *a}
+		d := NewWithBigInt(a, 0)
 		tableDigits := d.NumDigits()
 		if actualDigits := int64(len(a.String())); actualDigits != tableDigits {
 			t.Errorf("expected %d digits for %v, found %d", tableDigits, a, actualDigits)
