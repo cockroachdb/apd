@@ -353,15 +353,15 @@ func readGDA(t testing.TB, name string) (string, []TestCase) {
 }
 
 func (tc TestCase) Context(t testing.TB) *Context {
-	_, ok := Roundings[tc.Rounding]
-	if !ok {
+	rounding := Rounder(tc.Rounding)
+	if _, ok := roundings[rounding]; !ok {
 		t.Fatalf("unsupported rounding mode %s", tc.Rounding)
 	}
 	c := &Context{
 		Precision:   uint32(tc.Precision),
 		MaxExponent: int32(tc.MaxExponent),
 		MinExponent: int32(tc.MinExponent),
-		Rounding:    tc.Rounding,
+		Rounding:    rounding,
 		Traps:       0,
 	}
 	return c
@@ -410,10 +410,6 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			t.Logf("%s:/^%s ", path, tc.ID)
 			t.Logf("%s %s = %s (%s)", tc.Operation, strings.Join(tc.Operands, " "), tc.Result, strings.Join(tc.Conditions, " "))
 			t.Logf("prec: %d, round: %s, Emax: %d, Emin: %d", tc.Precision, tc.Rounding, tc.MaxExponent, tc.MinExponent)
-			_, ok := Roundings[tc.Rounding]
-			if !ok {
-				t.Fatalf("unsupported rounding mode %s", tc.Rounding)
-			}
 			operands := make([]*Decimal, 2)
 			c := tc.Context(t)
 			var res, opres Condition
