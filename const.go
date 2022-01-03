@@ -14,6 +14,8 @@
 
 package apd
 
+import "math"
+
 var (
 	bigOne  = NewBigInt(1)
 	bigTwo  = NewBigInt(2)
@@ -27,6 +29,9 @@ var (
 	decimalTwo       = New(2, 0)
 	decimalThree     = New(3, 0)
 	decimalEight     = New(8, 0)
+
+	decimalMax = New(math.MaxInt64, 0)
+	decimalMin = New(math.MinInt64, 0)
 
 	decimalCbrtC1 = makeConst(strCbrtC1)
 	decimalCbrtC2 = makeConst(strCbrtC2)

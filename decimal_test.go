@@ -96,7 +96,7 @@ func TestUpscale(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {
-			a, b, s, err := upscale(tc.x, tc.y)
+			a, b, s, err := upscale(tc.x, tc.y, new(BigInt))
 			if err != nil {
 				t.Fatal(err)
 			}

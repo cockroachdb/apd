@@ -88,9 +88,12 @@ func NumDigits(b *BigInt) int64 {
 	}
 
 	n := int64(float64(bl) / digitsToBitsRatio)
-	a := new(BigInt)
-	e := tableExp10(n, a)
+	var tpmE BigInt
+	e := tableExp10(n, &tpmE)
+	var a *BigInt
 	if b.Sign() < 0 {
+		var tmpA BigInt
+		a := &tmpA
 		a.Abs(b)
 	} else {
 		a = b
@@ -110,27 +113,24 @@ const powerTenTableSize = 128
 var pow10LookupTable [powerTenTableSize + 1]BigInt
 
 func init() {
-	tmpInt := new(BigInt)
 	for i := int64(0); i <= powerTenTableSize; i++ {
-		setBigWithPow(&pow10LookupTable[i], tmpInt, i)
+		setBigWithPow(&pow10LookupTable[i], i)
 	}
 }
 
-func setBigWithPow(bi *BigInt, tmpInt *BigInt, pow int64) {
-	if tmpInt == nil {
-		tmpInt = new(BigInt)
-	}
-	bi.Exp(bigTen, tmpInt.SetInt64(pow), nil)
+func setBigWithPow(res *BigInt, pow int64) {
+	var tmp BigInt
+	tmp.SetInt64(pow)
+	res.Exp(bigTen, &tmp, nil)
 }
 
 // tableExp10 returns 10^x for x >= 0, looked up from a table when
 // possible. This returned value must not be mutated. tmp is used as an
-// intermediate variable, but may be nil.
+// intermediate variable and must not be nil.
 func tableExp10(x int64, tmp *BigInt) *BigInt {
 	if x <= powerTenTableSize {
 		return &pow10LookupTable[x]
 	}
-	b := new(BigInt)
-	setBigWithPow(b, tmp, x)
-	return b
+	setBigWithPow(tmp, x)
+	return tmp
 }
