@@ -70,18 +70,19 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			return SystemUnderflow | Underflow
 		}
 		res |= Rounded
-		y := new(BigInt)
-		e := tableExp10(diff, y)
-		m := new(BigInt)
-		y.QuoRem(&d.Coeff, e, m)
+		var y, m BigInt
+		e := tableExp10(diff, &y)
+		y.QuoRem(&d.Coeff, e, &m)
 		if m.Sign() != 0 {
 			res |= Inexact
-			discard := NewWithBigInt(m, int32(-diff))
-			if r(y, x.Negative, discard.Cmp(decimalHalf)) {
-				roundAddOne(y, &diff)
+			var discard Decimal
+			discard.Coeff.Set(&m)
+			discard.Exponent = int32(-diff)
+			if r(&y, x.Negative, discard.Cmp(decimalHalf)) {
+				roundAddOne(&y, &diff)
 			}
 		}
-		d.Coeff.Set(y)
+		d.Coeff.Set(&y)
 	} else {
 		diff = 0
 	}
@@ -152,7 +153,7 @@ func roundUp(result *BigInt, neg bool, half int) bool {
 }
 
 func round05Up(result *BigInt, neg bool, half int) bool {
-	z := new(BigInt)
+	var z BigInt
 	z.Rem(result, bigFive)
 	if z.Sign() == 0 {
 		return true

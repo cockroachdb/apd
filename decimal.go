@@ -15,7 +15,6 @@
 package apd
 
 import (
-	"math"
 	"strconv"
 	"strings"
 
@@ -243,16 +242,16 @@ func (d *Decimal) Int64() (int64, error) {
 	if d.Form != Finite {
 		return 0, errors.Errorf("%s is not finite", d.String())
 	}
-	integ, frac := new(Decimal), new(Decimal)
-	d.Modf(integ, frac)
+	var integ, frac Decimal
+	d.Modf(&integ, &frac)
 	if !frac.IsZero() {
 		return 0, errors.Errorf("%s: has fractional part", d.String())
 	}
 	var ed ErrDecimal
-	if integ.Cmp(New(math.MaxInt64, 0)) > 0 {
+	if integ.Cmp(decimalMaxInt64) > 0 {
 		return 0, errors.Errorf("%s: greater than max int64", d.String())
 	}
-	if integ.Cmp(New(math.MinInt64, 0)) < 0 {
+	if integ.Cmp(decimalMinInt64) < 0 {
 		return 0, errors.Errorf("%s: less than min int64", d.String())
 	}
 	if err := ed.Err(); err != nil {
@@ -320,10 +319,12 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 			// fractional parts and do operations similar Round. We avoid calling Round
 			// directly because it calls setExponent and modifies the result's exponent
 			// and coeff in ways that would be wrong here.
-			tmp := NewWithBigInt(&d.Coeff, r-Etiny)
-			integ, frac := new(Decimal), new(Decimal)
-			tmp.Modf(integ, frac)
-			frac.Abs(frac)
+			var tmp Decimal
+			tmp.Coeff.Set(&d.Coeff)
+			tmp.Exponent = r - Etiny
+			var integ, frac Decimal
+			tmp.Modf(&integ, &frac)
+			frac.Abs(&frac)
 			if !frac.IsZero() {
 				res |= Inexact
 				if c.rounding()(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
@@ -357,8 +358,9 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 
 // upscale converts a and b to BigInts with the same scaling. It returns
 // them with this scaling, along with the scaling. An error can be produced
-// if the resulting scale factor is out of range.
-func upscale(a, b *Decimal) (*BigInt, *BigInt, int32, error) {
+// if the resulting scale factor is out of range. The tmp argument must be
+// provided and can be (but won't always be) one of the return values.
+func upscale(a, b *Decimal, tmp *BigInt) (*BigInt, *BigInt, int32, error) {
 	if a.Exponent == b.Exponent {
 		return &a.Coeff, &b.Coeff, a.Exponent, nil
 	}
@@ -373,7 +375,7 @@ func upscale(a, b *Decimal) (*BigInt, *BigInt, int32, error) {
 	if s > MaxExponent {
 		return nil, nil, 0, errors.New(errExponentOutOfRangeStr)
 	}
-	x := new(BigInt)
+	x := tmp
 	e := tableExp10(s, x)
 	x.Mul(&a.Coeff, e)
 	y := &b.Coeff
@@ -557,14 +559,14 @@ func (d *Decimal) Cmp(x *Decimal) int {
 
 	var cmp int
 	if d.Exponent < x.Exponent {
-		var xScaled BigInt
+		var xScaled, tmpE BigInt
 		xScaled.Set(&x.Coeff)
-		xScaled.Mul(&xScaled, tableExp10(int64(x.Exponent)-int64(d.Exponent), nil))
+		xScaled.Mul(&xScaled, tableExp10(int64(x.Exponent)-int64(d.Exponent), &tmpE))
 		cmp = d.Coeff.Cmp(&xScaled)
 	} else {
-		var dScaled BigInt
+		var dScaled, tmpE BigInt
 		dScaled.Set(&d.Coeff)
-		dScaled.Mul(&dScaled, tableExp10(int64(d.Exponent)-int64(x.Exponent), nil))
+		dScaled.Mul(&dScaled, tableExp10(int64(d.Exponent)-int64(x.Exponent), &tmpE))
 		cmp = dScaled.Cmp(&x.Coeff)
 	}
 	if ds < 0 {
@@ -637,7 +639,8 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 		return
 	}
 
-	e := tableExp10(exp, nil)
+	var tmpE BigInt
+	e := tableExp10(exp, &tmpE)
 
 	var icoeff *BigInt
 	if integ != nil {
@@ -719,12 +722,12 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 
 	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
 	// faster than converting to a string and trimming the 0s from the end.
-	z := d.setBig(new(BigInt))
-	r := new(BigInt)
+	var z, r BigInt
+	d.setBig(&z)
 	for {
-		z.QuoRem(&d.Coeff, bigTen, r)
+		z.QuoRem(&d.Coeff, bigTen, &r)
 		if r.Sign() == 0 {
-			d.Coeff.Set(z)
+			d.Coeff.Set(&z)
 			nd++
 		} else {
 			break
