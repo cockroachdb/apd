@@ -41,7 +41,7 @@ type Context struct {
 	Traps Condition
 	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
 	// empty or not present in Roundings.
-	Rounding string
+	Rounding Rounder
 }
 
 const (
@@ -351,8 +351,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			res |= Inexact | Rounded
 			dividend.Mul(&dividend, bigTwo)
 			half := dividend.Cmp(&divisor)
-			rounding := c.rounding()
-			if rounding(&quo.Coeff, quo.Negative, half) {
+			if c.Rounding.ShouldAddOne(&quo.Coeff, quo.Negative, half) {
 				roundAddOne(&quo.Coeff, &diff)
 			}
 		}
@@ -1203,7 +1202,7 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 
 			d.Exponent = -diff
 			// Avoid the c.Precision == 0 check.
-			res = nc.rounding().Round(nc, d, d)
+			res = nc.Rounding.Round(nc, d, d)
 			// Adjust for 0.9 -> 1.0 rollover.
 			if d.Exponent > 0 {
 				d.Coeff.Mul(&d.Coeff, bigTen)
@@ -1284,6 +1283,7 @@ func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.
+// The returned value must not be mutated.
 func exp10(x int64, tmp *BigInt) (exp *BigInt, err error) {
 	if x > MaxExponent || x < MinExponent {
 		return nil, errors.New(errExponentOutOfRangeStr)
