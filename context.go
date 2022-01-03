@@ -16,7 +16,6 @@ package apd
 
 import (
 	"math"
-	"math/big"
 
 	"github.com/pkg/errors"
 )
@@ -287,8 +286,8 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	var res Condition
 	var diff int64
 	if !x.IsZero() {
-		dividend := new(big.Int).Abs(&x.Coeff)
-		divisor := new(big.Int).Abs(&y.Coeff)
+		dividend := new(BigInt).Abs(&x.Coeff)
+		divisor := new(BigInt).Abs(&y.Coeff)
 
 		// The operand coefficients are adjusted so that the coefficient of the
 		// dividend is greater than or equal to the coefficient of the divisor and
@@ -304,7 +303,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		// While the coefficient of the dividend is greater than or equal to ten
 		// times the coefficient of the divisor the coefficient of the divisor is
 		// multiplied by 10 and adjust is decremented by 1.
-		for tmp := new(big.Int); ; {
+		for tmp := new(BigInt); ; {
 			tmp.Mul(divisor, bigTen)
 			if dividend.Cmp(tmp) < 0 {
 				break
@@ -420,7 +419,7 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "Rem")
 	}
-	tmp := new(big.Int)
+	tmp := new(BigInt)
 	tmp.QuoRem(a, b, &d.Coeff)
 	if NumDigits(tmp) > int64(c.Precision) {
 		d.Set(decimalNaN)
@@ -777,7 +776,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		ed.Add(tmp3, tmp2, tmp2)
 		tmp1.Set(tmp3)
 
-		eps := Decimal{Coeff: *bigOne, Exponent: -int32(p)}
+		eps := NewWithBigInt(bigOne, -int32(p))
 		for n := 1; ; n++ {
 
 			// tmp3 *= (x / (x+2))^2
@@ -791,7 +790,7 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 			ed.Add(tmp1, tmp1, tmp4)
 
-			if tmp4.Abs(tmp4).Cmp(&eps) <= 0 {
+			if tmp4.Abs(tmp4).Cmp(eps) <= 0 {
 				break
 			}
 		}
@@ -989,10 +988,10 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 }
 
 // integerPower sets d = x**y. d and x must not point to the same Decimal.
-func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
+func (c *Context) integerPower(d, x *Decimal, y *BigInt) (Condition, error) {
 	// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring.
 
-	b := new(big.Int).Set(y)
+	b := new(BigInt).Set(y)
 	neg := b.Sign() < 0
 	if neg {
 		b.Abs(b)
@@ -1274,7 +1273,7 @@ func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.
-func exp10(x int64) (exp *big.Int, err error) {
+func exp10(x int64) (exp *BigInt, err error) {
 	if x > MaxExponent || x < MinExponent {
 		return nil, errors.New(errExponentOutOfRangeStr)
 	}
