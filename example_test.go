@@ -17,7 +17,7 @@ package apd_test
 import (
 	"fmt"
 
-	"github.com/cockroachdb/apd/v2"
+	"github.com/cockroachdb/apd/v3"
 )
 
 // ExampleOverflow demonstrates how to detect or error on overflow.

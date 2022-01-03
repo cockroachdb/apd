@@ -73,7 +73,9 @@ func (l *loop) done(z *Decimal) (bool, error) {
 	//   p   = 3
 	//   z   = 0.001234 = 1234 * 10^-6
 	//   eps = 0.00001  = 10^(-3+4-6)
-	eps := Decimal{Coeff: *bigOne, Exponent: -l.precision + int32(z.NumDigits()) + z.Exponent}
+	var eps Decimal
+	eps.Coeff.Set(bigOne)
+	eps.Exponent = -l.precision + int32(z.NumDigits()) + z.Exponent
 	if l.delta.Cmp(&eps) <= 0 {
 		return true, nil
 	}
