@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/big"
 	"testing"
 	"unsafe"
 )
@@ -65,7 +64,7 @@ func TestNewWithBigInt(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			b, ok := new(big.Int).SetString(tc, 10)
+			b, ok := new(BigInt).SetString(tc, 10)
 			if !ok {
 				t.Fatal("bad bigint")
 			}
@@ -74,7 +73,7 @@ func TestNewWithBigInt(t *testing.T) {
 				t.Fatal("unexpected negative coeff")
 			}
 			// Verify that changing b doesn't change d.
-			b.Set(big.NewInt(1234))
+			b.Set(NewBigInt(1234))
 			if d.CmpTotal(expect) != 0 {
 				t.Fatalf("expected %s, got %s", expect, d)
 			}
@@ -85,15 +84,15 @@ func TestNewWithBigInt(t *testing.T) {
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal
-		a, b *big.Int
+		a, b *BigInt
 		s    int32
 	}{
-		{x: New(1, 0), y: New(100, -1), a: big.NewInt(10), b: big.NewInt(100), s: -1},
-		{x: New(1, 0), y: New(10, -1), a: big.NewInt(10), b: big.NewInt(10), s: -1},
-		{x: New(1, 0), y: New(10, 0), a: big.NewInt(1), b: big.NewInt(10), s: 0},
-		{x: New(1, 1), y: New(1, 0), a: big.NewInt(10), b: big.NewInt(1), s: 0},
-		{x: New(10, -2), y: New(1, -1), a: big.NewInt(10), b: big.NewInt(10), s: -2},
-		{x: New(1, -2), y: New(100, 1), a: big.NewInt(1), b: big.NewInt(100000), s: -2},
+		{x: New(1, 0), y: New(100, -1), a: NewBigInt(10), b: NewBigInt(100), s: -1},
+		{x: New(1, 0), y: New(10, -1), a: NewBigInt(10), b: NewBigInt(10), s: -1},
+		{x: New(1, 0), y: New(10, 0), a: NewBigInt(1), b: NewBigInt(10), s: 0},
+		{x: New(1, 1), y: New(1, 0), a: NewBigInt(10), b: NewBigInt(1), s: 0},
+		{x: New(10, -2), y: New(1, -1), a: NewBigInt(10), b: NewBigInt(10), s: -2},
+		{x: New(1, -2), y: New(100, 1), a: NewBigInt(1), b: NewBigInt(100000), s: -2},
 	}
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {
@@ -786,10 +785,14 @@ func TestReduce(t *testing.T) {
 }
 
 // TestSizeof is meant to catch changes that unexpectedly increase
-// the size of the Decimal struct.
+// the size of the BigInt, Decimal, and Context structs.
 func TestSizeof(t *testing.T) {
+	var b BigInt
+	if s := unsafe.Sizeof(b); s != 56 {
+		t.Errorf("sizeof(BigInt) changed: %d", s)
+	}
 	var d Decimal
-	if s := unsafe.Sizeof(d); s != 40 {
+	if s := unsafe.Sizeof(d); s != 64 {
 		t.Errorf("sizeof(Decimal) changed: %d", s)
 	}
 	var c Context
