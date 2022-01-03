@@ -44,49 +44,55 @@ func (e *ErrDecimal) Err() error {
 	return nil
 }
 
-func (e *ErrDecimal) op2(d, x *Decimal, f func(a, b *Decimal) (Condition, error)) *Decimal {
-	if e.Err() != nil {
-		return d
-	}
-	res, err := f(d, x)
+// update adjusts the ErrDecimal's state with the result of an operation.
+func (e *ErrDecimal) update(res Condition, err error) {
 	e.Flags |= res
 	e.err = err
-	return d
-}
-
-func (e *ErrDecimal) op3(d, x, y *Decimal, f func(a, b, c *Decimal) (Condition, error)) *Decimal {
-	if e.Err() != nil {
-		return d
-	}
-	res, err := f(d, x, y)
-	e.Flags |= res
-	e.err = err
-	return d
 }
 
 // Abs performs e.Ctx.Abs(d, x) and returns d.
 func (e *ErrDecimal) Abs(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Abs)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Abs(d, x))
+	return d
 }
 
 // Add performs e.Ctx.Add(d, x, y) and returns d.
 func (e *ErrDecimal) Add(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.Add)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Add(d, x, y))
+	return d
 }
 
 // Ceil performs e.Ctx.Ceil(d, x) and returns d.
 func (e *ErrDecimal) Ceil(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Ceil)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Ceil(d, x))
+	return d
 }
 
 // Exp performs e.Ctx.Exp(d, x) and returns d.
 func (e *ErrDecimal) Exp(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Exp)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Exp(d, x))
+	return d
 }
 
 // Floor performs e.Ctx.Floor(d, x) and returns d.
 func (e *ErrDecimal) Floor(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Floor)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Floor(d, x))
+	return d
 }
 
 // Int64 returns 0 if err is set. Otherwise returns d.Int64().
@@ -101,27 +107,47 @@ func (e *ErrDecimal) Int64(d *Decimal) int64 {
 
 // Ln performs e.Ctx.Ln(d, x) and returns d.
 func (e *ErrDecimal) Ln(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Ln)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Ln(d, x))
+	return d
 }
 
 // Log10 performs d.Log10(x) and returns d.
 func (e *ErrDecimal) Log10(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Log10)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Log10(d, x))
+	return d
 }
 
 // Mul performs e.Ctx.Mul(d, x, y) and returns d.
 func (e *ErrDecimal) Mul(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.Mul)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Mul(d, x, y))
+	return d
 }
 
 // Neg performs e.Ctx.Neg(d, x) and returns d.
 func (e *ErrDecimal) Neg(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Neg)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Neg(d, x))
+	return d
 }
 
 // Pow performs e.Ctx.Pow(d, x, y) and returns d.
 func (e *ErrDecimal) Pow(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.Pow)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Pow(d, x, y))
+	return d
 }
 
 // Quantize performs e.Ctx.Quantize(d, v, exp) and returns d.
@@ -129,20 +155,26 @@ func (e *ErrDecimal) Quantize(d, v *Decimal, exp int32) *Decimal {
 	if e.Err() != nil {
 		return d
 	}
-	res, err := e.Ctx.Quantize(d, v, exp)
-	e.Flags |= res
-	e.err = err
+	e.update(e.Ctx.Quantize(d, v, exp))
 	return d
 }
 
 // Quo performs e.Ctx.Quo(d, x, y) and returns d.
 func (e *ErrDecimal) Quo(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.Quo)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Quo(d, x, y))
+	return d
 }
 
 // QuoInteger performs e.Ctx.QuoInteger(d, x, y) and returns d.
 func (e *ErrDecimal) QuoInteger(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.QuoInteger)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.QuoInteger(d, x, y))
+	return d
 }
 
 // Reduce performs e.Ctx.Reduce(d, x) and returns the number of zeros removed
@@ -152,37 +184,60 @@ func (e *ErrDecimal) Reduce(d, x *Decimal) (int, *Decimal) {
 		return 0, d
 	}
 	n, res, err := e.Ctx.Reduce(d, x)
-	e.Flags |= res
-	e.err = err
+	e.update(res, err)
 	return n, d
 }
 
 // Rem performs e.Ctx.Rem(d, x, y) and returns d.
 func (e *ErrDecimal) Rem(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.Rem)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Rem(d, x, y))
+	return d
 }
 
 // Round performs e.Ctx.Round(d, x) and returns d.
 func (e *ErrDecimal) Round(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Round)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Round(d, x))
+	return d
 }
 
 // Sqrt performs e.Ctx.Sqrt(d, x) and returns d.
 func (e *ErrDecimal) Sqrt(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.Sqrt)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Sqrt(d, x))
+	return d
 }
 
 // Sub performs e.Ctx.Sub(d, x, y) and returns d.
 func (e *ErrDecimal) Sub(d, x, y *Decimal) *Decimal {
-	return e.op3(d, x, y, e.Ctx.Sub)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.Sub(d, x, y))
+	return d
 }
 
 // RoundToIntegralValue performs e.Ctx.RoundToIntegralValue(d, x) and returns d.
 func (e *ErrDecimal) RoundToIntegralValue(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.RoundToIntegralValue)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.RoundToIntegralValue(d, x))
+	return d
 }
 
 // RoundToIntegralExact performs e.Ctx.RoundToIntegralExact(d, x) and returns d.
 func (e *ErrDecimal) RoundToIntegralExact(d, x *Decimal) *Decimal {
-	return e.op2(d, x, e.Ctx.RoundToIntegralExact)
+	if e.Err() != nil {
+		return d
+	}
+	e.update(e.Ctx.RoundToIntegralExact(d, x))
+	return d
 }
