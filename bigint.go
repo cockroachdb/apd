@@ -17,6 +17,7 @@ package apd
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
 	"math/rand"
 	"unsafe"
 )
@@ -69,6 +70,11 @@ func NewBigInt(x int64) *BigInt {
 // BigInt is negative ((big.Int).Sign() < 0) but the absolute value is still
 // small enough to represent in the _inline array.
 var negSentinel = new(big.Int)
+
+// isInline returns whether the BigInt stores its value in its _inline array.
+func (z *BigInt) isInline() bool {
+	return z._inner == nil || z._inner == negSentinel
+}
 
 // The memory representation of big.Int. Used for unsafe modification below.
 type intStruct struct {
@@ -193,12 +199,104 @@ func (z *BigInt) updateInner(src *big.Int) {
 	}
 }
 
+// innerAsUint returns the BigInt's current absolute value as a uint and a flag
+// indicating whether the value is negative. If the value is not stored inline
+// or if it can not fit in a uint, false is returned.
+//
+// NOTE: this was carefully written to permit function inlining. Modify with
+// care.
+func (z *BigInt) innerAsUint() (val uint, neg bool, ok bool) {
+	if !z.isInline() {
+		// The value is not stored inline.
+		return 0, false, false
+	}
+	for i := 1; i < len(z._inline); i++ {
+		if z._inline[i] != 0 {
+			// The value can not fit in a uint.
+			return 0, false, false
+		}
+	}
+
+	val = uint(z._inline[0])
+	neg = z._inner == negSentinel
+	return val, neg, true
+}
+
+// updateInnerFromUint updates the BigInt's current value with the provided
+// absolute value and sign.
+//
+// NOTE: this was carefully written to permit function inlining. Modify with
+// care.
+func (z *BigInt) updateInnerFromUint(val uint, neg bool) {
+	// Set the inline value, making sure to clear out all other words.
+	z._inline[0] = big.Word(val)
+	for i := 1; i < len(z._inline); i++ {
+		z._inline[i] = 0
+	}
+
+	// Set or unset the negative sentinel.
+	if neg {
+		z._inner = negSentinel
+	} else {
+		z._inner = nil
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//                    inline arithmetic for small values                     //
+///////////////////////////////////////////////////////////////////////////////
+
+func addInline(xVal, yVal uint, xNeg, yNeg bool) (zVal uint, zNeg, ok bool) {
+	if xNeg == yNeg {
+		sum, carry := bits.Add(xVal, yVal, 0)
+		if carry != 0 { // overflow
+			return 0, false, false
+		}
+		return sum, xNeg, true
+	}
+
+	diff, borrow := bits.Sub(xVal, yVal, 0)
+	if borrow != 0 { // underflow
+		xNeg = !xNeg
+		diff = yVal - xVal
+	}
+	if diff == 0 {
+		xNeg = false
+	}
+	return diff, xNeg, true
+}
+
+func mulInline(xVal, yVal uint, xNeg, yNeg bool) (zVal uint, zNeg, ok bool) {
+	hi, lo := bits.Mul(xVal, yVal)
+	if hi != 0 { // overflow
+		return 0, false, false
+	}
+	neg := xNeg != yNeg
+	return lo, neg, true
+}
+
+func quoInline(xVal, yVal uint, xNeg, yNeg bool) (quoVal uint, quoNeg, ok bool) {
+	quo := xVal / yVal
+	neg := xNeg != yNeg
+	return quo, neg, true
+}
+
+func remInline(xVal, yVal uint, xNeg, yNeg bool) (remVal uint, remNeg, ok bool) {
+	rem := xVal % yVal
+	return rem, xNeg, true
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                        big.Int API wrapper methods                        //
 ///////////////////////////////////////////////////////////////////////////////
 
 // Abs calls (big.Int).Abs.
 func (z *BigInt) Abs(x *BigInt) *BigInt {
+	if x.isInline() {
+		z._inline = x._inline
+		z._inner = nil // !negSentinel
+		return z
+	}
 	var tmp1, tmp2 big.Int
 	zi := z.inner(&tmp1)
 	zi.Abs(x.inner(&tmp2))
@@ -208,6 +306,14 @@ func (z *BigInt) Abs(x *BigInt) *BigInt {
 
 // Add calls (big.Int).Add.
 func (z *BigInt) Add(x, y *BigInt) *BigInt {
+	if xVal, xNeg, ok := x.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			if zVal, zNeg, ok := addInline(xVal, yVal, xNeg, yNeg); ok {
+				z.updateInnerFromUint(zVal, zNeg)
+				return z
+			}
+		}
+	}
 	var tmp1, tmp2, tmp3 big.Int
 	zi := z.inner(&tmp1)
 	zi.Add(x.inner(&tmp2), y.inner(&tmp3))
@@ -250,12 +356,25 @@ func (z *BigInt) Binomial(n, k int64) *BigInt {
 
 // Bit calls (big.Int).Bit.
 func (z *BigInt) Bit(i int) uint {
+	if i == 0 && z.isInline() {
+		// Optimization for common case: odd/even test of z.
+		return uint(z._inline[0] & 1)
+	}
 	var tmp1 big.Int
 	return z.inner(&tmp1).Bit(i)
 }
 
 // BitLen calls (big.Int).BitLen.
 func (z *BigInt) BitLen() int {
+	if z.isInline() {
+		// Find largest non-zero inline word.
+		for i := len(z._inline) - 1; i >= 0; i-- {
+			if z._inline[i] != 0 {
+				return i*bits.UintSize + bits.Len(uint(z._inline[i]))
+			}
+		}
+		return 0
+	}
 	var tmp1 big.Int
 	return z.inner(&tmp1).BitLen()
 }
@@ -274,12 +393,44 @@ func (z *BigInt) Bytes() []byte {
 
 // Cmp calls (big.Int).Cmp.
 func (z *BigInt) Cmp(y *BigInt) (r int) {
+	if zVal, zNeg, ok := z.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			switch {
+			case zNeg == yNeg:
+				switch {
+				case zVal < yVal:
+					r = -1
+				case zVal > yVal:
+					r = 1
+				}
+				if zNeg {
+					r = -r
+				}
+			case zNeg:
+				r = -1
+			default:
+				r = 1
+			}
+			return r
+		}
+	}
 	var tmp1, tmp2 big.Int
 	return z.inner(&tmp1).Cmp(y.inner(&tmp2))
 }
 
 // CmpAbs calls (big.Int).CmpAbs.
-func (z *BigInt) CmpAbs(y *BigInt) int {
+func (z *BigInt) CmpAbs(y *BigInt) (r int) {
+	if zVal, _, ok := z.innerAsUint(); ok {
+		if yVal, _, ok := y.innerAsUint(); ok {
+			switch {
+			case zVal < yVal:
+				r = -1
+			case zVal > yVal:
+				r = 1
+			}
+			return r
+		}
+	}
 	var tmp1, tmp2 big.Int
 	return z.inner(&tmp1).CmpAbs(y.inner(&tmp2))
 }
@@ -441,6 +592,14 @@ func (z *BigInt) ModSqrt(x, p *BigInt) *BigInt {
 
 // Mul calls (big.Int).Mul.
 func (z *BigInt) Mul(x, y *BigInt) *BigInt {
+	if xVal, xNeg, ok := x.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			if zVal, zNeg, ok := mulInline(xVal, yVal, xNeg, yNeg); ok {
+				z.updateInnerFromUint(zVal, zNeg)
+				return z
+			}
+		}
+	}
 	var tmp1, tmp2, tmp3 big.Int
 	zi := z.inner(&tmp1)
 	zi.Mul(x.inner(&tmp2), y.inner(&tmp3))
@@ -459,6 +618,15 @@ func (z *BigInt) MulRange(x, y int64) *BigInt {
 
 // Neg calls (big.Int).Neg.
 func (z *BigInt) Neg(x *BigInt) *BigInt {
+	if x.isInline() {
+		z._inline = x._inline
+		if x._inner == negSentinel {
+			z._inner = nil
+		} else {
+			z._inner = negSentinel
+		}
+		return z
+	}
 	var tmp1, tmp2 big.Int
 	zi := z.inner(&tmp1)
 	zi.Neg(x.inner(&tmp2))
@@ -492,6 +660,14 @@ func (z *BigInt) ProbablyPrime(n int) bool {
 
 // Quo calls (big.Int).Quo.
 func (z *BigInt) Quo(x, y *BigInt) *BigInt {
+	if xVal, xNeg, ok := x.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			if quoVal, quoNeg, ok := quoInline(xVal, yVal, xNeg, yNeg); ok {
+				z.updateInnerFromUint(quoVal, quoNeg)
+				return z
+			}
+		}
+	}
 	var tmp1, tmp2, tmp3 big.Int
 	zi := z.inner(&tmp1)
 	zi.Quo(x.inner(&tmp2), y.inner(&tmp3))
@@ -501,6 +677,17 @@ func (z *BigInt) Quo(x, y *BigInt) *BigInt {
 
 // QuoRem calls (big.Int).QuoRem.
 func (z *BigInt) QuoRem(x, y, r *BigInt) (*BigInt, *BigInt) {
+	if xVal, xNeg, ok := x.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			if quoVal, quoNeg, ok := quoInline(xVal, yVal, xNeg, yNeg); ok {
+				if remVal, remNeg, ok := remInline(xVal, yVal, xNeg, yNeg); ok {
+					z.updateInnerFromUint(quoVal, quoNeg)
+					r.updateInnerFromUint(remVal, remNeg)
+					return z, r
+				}
+			}
+		}
+	}
 	var tmp1, tmp2, tmp3, tmp4 big.Int
 	zi := z.inner(&tmp1)
 	ri := r.inner(&tmp2)
@@ -521,6 +708,14 @@ func (z *BigInt) Rand(rnd *rand.Rand, n *BigInt) *BigInt {
 
 // Rem calls (big.Int).Rem.
 func (z *BigInt) Rem(x, y *BigInt) *BigInt {
+	if xVal, xNeg, ok := x.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			if remVal, remNeg, ok := remInline(xVal, yVal, xNeg, yNeg); ok {
+				z.updateInnerFromUint(remVal, remNeg)
+				return z
+			}
+		}
+	}
 	var tmp1, tmp2, tmp3 big.Int
 	zi := z.inner(&tmp1)
 	zi.Rem(x.inner(&tmp2), y.inner(&tmp3))
@@ -550,6 +745,10 @@ func (z *BigInt) Scan(s fmt.ScanState, ch rune) error {
 
 // Set calls (big.Int).Set.
 func (z *BigInt) Set(x *BigInt) *BigInt {
+	if x.isInline() {
+		*z = *x
+		return z
+	}
 	var tmp1, tmp2 big.Int
 	zi := z.inner(&tmp1)
 	zi.Set(x.inner(&tmp2))
@@ -583,6 +782,15 @@ func (z *BigInt) SetBytes(buf []byte) *BigInt {
 
 // SetInt64 calls (big.Int).SetInt64.
 func (z *BigInt) SetInt64(x int64) *BigInt {
+	if bits.UintSize == 64 {
+		neg := false
+		if x < 0 {
+			neg = true
+			x = -x
+		}
+		z.updateInnerFromUint(uint(x), neg)
+		return z
+	}
 	var tmp1 big.Int
 	zi := z.inner(&tmp1)
 	zi.SetInt64(x)
@@ -603,6 +811,10 @@ func (z *BigInt) SetString(s string, base int) (*BigInt, bool) {
 
 // SetUint64 calls (big.Int).SetUint64.
 func (z *BigInt) SetUint64(x uint64) *BigInt {
+	if bits.UintSize == 64 {
+		z.updateInnerFromUint(uint(x), false)
+		return z
+	}
 	var tmp1 big.Int
 	zi := z.inner(&tmp1)
 	zi.SetUint64(x)
@@ -612,8 +824,15 @@ func (z *BigInt) SetUint64(x uint64) *BigInt {
 
 // Sign calls (big.Int).Sign.
 func (z *BigInt) Sign() int {
-	var tmp1 big.Int
-	return z.inner(&tmp1).Sign()
+	if z._inner == nil {
+		if z._inline[0] == 0 {
+			return 0
+		}
+		return 1
+	} else if z._inner == negSentinel {
+		return -1
+	}
+	return z._inner.Sign()
 }
 
 // Sqrt calls (big.Int).Sqrt.
@@ -633,6 +852,14 @@ func (z *BigInt) String() string {
 
 // Sub calls (big.Int).Sub.
 func (z *BigInt) Sub(x, y *BigInt) *BigInt {
+	if xVal, xNeg, ok := x.innerAsUint(); ok {
+		if yVal, yNeg, ok := y.innerAsUint(); ok {
+			if zVal, zNeg, ok := addInline(xVal, yVal, xNeg, !yNeg); ok {
+				z.updateInnerFromUint(zVal, zNeg)
+				return z
+			}
+		}
+	}
 	var tmp1, tmp2, tmp3 big.Int
 	zi := z.inner(&tmp1)
 	zi.Sub(x.inner(&tmp2), y.inner(&tmp3))
