@@ -12,7 +12,9 @@ apd is an arbitrary-precision decimal package for Go.
 - **Good performance**. Operations will either be fast enough or will produce an error if they will be slow. This prevents edge-case operations from consuming lots of CPU or memory.
 - **Condition flags and traps**. All operations will report whether their result is exact, is rounded, is over- or under-flowed, is [subnormal](https://en.wikipedia.org/wiki/Denormal_number), or is some other condition. `apd` supports traps which will trigger an error on any of these conditions. This makes it possible to guarantee exactness in computations, if needed.
 
-`apd` has three main types. The first is [`BigInt`](https://godoc.org/github.com/cockroachdb/apd#BigInt) which is a wrapper around `big.Int` that exposes an identical API while reducing memory allocations. `BigInt` does so by using an inline array to back the `big.Int`'s variable-length value slice when the integer's absolute value is sufficiently small. 
+`apd` has three main types.
+
+The first is [`BigInt`](https://godoc.org/github.com/cockroachdb/apd#BigInt) which is a wrapper around `big.Int` that exposes an identical API while reducing memory allocations. `BigInt` does so by using an inline array to back the `big.Int`'s variable-length value when the integer's absolute value is sufficiently small. `BigInt` also contains fast-paths that allow it to perform basic arithmetic directly on this inline array, only falling back to `big.Int` when the arithmetic gets complex or takes place on large values.
 
 The second is [`Decimal`](https://godoc.org/github.com/cockroachdb/apd#Decimal) which holds the values of decimals. It is simple and uses a `BigInt` with an exponent to describe values. Most operations on `Decimal`s can’t produce errors as they work directly on the underlying `big.Int`. Notably, however, there are no arithmetic operations on `Decimal`s.
 
