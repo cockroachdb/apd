@@ -294,6 +294,9 @@ func mulInline(xVal, yVal uint, xNeg, yNeg bool) (zVal uint, zNeg, ok bool) {
 
 //gcassert:inline
 func quoInline(xVal, yVal uint, xNeg, yNeg bool) (quoVal uint, quoNeg, ok bool) {
+	if yVal == 0 { // divide by 0
+		return 0, false, false
+	}
 	quo := xVal / yVal
 	neg := xNeg != yNeg
 	return quo, neg, true
@@ -301,6 +304,9 @@ func quoInline(xVal, yVal uint, xNeg, yNeg bool) (quoVal uint, quoNeg, ok bool) 
 
 //gcassert:inline
 func remInline(xVal, yVal uint, xNeg, yNeg bool) (remVal uint, remNeg, ok bool) {
+	if yVal == 0 { // divide by 0
+		return 0, false, false
+	}
 	rem := xVal % yVal
 	return rem, xNeg, true
 }
@@ -361,7 +367,7 @@ func (z *BigInt) AndNot(x, y *BigInt) *BigInt {
 // Append calls (big.Int).Append.
 func (z *BigInt) Append(buf []byte, base int) []byte {
 	var tmp1 big.Int
-	return z.inner(&tmp1).Append(buf, base)
+	return z.innerOrNil(&tmp1).Append(buf, base)
 }
 
 // Binomial calls (big.Int).Binomial.
@@ -770,10 +776,10 @@ func (z *BigInt) Set(x *BigInt) *BigInt {
 }
 
 // SetBit calls (big.Int).SetBit.
-func (z *BigInt) SetBit(x *BigInt, i int, v uint) *BigInt {
+func (z *BigInt) SetBit(x *BigInt, i int, b uint) *BigInt {
 	var tmp1, tmp2 big.Int
 	zi := z.inner(&tmp1)
-	zi.SetBit(x.inner(&tmp2), i, v)
+	zi.SetBit(x.inner(&tmp2), i, b)
 	z.updateInner(zi)
 	return z
 }
@@ -863,7 +869,7 @@ func (z *BigInt) Sqrt(x *BigInt) *BigInt {
 // String calls (big.Int).String.
 func (z *BigInt) String() string {
 	var tmp1 big.Int
-	return z.inner(&tmp1).String()
+	return z.innerOrNil(&tmp1).String()
 }
 
 // Sub calls (big.Int).Sub.
@@ -886,7 +892,7 @@ func (z *BigInt) Sub(x, y *BigInt) *BigInt {
 // Text calls (big.Int).Text.
 func (z *BigInt) Text(base int) string {
 	var tmp1 big.Int
-	return z.inner(&tmp1).Text(base)
+	return z.innerOrNil(&tmp1).Text(base)
 }
 
 // TrailingZeroBits calls (big.Int).TrailingZeroBits.

@@ -17,15 +17,28 @@
 
 package apd
 
-import "testing"
+import (
+	"testing"
+	"testing/quick"
+)
+
+// TestBigIntMatchesMathBigInt15 is like TestBigIntMatchesMathBigInt, but for
+// parts of the shared BigInt/big.Int API that were introduced in go1.15.
+func TestBigIntMatchesMathBigInt15(t *testing.T) {
+	t.Run("FillBytes", func(t *testing.T) {
+		apd := func(z number) []byte {
+			return z.toApd(t).FillBytes(make([]byte, len(z)))
+		}
+		math := func(z number) []byte {
+			return z.toMath(t).FillBytes(make([]byte, len(z)))
+		}
+		require(t, quick.CheckEqual(apd, math, nil))
+	})
+}
 
 //////////////////////////////////////////////////////////////////////////////////
 // The following tests were copied from the standard library's math/big package //
 //////////////////////////////////////////////////////////////////////////////////
-
-//
-// Tests from src/math/big/int_test.go
-//
 
 func TestBigIntFillBytes(t *testing.T) {
 	checkResult := func(t *testing.T, buf []byte, want *BigInt) {
