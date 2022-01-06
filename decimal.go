@@ -17,6 +17,7 @@ package apd
 import (
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"database/sql/driver"
 	"github.com/pkg/errors"
@@ -735,6 +736,13 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 	}
 	d.Exponent += int32(nd)
 	return d, nd
+}
+
+const decimalSize = unsafe.Sizeof(Decimal{})
+
+// Size returns the total memory footprint of d in bytes.
+func (d *Decimal) Size() uintptr {
+	return decimalSize - bigIntSize + d.Coeff.Size()
 }
 
 // Value implements the database/sql/driver.Valuer interface. It converts d to a

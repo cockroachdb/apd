@@ -801,6 +801,41 @@ func TestSizeof(t *testing.T) {
 	}
 }
 
+// TestSize tests the Size method on BigInt and Decimal. Unlike Sizeof, which
+// returns the shallow size of the structs, the Size method reports the total
+// memory footprint of each struct and all referenced objects.
+func TestSize(t *testing.T) {
+	var d Decimal
+	if e, s := uintptr(32), d.Size(); e != s {
+		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
+	}
+	if e, s := uintptr(24), d.Coeff.Size(); e != s {
+		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
+	}
+	// Set to an inlinable value.
+	d.SetInt64(1234)
+	if e, s := uintptr(32), d.Size(); e != s {
+		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
+	}
+	if e, s := uintptr(24), d.Coeff.Size(); e != s {
+		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
+	}
+	// Set to a non-inlinable value.
+	if _, _, err := d.SetString("123456789123456789123456789.123456789123456789"); err != nil {
+		t.Fatal(err)
+	}
+	if d.Coeff.isInline() {
+		// Sanity-check, in case inlineWords changes.
+		t.Fatal("BigInt inlined large value. Did inlineWords change?")
+	}
+	if e, s := uintptr(120), d.Size(); e != s {
+		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
+	}
+	if e, s := uintptr(112), d.Coeff.Size(); e != s {
+		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
+	}
+}
+
 func TestJSONEncoding(t *testing.T) {
 	var encodingTests = []string{
 		"0",
