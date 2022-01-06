@@ -1,0 +1,49 @@
+name: Go
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go:
+          - '1.11'
+          - '1.12'
+          - '1.13'
+          - '1.14'
+          - '1.15'
+          - '1.16'
+          - '1.17'
+          - '1.18'
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '${{ matrix.go }}'
+
+      - name: 'Build with ${{ matrix.go }}'
+        run: go build -v ./...
+
+      - name: 'Test with ${{ matrix.go }}'
+        run: go test -v ./...
+
+      - name: 'Lint with ${{ matrix.go }}'
+        run: |
+          go install golang.org/x/lint/golint
+          golint ./...
+
+      - name: 'Staticcheck with ${{ matrix.go }}'
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck
+          staticcheck ./...
