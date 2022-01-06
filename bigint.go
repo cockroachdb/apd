@@ -246,6 +246,20 @@ func (z *BigInt) updateInnerFromUint(val uint, neg bool) {
 	}
 }
 
+const (
+	bigIntSize     = unsafe.Sizeof(BigInt{})
+	mathBigIntSize = unsafe.Sizeof(big.Int{})
+	mathWordSize   = unsafe.Sizeof(big.Word(0))
+)
+
+// Size returns the total memory footprint of z in bytes.
+func (z *BigInt) Size() uintptr {
+	if z.isInline() {
+		return bigIntSize
+	}
+	return bigIntSize + mathBigIntSize + uintptr(cap(z._inner.Bits()))*mathWordSize
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                    inline arithmetic for small values                     //
 ///////////////////////////////////////////////////////////////////////////////
