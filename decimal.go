@@ -246,19 +246,19 @@ func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
 // Int64 returns the int64 representation of x. If x cannot be represented in an int64, an error is returned.
 func (d *Decimal) Int64() (int64, error) {
 	if d.Form != Finite {
-		return 0, errors.Errorf("%s is not finite", d)
+		return 0, errors.Errorf("%s is not finite", d.String())
 	}
 	integ, frac := new(Decimal), new(Decimal)
 	d.Modf(integ, frac)
 	if !frac.IsZero() {
-		return 0, errors.Errorf("%s: has fractional part", d)
+		return 0, errors.Errorf("%s: has fractional part", d.String())
 	}
 	var ed ErrDecimal
 	if integ.Cmp(New(math.MaxInt64, 0)) > 0 {
-		return 0, errors.Errorf("%s: greater than max int64", d)
+		return 0, errors.Errorf("%s: greater than max int64", d.String())
 	}
 	if integ.Cmp(New(math.MinInt64, 0)) < 0 {
-		return 0, errors.Errorf("%s: less than min int64", d)
+		return 0, errors.Errorf("%s: less than min int64", d.String())
 	}
 	if err := ed.Err(); err != nil {
 		return 0, err
