@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/big"
 	"testing"
 	"unsafe"
 )
@@ -65,7 +64,7 @@ func TestNewWithBigInt(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			b, ok := new(big.Int).SetString(tc, 10)
+			b, ok := new(BigInt).SetString(tc, 10)
 			if !ok {
 				t.Fatal("bad bigint")
 			}
@@ -74,7 +73,7 @@ func TestNewWithBigInt(t *testing.T) {
 				t.Fatal("unexpected negative coeff")
 			}
 			// Verify that changing b doesn't change d.
-			b.Set(big.NewInt(1234))
+			b.Set(NewBigInt(1234))
 			if d.CmpTotal(expect) != 0 {
 				t.Fatalf("expected %s, got %s", expect, d)
 			}
@@ -85,19 +84,19 @@ func TestNewWithBigInt(t *testing.T) {
 func TestUpscale(t *testing.T) {
 	tests := []struct {
 		x, y *Decimal
-		a, b *big.Int
+		a, b *BigInt
 		s    int32
 	}{
-		{x: New(1, 0), y: New(100, -1), a: big.NewInt(10), b: big.NewInt(100), s: -1},
-		{x: New(1, 0), y: New(10, -1), a: big.NewInt(10), b: big.NewInt(10), s: -1},
-		{x: New(1, 0), y: New(10, 0), a: big.NewInt(1), b: big.NewInt(10), s: 0},
-		{x: New(1, 1), y: New(1, 0), a: big.NewInt(10), b: big.NewInt(1), s: 0},
-		{x: New(10, -2), y: New(1, -1), a: big.NewInt(10), b: big.NewInt(10), s: -2},
-		{x: New(1, -2), y: New(100, 1), a: big.NewInt(1), b: big.NewInt(100000), s: -2},
+		{x: New(1, 0), y: New(100, -1), a: NewBigInt(10), b: NewBigInt(100), s: -1},
+		{x: New(1, 0), y: New(10, -1), a: NewBigInt(10), b: NewBigInt(10), s: -1},
+		{x: New(1, 0), y: New(10, 0), a: NewBigInt(1), b: NewBigInt(10), s: 0},
+		{x: New(1, 1), y: New(1, 0), a: NewBigInt(10), b: NewBigInt(1), s: 0},
+		{x: New(10, -2), y: New(1, -1), a: NewBigInt(10), b: NewBigInt(10), s: -2},
+		{x: New(1, -2), y: New(100, 1), a: NewBigInt(1), b: NewBigInt(100000), s: -2},
 	}
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s, %s", tc.x, tc.y), func(t *testing.T) {
-			a, b, s, err := upscale(tc.x, tc.y)
+			a, b, s, err := upscale(tc.x, tc.y, new(BigInt))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -786,15 +785,54 @@ func TestReduce(t *testing.T) {
 }
 
 // TestSizeof is meant to catch changes that unexpectedly increase
-// the size of the Decimal struct.
+// the size of the BigInt, Decimal, and Context structs.
 func TestSizeof(t *testing.T) {
+	var b BigInt
+	if s := unsafe.Sizeof(b); s != 24 {
+		t.Errorf("sizeof(BigInt) changed: %d", s)
+	}
 	var d Decimal
-	if s := unsafe.Sizeof(d); s != 48 {
+	if s := unsafe.Sizeof(d); s != 32 {
 		t.Errorf("sizeof(Decimal) changed: %d", s)
 	}
 	var c Context
 	if s := unsafe.Sizeof(c); s != 32 {
 		t.Errorf("sizeof(Context) changed: %d", s)
+	}
+}
+
+// TestSize tests the Size method on BigInt and Decimal. Unlike Sizeof, which
+// returns the shallow size of the structs, the Size method reports the total
+// memory footprint of each struct and all referenced objects.
+func TestSize(t *testing.T) {
+	var d Decimal
+	if e, s := uintptr(32), d.Size(); e != s {
+		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
+	}
+	if e, s := uintptr(24), d.Coeff.Size(); e != s {
+		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
+	}
+	// Set to an inlinable value.
+	d.SetInt64(1234)
+	if e, s := uintptr(32), d.Size(); e != s {
+		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
+	}
+	if e, s := uintptr(24), d.Coeff.Size(); e != s {
+		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
+	}
+	// Set to a non-inlinable value.
+	if _, _, err := d.SetString("123456789123456789123456789.123456789123456789"); err != nil {
+		t.Fatal(err)
+	}
+	if d.Coeff.isInline() {
+		// Sanity-check, in case inlineWords changes.
+		t.Fatal("BigInt inlined large value. Did inlineWords change?")
+	}
+	if e, s := uintptr(120), d.Size(); e != s {
+		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
+	}
+	if e, s := uintptr(112), d.Coeff.Size(); e != s {
+		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
 	}
 }
 

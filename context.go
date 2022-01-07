@@ -16,7 +16,6 @@ package apd
 
 import (
 	"math"
-	"math/big"
 
 	"github.com/pkg/errors"
 )
@@ -42,7 +41,7 @@ type Context struct {
 	Traps Condition
 	// Rounding specifies the Rounder to use during rounding. RoundHalfUp is used if
 	// empty or not present in Roundings.
-	Rounding string
+	Rounding Rounder
 }
 
 const (
@@ -73,9 +72,10 @@ var BaseContext = Context{
 
 // WithPrecision returns a copy of c but with the specified precision.
 func (c *Context) WithPrecision(p uint32) *Context {
-	r := *c
+	r := new(Context)
+	*r = *c
 	r.Precision = p
-	return &r
+	return r
 }
 
 // goError converts flags into an error based on c.Traps.
@@ -136,7 +136,8 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 		}
 		return 0, nil
 	}
-	a, b, s, err := upscale(x, y)
+	var tmp BigInt
+	a, b, s, err := upscale(x, y, &tmp)
 	if err != nil {
 		return 0, errors.Wrap(err, "add")
 	}
@@ -283,12 +284,13 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// An integer variable, adjust, is initialized to 0.
 	var adjust int64
 	// The result coefficient is initialized to 0.
-	quo := new(Decimal)
+	var quo Decimal
 	var res Condition
 	var diff int64
 	if !x.IsZero() {
-		dividend := new(big.Int).Abs(&x.Coeff)
-		divisor := new(big.Int).Abs(&y.Coeff)
+		var dividend, divisor BigInt
+		dividend.Abs(&x.Coeff)
+		divisor.Abs(&y.Coeff)
 
 		// The operand coefficients are adjusted so that the coefficient of the
 		// dividend is greater than or equal to the coefficient of the divisor and
@@ -296,20 +298,21 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 
 		// While the coefficient of the dividend is less than the coefficient of
 		// the divisor it is multiplied by 10 and adjust is incremented by 1.
-		for dividend.Cmp(divisor) < 0 {
-			dividend.Mul(dividend, bigTen)
+		for dividend.Cmp(&divisor) < 0 {
+			dividend.Mul(&dividend, bigTen)
 			adjust++
 		}
 
 		// While the coefficient of the dividend is greater than or equal to ten
 		// times the coefficient of the divisor the coefficient of the divisor is
 		// multiplied by 10 and adjust is decremented by 1.
-		for tmp := new(big.Int); ; {
-			tmp.Mul(divisor, bigTen)
-			if dividend.Cmp(tmp) < 0 {
+		var tmp BigInt
+		for {
+			tmp.Mul(&divisor, bigTen)
+			if dividend.Cmp(&tmp) < 0 {
 				break
 			}
-			divisor.Set(tmp)
+			divisor.Set(&tmp)
 			adjust--
 		}
 
@@ -320,8 +323,8 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			// While the coefficient of the divisor is smaller than or equal to the
 			// coefficient of the dividend the former is subtracted from the latter and
 			// the coefficient of the result is incremented by 1.
-			for divisor.Cmp(dividend) <= 0 {
-				dividend.Sub(dividend, divisor)
+			for divisor.Cmp(&dividend) <= 0 {
+				dividend.Sub(&dividend, &divisor)
 				quo.Coeff.Add(&quo.Coeff, bigOne)
 			}
 
@@ -335,7 +338,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			// Otherwise, the coefficients of the result and the dividend are multiplied
 			// by 10 and adjust is incremented by 1.
 			quo.Coeff.Mul(&quo.Coeff, bigTen)
-			dividend.Mul(dividend, bigTen)
+			dividend.Mul(&dividend, bigTen)
 			adjust++
 		}
 
@@ -346,10 +349,9 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		// taken into account for rounding.
 		if dividend.Sign() != 0 && adj >= int64(c.MinExponent) {
 			res |= Inexact | Rounded
-			dividend.Mul(dividend, bigTwo)
-			half := dividend.Cmp(divisor)
-			rounding := c.rounding()
-			if rounding(&quo.Coeff, quo.Negative, half) {
+			dividend.Mul(&dividend, bigTwo)
+			half := dividend.Cmp(&divisor)
+			if c.Rounding.ShouldAddOne(&quo.Coeff, quo.Negative, half) {
 				roundAddOne(&quo.Coeff, &diff)
 			}
 		}
@@ -360,7 +362,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// the coefficient calculation from the original exponent of the dividend.
 	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 	quo.Negative = neg
-	d.Set(quo)
+	d.Set(&quo)
 	return c.goError(res)
 }
 
@@ -375,7 +377,8 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	neg := x.Negative != y.Negative
 	var res Condition
 
-	a, b, _, err := upscale(x, y)
+	var tmp BigInt
+	a, b, _, err := upscale(x, y, &tmp)
 	if err != nil {
 		return 0, errors.Wrap(err, "QuoInteger")
 	}
@@ -416,13 +419,14 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 		d.Set(decimalNaN)
 		return c.goError(res)
 	}
-	a, b, s, err := upscale(x, y)
+	var tmp1 BigInt
+	a, b, s, err := upscale(x, y, &tmp1)
 	if err != nil {
 		return 0, errors.Wrap(err, "Rem")
 	}
-	tmp := new(big.Int)
-	tmp.QuoRem(a, b, &d.Coeff)
-	if NumDigits(tmp) > int64(c.Precision) {
+	var tmp2 BigInt
+	tmp2.QuoRem(a, b, &d.Coeff)
+	if NumDigits(&tmp2) > int64(c.Precision) {
 		d.Set(decimalNaN)
 		return c.goError(DivisionImpossible)
 	}
@@ -485,7 +489,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		workp = 7
 	}
 
-	f := new(Decimal).Set(x)
+	var f Decimal
+	f.Set(x)
 	nd := x.NumDigits()
 	e := nd + int64(x.Exponent)
 	f.Exponent = int32(-nd)
@@ -494,23 +499,23 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	ed := MakeErrDecimal(nc)
 	// Set approx to the first guess, based on whether e (the exponent part of x)
 	// is odd or even.
-	approx := new(Decimal)
+	var approx Decimal
 	if e%2 == 0 {
 		approx.SetFinite(819, -3)
-		ed.Mul(approx, approx, f)
-		ed.Add(approx, approx, New(259, -3))
+		ed.Mul(&approx, &approx, &f)
+		ed.Add(&approx, &approx, New(259, -3))
 	} else {
 		f.Exponent--
 		e++
 		approx.SetFinite(259, -2)
-		ed.Mul(approx, approx, f)
-		ed.Add(approx, approx, New(819, -4))
+		ed.Mul(&approx, &approx, &f)
+		ed.Add(&approx, &approx, New(819, -4))
 	}
 
 	// Now we repeatedly improve approx. Our precision improves quadratically,
 	// which we keep track of in p.
 	p := uint32(3)
-	tmp := new(Decimal)
+	var tmp Decimal
 
 	// The algorithm in the paper says to use c.Precision + 2. decNumber uses
 	// workp + 2. But we use workp + 5 to make the tests pass. This means it is
@@ -522,11 +527,11 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		}
 		nc.Precision = p
 		// tmp = f / approx
-		ed.Quo(tmp, f, approx)
+		ed.Quo(&tmp, &f, &approx)
 		// tmp = approx + f / approx
-		ed.Add(tmp, tmp, approx)
+		ed.Add(&tmp, &tmp, &approx)
 		// approx = 0.5 * (approx + f / approx)
-		ed.Mul(approx, tmp, decimalHalf)
+		ed.Mul(&approx, &tmp, decimalHalf)
 	}
 
 	// At this point the paper says: "approx is now within 1 ulp of the properly
@@ -542,7 +547,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 		return 0, err
 	}
 
-	d.Set(approx)
+	d.Set(&approx)
 	d.Exponent += int32(e / 2)
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
@@ -561,12 +566,10 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		return res, err
 	}
 
+	var ax, z Decimal
+	ax.Abs(x)
+	z.Set(&ax)
 	neg := x.Negative
-	ax := x
-	if x.Negative {
-		ax = new(Decimal).Abs(x)
-	}
-	z := new(Decimal).Set(ax)
 	nc := BaseContext.WithPrecision(c.Precision*2 + 2)
 	ed := MakeErrDecimal(nc)
 	exp8 := 0
@@ -580,46 +583,47 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	// x = z * 8^exp8 will hold.
 	for z.Cmp(decimalOneEighth) < 0 {
 		exp8--
-		ed.Mul(z, z, decimalEight)
+		ed.Mul(&z, &z, decimalEight)
 	}
 
 	for z.Cmp(decimalOne) > 0 {
 		exp8++
-		ed.Mul(z, z, decimalOneEighth)
+		ed.Mul(&z, &z, decimalOneEighth)
 	}
 
 	// Use this polynomial to approximate the cube root between 0.125 and 1.
 	// z = (-0.46946116 * z + 1.072302) * z + 0.3812513
 	// It will serve as an initial estimate, hence the precision of this
 	// computation may only impact performance, not correctness.
-	z0 := new(Decimal).Set(z)
-	ed.Mul(z, z, decimalCbrtC1)
-	ed.Add(z, z, decimalCbrtC2)
-	ed.Mul(z, z, z0)
-	ed.Add(z, z, decimalCbrtC3)
+	var z0 Decimal
+	z0.Set(&z)
+	ed.Mul(&z, &z, decimalCbrtC1)
+	ed.Add(&z, &z, decimalCbrtC2)
+	ed.Mul(&z, &z, &z0)
+	ed.Add(&z, &z, decimalCbrtC3)
 
 	for ; exp8 < 0; exp8++ {
-		ed.Mul(z, z, decimalHalf)
+		ed.Mul(&z, &z, decimalHalf)
 	}
 
 	for ; exp8 > 0; exp8-- {
-		ed.Mul(z, z, decimalTwo)
+		ed.Mul(&z, &z, decimalTwo)
 	}
 
 	// Loop until convergence.
-	for loop := nc.newLoop("cbrt", z, c.Precision+1, 1); ; {
+	for loop := nc.newLoop("cbrt", &z, c.Precision+1, 1); ; {
 		// z = (2.0 * z0 +  x / (z0 * z0) ) / 3.0;
-		z0.Set(z)
-		ed.Mul(z, z, z0)
-		ed.Quo(z, ax, z)
-		ed.Add(z, z, z0)
-		ed.Add(z, z, z0)
-		ed.Quo(z, z, decimalThree)
+		z0.Set(&z)
+		ed.Mul(&z, &z, &z0)
+		ed.Quo(&z, &ax, &z)
+		ed.Add(&z, &z, &z0)
+		ed.Add(&z, &z, &z0)
+		ed.Quo(&z, &z, decimalThree)
 
 		if err := ed.Err(); err != nil {
 			return 0, err
 		}
-		if done, err := loop.done(z); err != nil {
+		if done, err := loop.done(&z); err != nil {
 			return 0, err
 		} else if done {
 			break
@@ -627,19 +631,19 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	}
 
 	z0.Set(x)
-	res, err := c.Round(d, z)
+	res, err := c.Round(d, &z)
 	d.Negative = neg
 
 	// Set z = d^3 to check for exactness.
-	ed.Mul(z, d, d)
-	ed.Mul(z, z, d)
+	ed.Mul(&z, d, d)
+	ed.Mul(&z, &z, d)
 
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
 
 	// Result is exact
-	if z0.Cmp(z) == 0 {
+	if z0.Cmp(&z) == 0 {
 		return 0, nil
 	}
 	return res, err
@@ -689,12 +693,8 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	nc.Rounding = RoundHalfEven
 	ed := MakeErrDecimal(nc)
 
-	tmp1 := new(Decimal)
-	tmp2 := new(Decimal)
-	tmp3 := new(Decimal)
-	tmp4 := new(Decimal)
-
-	z := new(Decimal).Set(x)
+	var tmp1, tmp2, tmp3, tmp4, z, resAdjust Decimal
+	z.Set(x)
 
 	// To get an initial estimate, we first reduce the input range to the interval
 	// [0.1, 1) by changing the exponent, and later adjust the result by a
@@ -718,16 +718,14 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	// precision. So for z close to 1 (before scaling) we use a power series
 	// instead (which converges very rapidly in this range).
 
-	resAdjust := new(Decimal)
-
 	// tmp1 = z - 1
-	ed.Sub(tmp1, z, decimalOne)
+	ed.Sub(&tmp1, &z, decimalOne)
 	// tmp3 = 0.1
 	tmp3.SetFinite(1, -1)
 
 	usePowerSeries := false
 
-	if tmp2.Abs(tmp1).Cmp(tmp3) <= 0 {
+	if tmp2.Abs(&tmp1).Cmp(&tmp3) <= 0 {
 		usePowerSeries = true
 	} else {
 		// Reduce input to range [0.1, 1).
@@ -738,12 +736,12 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		//   ln(10^expDelta) = expDelta * ln(10)
 		// to the result.
 		resAdjust.setCoefficient(int64(expDelta))
-		ed.Mul(resAdjust, resAdjust, decimalLn10.get(p))
+		ed.Mul(&resAdjust, &resAdjust, decimalLn10.get(p))
 
 		// tmp1 = z - 1
-		ed.Sub(tmp1, z, decimalOne)
+		ed.Sub(&tmp1, &z, decimalOne)
 
-		if tmp2.Abs(tmp1).Cmp(tmp3) <= 0 {
+		if tmp2.Abs(&tmp1).Cmp(&tmp3) <= 0 {
 			usePowerSeries = true
 		} else {
 			// Compute an initial estimate using floats.
@@ -768,30 +766,32 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 		// tmp1 is already x
 
 		// tmp3 = x + 2
-		ed.Add(tmp3, tmp1, decimalTwo)
+		ed.Add(&tmp3, &tmp1, decimalTwo)
 
 		// tmp2 = (x / (x+2))
-		ed.Quo(tmp2, tmp1, tmp3)
+		ed.Quo(&tmp2, &tmp1, &tmp3)
 
 		// tmp1 = tmp3 = 2 * (x / (x+2))
-		ed.Add(tmp3, tmp2, tmp2)
-		tmp1.Set(tmp3)
+		ed.Add(&tmp3, &tmp2, &tmp2)
+		tmp1.Set(&tmp3)
 
-		eps := Decimal{Coeff: *bigOne, Exponent: -int32(p)}
+		var eps Decimal
+		eps.Coeff.Set(bigOne)
+		eps.Exponent = -int32(p)
 		for n := 1; ; n++ {
 
 			// tmp3 *= (x / (x+2))^2
-			ed.Mul(tmp3, tmp3, tmp2)
-			ed.Mul(tmp3, tmp3, tmp2)
+			ed.Mul(&tmp3, &tmp3, &tmp2)
+			ed.Mul(&tmp3, &tmp3, &tmp2)
 
 			// tmp4 = 2n+1
 			tmp4.SetFinite(int64(2*n+1), 0)
 
-			ed.Quo(tmp4, tmp3, tmp4)
+			ed.Quo(&tmp4, &tmp3, &tmp4)
 
-			ed.Add(tmp1, tmp1, tmp4)
+			ed.Add(&tmp1, &tmp1, &tmp4)
 
-			if tmp4.Abs(tmp4).Cmp(&eps) <= 0 {
+			if tmp4.Abs(&tmp4).Cmp(&eps) <= 0 {
 				break
 			}
 		}
@@ -803,24 +803,24 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 			// tmp1 = a_n (either from initial estimate or last iteration)
 
 			// tmp2 = exp(a_n)
-			ed.Exp(tmp2, tmp1)
+			ed.Exp(&tmp2, &tmp1)
 
 			// tmp3 = exp(a_n) - z
-			ed.Sub(tmp3, tmp2, z)
+			ed.Sub(&tmp3, &tmp2, &z)
 
 			// tmp3 = 2 * (exp(a_n) - z)
-			ed.Add(tmp3, tmp3, tmp3)
+			ed.Add(&tmp3, &tmp3, &tmp3)
 
 			// tmp4 = exp(a_n) + z
-			ed.Add(tmp4, tmp2, z)
+			ed.Add(&tmp4, &tmp2, &z)
 
 			// tmp2 = 2 * (exp(a_n) - z) / (exp(a_n) + z)
-			ed.Quo(tmp2, tmp3, tmp4)
+			ed.Quo(&tmp2, &tmp3, &tmp4)
 
 			// tmp1 = a_(n+1) = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
-			ed.Sub(tmp1, tmp1, tmp2)
+			ed.Sub(&tmp1, &tmp1, &tmp2)
 
-			if done, err := loop.done(tmp1); err != nil {
+			if done, err := loop.done(&tmp1); err != nil {
 				return 0, err
 			} else if done {
 				break
@@ -832,12 +832,12 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 	}
 
 	// Apply the adjustment due to the initial rescaling.
-	ed.Add(tmp1, tmp1, resAdjust)
+	ed.Add(&tmp1, &tmp1, &resAdjust)
 
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
-	res := c.round(d, tmp1)
+	res := c.round(d, &tmp1)
 	res |= Inexact
 	return c.goError(res)
 }
@@ -853,14 +853,14 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 
 	nc := BaseContext.WithPrecision(c.Precision + 2)
 	nc.Rounding = RoundHalfEven
-	z := new(Decimal)
-	_, err := nc.Ln(z, x)
+	var z Decimal
+	_, err := nc.Ln(&z, x)
 	if err != nil {
 		return 0, errors.Wrap(err, "ln")
 	}
 	nc.Precision = c.Precision
 
-	qr, err := nc.Mul(d, z, decimalInvLn10.get(c.Precision+2))
+	qr, err := nc.Mul(d, &z, decimalInvLn10.get(c.Precision+2))
 	if err != nil {
 		return 0, err
 	}
@@ -898,7 +898,8 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 
 	// Stage 1
 	cp := c.Precision
-	tmp1 := new(Decimal).Abs(x)
+	var tmp1 Decimal
+	tmp1.Abs(x)
 	if f, err := tmp1.Float64(); err == nil {
 		// This algorithm doesn't work if currentprecision*23 < |x|. Attempt to
 		// increase the working precision if needed as long as it isn't too large. If
@@ -907,9 +908,10 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 			cp = uint32(math.Ceil(ncp))
 		}
 	}
-	tmp2 := New(int64(cp)*23, 0)
+	var tmp2 Decimal
+	tmp2.SetInt64(int64(cp) * 23)
 	// if abs(x) > 23*currentprecision; assert false
-	if tmp1.Cmp(tmp2) > 0 {
+	if tmp1.Cmp(&tmp2) > 0 {
 		res |= Overflow
 		if x.Sign() < 0 {
 			res = res.negateOverflowFlags()
@@ -922,7 +924,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	}
 	// if abs(x) <= setexp(.9, -currentprecision); then result 1
 	tmp2.SetFinite(9, int32(-cp)-1)
-	if tmp1.Cmp(tmp2) <= 0 {
+	if tmp1.Cmp(&tmp2) <= 0 {
 		d.Set(decimalOne)
 		return c.goError(res)
 	}
@@ -933,14 +935,15 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	if t < 0 {
 		t = 0
 	}
-	k := New(1, t)
-	r := new(Decimal)
+	var k, r Decimal
+	k.SetFinite(1, t)
 	nc := c.WithPrecision(cp)
 	nc.Rounding = RoundHalfEven
-	if _, err := nc.Quo(r, x, k); err != nil {
+	if _, err := nc.Quo(&r, x, &k); err != nil {
 		return 0, errors.Wrap(err, "Quo")
 	}
-	ra := new(Decimal).Abs(r)
+	var ra Decimal
+	ra.Abs(&r)
 	p := int64(cp) + int64(t) + 2
 
 	// Stage 3
@@ -958,27 +961,29 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	// Stage 4
 	nc.Precision = uint32(p)
 	ed := MakeErrDecimal(nc)
-	sum := New(1, 0)
+	var sum Decimal
+	sum.SetInt64(1)
 	tmp2.Exponent = 0
 	for i := n - 1; i > 0; i-- {
 		tmp2.setCoefficient(i)
 		// tmp1 = r / i
-		ed.Quo(tmp1, r, tmp2)
+		ed.Quo(&tmp1, &r, &tmp2)
 		// sum = sum * r / i
-		ed.Mul(sum, tmp1, sum)
+		ed.Mul(&sum, &tmp1, &sum)
 		// sum = sum + 1
-		ed.Add(sum, sum, decimalOne)
+		ed.Add(&sum, &sum, decimalOne)
 	}
 	if err != ed.Err() {
 		return 0, err
 	}
 
 	// sum ** k
-	ki, err := exp10(int64(t))
+	var tmpE BigInt
+	ki, err := exp10(int64(t), &tmpE)
 	if err != nil {
 		return 0, errors.Wrap(err, "ki")
 	}
-	ires, err := nc.integerPower(d, sum, ki)
+	ires, err := nc.integerPower(d, &sum, ki)
 	if err != nil {
 		return 0, errors.Wrap(err, "integer power")
 	}
@@ -989,29 +994,31 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 }
 
 // integerPower sets d = x**y. d and x must not point to the same Decimal.
-func (c *Context) integerPower(d, x *Decimal, y *big.Int) (Condition, error) {
+func (c *Context) integerPower(d, x *Decimal, y *BigInt) (Condition, error) {
 	// See: https://en.wikipedia.org/wiki/Exponentiation_by_squaring.
 
-	b := new(big.Int).Set(y)
+	var b BigInt
+	b.Set(y)
 	neg := b.Sign() < 0
 	if neg {
-		b.Abs(b)
+		b.Abs(&b)
 	}
 
-	n, z := new(Decimal), d
+	var n Decimal
 	n.Set(x)
+	z := d
 	z.Set(decimalOne)
 	ed := MakeErrDecimal(c)
 	for b.Sign() > 0 {
 		if b.Bit(0) == 1 {
-			ed.Mul(z, z, n)
+			ed.Mul(z, z, &n)
 		}
-		b.Rsh(b, 1)
+		b.Rsh(&b, 1)
 
 		// Only compute the next n if we are going to use it. Otherwise n can overflow
 		// on the last iteration causing this to error.
 		if b.Sign() > 0 {
-			ed.Mul(n, n, n)
+			ed.Mul(&n, &n, &n)
 		}
 		if err := ed.Err(); err != nil {
 			// In the negative case, convert overflow to underflow.
@@ -1034,8 +1041,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 		return res, err
 	}
 
-	integ, frac := new(Decimal), new(Decimal)
-	y.Modf(integ, frac)
+	var integ, frac Decimal
+	y.Modf(&integ, &frac)
 	yIsInt := frac.IsZero()
 	neg := x.Negative && y.Form == Finite && yIsInt && integ.Coeff.Bit(0) == 1 && integ.Exponent == 0
 
@@ -1056,7 +1063,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 
 	// Check if y is of type int.
-	tmp := new(Decimal).Abs(y)
+	var tmp Decimal
+	tmp.Abs(y)
 
 	xs := x.Sign()
 	ys := y.Sign()
@@ -1101,7 +1109,7 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	}
 
 	// If integ.Exponent > 0, we need to add trailing 0s to integ.Coeff.
-	res := c.quantize(integ, integ, 0)
+	res := c.quantize(&integ, &integ, 0)
 	nres, err := nc.integerPower(z, x, integ.setBig(&integ.Coeff))
 	res |= nres
 	if err != nil {
@@ -1117,18 +1125,18 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 	ed := MakeErrDecimal(nc)
 
 	// Compute x**frac(y)
-	ed.Abs(tmp, x)
-	ed.Ln(tmp, tmp)
-	ed.Mul(tmp, tmp, frac)
-	ed.Exp(tmp, tmp)
+	ed.Abs(&tmp, x)
+	ed.Ln(&tmp, &tmp)
+	ed.Mul(&tmp, &tmp, &frac)
+	ed.Exp(&tmp, &tmp)
 
 	// Join integer and frac parts back.
-	ed.Mul(tmp, z, tmp)
+	ed.Mul(&tmp, z, &tmp)
 
 	if err := ed.Err(); err != nil {
 		return ed.Flags, err
 	}
-	res |= c.round(d, tmp)
+	res |= c.round(d, &tmp)
 	d.Negative = neg
 	res |= Inexact
 	return c.goError(res)
@@ -1166,7 +1174,8 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 		if diff < MinExponent {
 			return SystemUnderflow | Underflow
 		}
-		d.Coeff.Mul(&d.Coeff, tableExp10(-int64(diff), nil))
+		var tmpE BigInt
+		d.Coeff.Mul(&d.Coeff, tableExp10(-int64(diff), &tmpE))
 	} else if diff > 0 {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
@@ -1193,7 +1202,7 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 
 			d.Exponent = -diff
 			// Avoid the c.Precision == 0 check.
-			res = nc.rounding().Round(nc, d, d)
+			res = nc.Rounding.Round(nc, d, d)
 			// Adjust for 0.9 -> 1.0 rollover.
 			if d.Exponent > 0 {
 				d.Coeff.Mul(&d.Coeff, bigTen)
@@ -1242,8 +1251,8 @@ func (c *Context) RoundToIntegralExact(d, x *Decimal) (Condition, error) {
 
 // Ceil sets d to the smallest integer >= x.
 func (c *Context) Ceil(d, x *Decimal) (Condition, error) {
-	frac := new(Decimal)
-	x.Modf(d, frac)
+	var frac Decimal
+	x.Modf(d, &frac)
 	if frac.Sign() > 0 {
 		return c.Add(d, d, decimalOne)
 	}
@@ -1252,8 +1261,8 @@ func (c *Context) Ceil(d, x *Decimal) (Condition, error) {
 
 // Floor sets d to the largest integer <= x.
 func (c *Context) Floor(d, x *Decimal) (Condition, error) {
-	frac := new(Decimal)
-	x.Modf(d, frac)
+	var frac Decimal
+	x.Modf(d, &frac)
 	if frac.Sign() < 0 {
 		return c.Sub(d, d, decimalOne)
 	}
@@ -1274,9 +1283,10 @@ func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.
-func exp10(x int64) (exp *big.Int, err error) {
+// The returned value must not be mutated.
+func exp10(x int64, tmp *BigInt) (exp *BigInt, err error) {
 	if x > MaxExponent || x < MinExponent {
 		return nil, errors.New(errExponentOutOfRangeStr)
 	}
-	return tableExp10(x, nil), nil
+	return tableExp10(x, tmp), nil
 }

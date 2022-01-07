@@ -14,10 +14,6 @@
 
 package apd
 
-import (
-	"math/big"
-)
-
 // Round sets d to rounded x, rounded to the precision specified by c. If c
 // has zero precision, no rounding will occur. If c has no Rounding specified,
 // RoundHalfUp is used.
@@ -30,24 +26,41 @@ func (c *Context) round(d, x *Decimal) Condition {
 		d.Set(x)
 		return d.setExponent(c, 0, int64(d.Exponent))
 	}
-	rounder := c.rounding()
-	res := rounder.Round(c, d, x)
+	res := c.Rounding.Round(c, d, x)
 	return res
 }
 
-func (c *Context) rounding() Rounder {
-	rounding, ok := Roundings[c.Rounding]
-	if !ok {
-		return roundHalfUp
-	}
-	return rounding
-}
+// Rounder specifies the behavior of rounding.
+type Rounder string
 
-// Rounder defines a function that returns true if 1 should be added to the
-// absolute value of a number being rounded. result is the result to which
-// the 1 would be added. neg is true if the number is negative. half is -1
-// if the discarded digits are < 0.5, 0 if = 0.5, or 1 if > 0.5.
-type Rounder func(result *big.Int, neg bool, half int) bool
+// ShouldAddOne returns true if 1 should be added to the absolute value
+// of a number being rounded. result is the result to which the 1 would
+// be added. neg is true if the number is negative. half is -1 if the
+// discarded digits are < 0.5, 0 if = 0.5, or 1 if > 0.5.
+func (r Rounder) ShouldAddOne(result *BigInt, neg bool, half int) bool {
+	// NOTE: this is written using a switch statement instead of some
+	// other form of dynamic dispatch to assist Go's escape analysis.
+	switch r {
+	case RoundDown:
+		return roundDown(result, neg, half)
+	case RoundHalfUp:
+		return roundHalfUp(result, neg, half)
+	case RoundHalfEven:
+		return roundHalfEven(result, neg, half)
+	case RoundCeiling:
+		return roundCeiling(result, neg, half)
+	case RoundFloor:
+		return roundFloor(result, neg, half)
+	case RoundHalfDown:
+		return roundHalfDown(result, neg, half)
+	case RoundUp:
+		return roundUp(result, neg, half)
+	case Round05Up:
+		return round05Up(result, neg, half)
+	default:
+		return roundHalfUp(result, neg, half)
+	}
+}
 
 // Round sets d to rounded x.
 func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
@@ -74,18 +87,19 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			return SystemUnderflow | Underflow
 		}
 		res |= Rounded
-		y := new(big.Int)
-		e := tableExp10(diff, y)
-		m := new(big.Int)
-		y.QuoRem(&d.Coeff, e, m)
+		var y, m BigInt
+		e := tableExp10(diff, &y)
+		y.QuoRem(&d.Coeff, e, &m)
 		if m.Sign() != 0 {
 			res |= Inexact
-			discard := NewWithBigInt(m, int32(-diff))
-			if r(y, x.Negative, discard.Cmp(decimalHalf)) {
-				roundAddOne(y, &diff)
+			var discard Decimal
+			discard.Coeff.Set(&m)
+			discard.Exponent = int32(-diff)
+			if r.ShouldAddOne(&y, x.Negative, discard.Cmp(decimalHalf)) {
+				roundAddOne(&y, &diff)
 			}
 		}
-		d.Coeff = *y
+		d.Coeff.Set(&y)
 	} else {
 		diff = 0
 	}
@@ -94,7 +108,7 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 }
 
 // roundAddOne adds 1 to abs(b).
-func roundAddOne(b *big.Int, diff *int64) {
+func roundAddOne(b *BigInt, diff *int64) {
 	if b.Sign() < 0 {
 		panic("unexpected negative")
 	}
@@ -107,56 +121,52 @@ func roundAddOne(b *big.Int, diff *int64) {
 	}
 }
 
-var (
-	// Roundings defines the set of Rounders used by Context. Users may add their
-	// own, but modification of this map is not safe during any other parallel
-	// Context operations.
-	Roundings = map[string]Rounder{
-		RoundDown:     roundDown,
-		RoundHalfUp:   roundHalfUp,
-		RoundHalfEven: roundHalfEven,
-		RoundCeiling:  roundCeiling,
-		RoundFloor:    roundFloor,
-		RoundHalfDown: roundHalfDown,
-		RoundUp:       roundUp,
-		Round05Up:     round05Up,
-	}
-)
+// roundings is a set containing all available Rounders.
+var roundings = map[Rounder]struct{}{
+	RoundDown:     {},
+	RoundHalfUp:   {},
+	RoundHalfEven: {},
+	RoundCeiling:  {},
+	RoundFloor:    {},
+	RoundHalfDown: {},
+	RoundUp:       {},
+	Round05Up:     {},
+}
 
 const (
 	// RoundDown rounds toward 0; truncate.
-	RoundDown = "down"
+	RoundDown Rounder = "down"
 	// RoundHalfUp rounds up if the digits are >= 0.5.
-	RoundHalfUp = "half_up"
+	RoundHalfUp Rounder = "half_up"
 	// RoundHalfEven rounds up if the digits are > 0.5. If the digits are equal
 	// to 0.5, it rounds up if the previous digit is odd, always producing an
 	// even digit.
-	RoundHalfEven = "half_even"
+	RoundHalfEven Rounder = "half_even"
 	// RoundCeiling towards +Inf: rounds up if digits are > 0 and the number
 	// is positive.
-	RoundCeiling = "ceiling"
+	RoundCeiling Rounder = "ceiling"
 	// RoundFloor towards -Inf: rounds up if digits are > 0 and the number
 	// is negative.
-	RoundFloor = "floor"
+	RoundFloor Rounder = "floor"
 	// RoundHalfDown rounds up if the digits are > 0.5.
-	RoundHalfDown = "half_down"
+	RoundHalfDown Rounder = "half_down"
 	// RoundUp rounds away from 0.
-	RoundUp = "up"
+	RoundUp Rounder = "up"
 	// Round05Up rounds zero or five away from 0; same as round-up, except that
 	// rounding up only occurs if the digit to be rounded up is 0 or 5.
-	Round05Up = "05up"
+	Round05Up Rounder = "05up"
 )
 
-func roundDown(result *big.Int, neg bool, half int) bool {
+func roundDown(result *BigInt, neg bool, half int) bool {
 	return false
 }
 
-func roundUp(result *big.Int, neg bool, half int) bool {
+func roundUp(result *BigInt, neg bool, half int) bool {
 	return true
 }
 
-func round05Up(result *big.Int, neg bool, half int) bool {
-	z := new(big.Int)
+func round05Up(result *BigInt, neg bool, half int) bool {
+	var z BigInt
 	z.Rem(result, bigFive)
 	if z.Sign() == 0 {
 		return true
@@ -165,11 +175,11 @@ func round05Up(result *big.Int, neg bool, half int) bool {
 	return z.Sign() == 0
 }
 
-func roundHalfUp(result *big.Int, neg bool, half int) bool {
+func roundHalfUp(result *BigInt, neg bool, half int) bool {
 	return half >= 0
 }
 
-func roundHalfEven(result *big.Int, neg bool, half int) bool {
+func roundHalfEven(result *BigInt, neg bool, half int) bool {
 	if half > 0 {
 		return true
 	}
@@ -179,14 +189,14 @@ func roundHalfEven(result *big.Int, neg bool, half int) bool {
 	return result.Bit(0) == 1
 }
 
-func roundHalfDown(result *big.Int, neg bool, half int) bool {
+func roundHalfDown(result *BigInt, neg bool, half int) bool {
 	return half > 0
 }
 
-func roundFloor(result *big.Int, neg bool, half int) bool {
+func roundFloor(result *BigInt, neg bool, half int) bool {
 	return neg
 }
 
-func roundCeiling(result *big.Int, neg bool, half int) bool {
+func roundCeiling(result *BigInt, neg bool, half int) bool {
 	return !neg
 }

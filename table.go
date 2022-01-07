@@ -14,8 +14,6 @@
 
 package apd
 
-import "math/big"
-
 // digitsLookupTable is used to map binary digit counts to their corresponding
 // decimal border values. The map relies on the proof that (without leading zeros)
 // for any given number of binary digits r, such that the number represented is
@@ -31,13 +29,13 @@ var digitsLookupTable [digitsTableSize + 1]tableVal
 
 type tableVal struct {
 	digits  int64
-	border  big.Int
-	nborder big.Int
+	border  BigInt
+	nborder BigInt
 }
 
 func init() {
-	curVal := big.NewInt(1)
-	curExp := new(big.Int)
+	curVal := NewBigInt(1)
+	curExp := new(BigInt)
 	for i := 1; i <= digitsTableSize; i++ {
 		if i > 1 {
 			curVal.Lsh(curVal, 1)
@@ -59,14 +57,14 @@ func (d *Decimal) NumDigits() int64 {
 }
 
 // NumDigits returns the number of decimal digits of b.
-func NumDigits(b *big.Int) int64 {
+func NumDigits(b *BigInt) int64 {
 	bl := b.BitLen()
 	if bl == 0 {
 		return 1
 	}
 
 	if bl <= digitsTableSize {
-		val := digitsLookupTable[bl]
+		val := &digitsLookupTable[bl]
 		// In general, we either have val.digits or val.digits+1 digits and we have
 		// to compare with the border value. But that's not true for all values of
 		// bl: in particular, if bl+1 maps to the same number of digits, then we
@@ -90,9 +88,12 @@ func NumDigits(b *big.Int) int64 {
 	}
 
 	n := int64(float64(bl) / digitsToBitsRatio)
-	a := new(big.Int)
-	e := tableExp10(n, a)
+	var tmp BigInt
+	e := tableExp10(n, &tmp)
+	var a *BigInt
 	if b.Sign() < 0 {
+		var tmpA BigInt
+		a := &tmpA
 		a.Abs(b)
 	} else {
 		a = b
@@ -109,30 +110,27 @@ func NumDigits(b *big.Int) int64 {
 // 10^3 inclusive.
 const powerTenTableSize = 128
 
-var pow10LookupTable [powerTenTableSize + 1]big.Int
+var pow10LookupTable [powerTenTableSize + 1]BigInt
 
 func init() {
-	tmpInt := new(big.Int)
 	for i := int64(0); i <= powerTenTableSize; i++ {
-		setBigWithPow(&pow10LookupTable[i], tmpInt, i)
+		setBigWithPow(&pow10LookupTable[i], i)
 	}
 }
 
-func setBigWithPow(bi *big.Int, tmpInt *big.Int, pow int64) {
-	if tmpInt == nil {
-		tmpInt = new(big.Int)
-	}
-	bi.Exp(bigTen, tmpInt.SetInt64(pow), nil)
+func setBigWithPow(res *BigInt, pow int64) {
+	var tmp BigInt
+	tmp.SetInt64(pow)
+	res.Exp(bigTen, &tmp, nil)
 }
 
 // tableExp10 returns 10^x for x >= 0, looked up from a table when
 // possible. This returned value must not be mutated. tmp is used as an
-// intermediate variable, but may be nil.
-func tableExp10(x int64, tmp *big.Int) *big.Int {
+// intermediate variable and must not be nil.
+func tableExp10(x int64, tmp *BigInt) *BigInt {
 	if x <= powerTenTableSize {
 		return &pow10LookupTable[x]
 	}
-	b := new(big.Int)
-	setBigWithPow(b, tmp, x)
-	return b
+	setBigWithPow(tmp, x)
+	return tmp
 }

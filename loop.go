@@ -19,8 +19,8 @@ type loop struct {
 	precision     int32
 	maxIterations uint64   // When to give up.
 	arg           *Decimal // original argument to function; only used for diagnostic.
-	prevZ         *Decimal // Result from the previous iteration.
-	delta         *Decimal // |Change| from previous iteration.
+	prevZ         Decimal  // Result from the previous iteration.
+	delta         Decimal  // |Change| from previous iteration.
 }
 
 const digitsToBitsRatio = math.Ln10 / math.Ln2
@@ -41,15 +41,13 @@ func (c *Context) newLoop(name string, arg *Decimal, precision uint32, maxItersP
 		arg:           new(Decimal).Set(arg),
 		precision:     int32(precision),
 		maxIterations: 10 + uint64(maxItersPerDigit*int(precision)),
-		prevZ:         new(Decimal),
-		delta:         new(Decimal),
 	}
 }
 
 // done reports whether the loop is done. If it does not converge
 // after the maximum number of iterations, it returns an error.
 func (l *loop) done(z *Decimal) (bool, error) {
-	if _, err := l.c.Sub(l.delta, l.prevZ, z); err != nil {
+	if _, err := l.c.Sub(&l.delta, &l.prevZ, z); err != nil {
 		return false, err
 	}
 	sign := l.delta.Sign()
@@ -60,7 +58,7 @@ func (l *loop) done(z *Decimal) (bool, error) {
 		// Convergence can oscillate when the calculation is nearly
 		// done and we're running out of bits. This stops that.
 		// See next comment.
-		l.delta.Neg(l.delta)
+		l.delta.Neg(&l.delta)
 	}
 
 	// We stop if the delta is smaller than a change of 1 in the
@@ -73,7 +71,9 @@ func (l *loop) done(z *Decimal) (bool, error) {
 	//   p   = 3
 	//   z   = 0.001234 = 1234 * 10^-6
 	//   eps = 0.00001  = 10^(-3+4-6)
-	eps := Decimal{Coeff: *bigOne, Exponent: -l.precision + int32(z.NumDigits()) + z.Exponent}
+	var eps Decimal
+	eps.Coeff.Set(bigOne)
+	eps.Exponent = -l.precision + int32(z.NumDigits()) + z.Exponent
 	if l.delta.Cmp(&eps) <= 0 {
 		return true, nil
 	}
@@ -81,7 +81,7 @@ func (l *loop) done(z *Decimal) (bool, error) {
 	if l.i == l.maxIterations {
 		return false, errors.Errorf(
 			"%s %s: did not converge after %d iterations; prev,last result %s,%s delta %s precision: %d",
-			l.name, l.arg.String(), l.maxIterations, z, l.prevZ, l.delta, l.precision,
+			l.name, l.arg.String(), l.maxIterations, z.String(), l.prevZ.String(), l.delta.String(), l.precision,
 		)
 	}
 	l.prevZ.Set(z)

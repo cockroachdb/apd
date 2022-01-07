@@ -14,13 +14,13 @@
 
 package apd
 
-import "math/big"
+import "math"
 
 var (
-	bigOne  = big.NewInt(1)
-	bigTwo  = big.NewInt(2)
-	bigFive = big.NewInt(5)
-	bigTen  = big.NewInt(10)
+	bigOne  = NewBigInt(1)
+	bigTwo  = NewBigInt(2)
+	bigFive = NewBigInt(5)
+	bigTen  = NewBigInt(10)
 
 	decimalZero      = New(0, 0)
 	decimalOneEighth = New(125, -3)
@@ -29,6 +29,9 @@ var (
 	decimalTwo       = New(2, 0)
 	decimalThree     = New(3, 0)
 	decimalEight     = New(8, 0)
+
+	decimalMaxInt64 = New(math.MaxInt64, 0)
+	decimalMinInt64 = New(math.MinInt64, 0)
 
 	decimalCbrtC1 = makeConst(strCbrtC1)
 	decimalCbrtC2 = makeConst(strCbrtC2)
