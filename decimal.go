@@ -197,14 +197,21 @@ func (c *Context) SetString(d *Decimal, s string) (*Decimal, Condition, error) {
 }
 
 // Set sets d's fields to the values of x and returns d.
+//gcassert:inline
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	if d == x {
 		return d
 	}
-	d.Negative = x.Negative
-	d.Coeff.Set(&x.Coeff)
-	d.Exponent = x.Exponent
+	return d.setSlow(x)
+}
+
+// setSlow is split from Set to allow the aliasing fast-path to be
+// inlined in callers.
+func (d *Decimal) setSlow(x *Decimal) *Decimal {
 	d.Form = x.Form
+	d.Negative = x.Negative
+	d.Exponent = x.Exponent
+	d.Coeff.Set(&x.Coeff)
 	return d
 }
 
