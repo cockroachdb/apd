@@ -937,3 +937,22 @@ func (z *BigInt) Xor(x, y *BigInt) *BigInt {
 	z.updateInner(zi)
 	return z
 }
+
+///////////////////////////////////////////////////////////////////////////////
+//                     apd.BigInt / math/big.Int interop                     //
+///////////////////////////////////////////////////////////////////////////////
+
+// MathBigInt returns the math/big.Int representation of z.
+func (z *BigInt) MathBigInt() *big.Int {
+	var tmp1 big.Int
+	return z.inner(&tmp1)
+}
+
+// SetMathBigInt sets z to x and returns z.
+func (z *BigInt) SetMathBigInt(x *big.Int) *BigInt {
+	var tmp1 big.Int
+	zi := z.inner(&tmp1)
+	zi.Set(x)
+	z.updateInner(zi)
+	return z
+}

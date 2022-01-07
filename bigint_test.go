@@ -751,6 +751,32 @@ func TestBigIntMatchesMathBigInt(t *testing.T) {
 	})
 }
 
+// TestBigIntMathBigIntRoundTrip uses testing/quick to verify that the
+// apd.BigInt / math/big.Int interoperation methods each round-trip.
+func TestBigIntMathBigIntRoundTrip(t *testing.T) {
+	t.Run("apd->math->apd", func(t *testing.T) {
+		base := func(z number) string {
+			return z.toApd(t).String()
+		}
+		roundtrip := func(z number) string {
+			bi := z.toApd(t).MathBigInt()
+			return new(BigInt).SetMathBigInt(bi).String()
+		}
+		require(t, quick.CheckEqual(base, roundtrip, nil))
+	})
+
+	t.Run("math->apd->math", func(t *testing.T) {
+		base := func(z number) string {
+			return z.toMath(t).String()
+		}
+		roundtrip := func(z number) string {
+			bi := new(BigInt).SetMathBigInt(z.toMath(t))
+			return bi.MathBigInt().String()
+		}
+		require(t, quick.CheckEqual(base, roundtrip, nil))
+	})
+}
+
 // number is a quick.Generator for large integer numbers.
 type number string
 
