@@ -499,8 +499,8 @@ func (d *Decimal) cmpOrder() int {
 // This comparison respects the normal rules of special values (like NaN),
 // and does not compare them.
 func (c *Context) Cmp(d, x, y *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
-		return res, err
+	if c.shouldSetAsNaN(x, y) {
+		return c.setAsNaN(d, x, y)
 	}
 	v := x.Cmp(y)
 	d.SetInt64(int64(v))
