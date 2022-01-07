@@ -24,7 +24,7 @@ func (c *Context) Round(d, x *Decimal) (Condition, error) {
 func (c *Context) round(d, x *Decimal) Condition {
 	if c.Precision == 0 {
 		d.Set(x)
-		return d.setExponent(c, 0, int64(d.Exponent))
+		return d.setExponent(c, unknownNumDigits, 0, int64(d.Exponent))
 	}
 	res := c.Rounding.Round(c, d, x)
 	return res
@@ -74,7 +74,7 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 		// Subnormal is defined before rounding.
 		res |= Subnormal
 		// setExponent here to prevent double-rounded subnormals.
-		res |= d.setExponent(c, res, int64(d.Exponent))
+		res |= d.setExponent(c, nd, res, int64(d.Exponent))
 		return res
 	}
 
@@ -100,10 +100,12 @@ func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
 			}
 		}
 		d.Coeff.Set(&y)
+		// The coefficient changed, so recompute num digits in setExponent.
+		nd = unknownNumDigits
 	} else {
 		diff = 0
 	}
-	res |= d.setExponent(c, res, int64(d.Exponent), diff)
+	res |= d.setExponent(c, nd, res, int64(d.Exponent), diff)
 	return res
 }
 
