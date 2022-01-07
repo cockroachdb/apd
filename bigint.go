@@ -214,10 +214,19 @@ func (z *BigInt) innerAsUint() (val uint, neg bool, ok bool) {
 		// The value is not stored inline.
 		return 0, false, false
 	}
-	for i := 1; i < len(z._inline); i++ {
-		if z._inline[i] != 0 {
+	if inlineWords == 2 {
+		// Manually unrolled loop for current inlineWords setting.
+		if z._inline[1] != 0 {
 			// The value can not fit in a uint.
 			return 0, false, false
+		}
+	} else {
+		// Fallback for other values of inlineWords.
+		for i := 1; i < len(z._inline); i++ {
+			if z._inline[i] != 0 {
+				// The value can not fit in a uint.
+				return 0, false, false
+			}
 		}
 	}
 
@@ -235,8 +244,14 @@ func (z *BigInt) innerAsUint() (val uint, neg bool, ok bool) {
 func (z *BigInt) updateInnerFromUint(val uint, neg bool) {
 	// Set the inline value, making sure to clear out all other words.
 	z._inline[0] = big.Word(val)
-	for i := 1; i < len(z._inline); i++ {
-		z._inline[i] = 0
+	if inlineWords == 2 {
+		// Manually unrolled loop for current inlineWords setting.
+		z._inline[1] = 0
+	} else {
+		// Fallback for other values of inlineWords.
+		for i := 1; i < len(z._inline); i++ {
+			z._inline[i] = 0
+		}
 	}
 
 	// Set or unset the negative sentinel.
