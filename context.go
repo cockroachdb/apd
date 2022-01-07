@@ -79,6 +79,7 @@ func (c *Context) WithPrecision(p uint32) *Context {
 }
 
 // goError converts flags into an error based on c.Traps.
+//gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
 	return flags.GoError(c.Traps)
 }
@@ -88,25 +89,31 @@ func (c *Context) etiny() int32 {
 	return c.MinExponent - int32(c.Precision) + 1
 }
 
-// setIfNaN sets d to the first NaNSignaling, or otherwise first NaN, of
-// vals. d' is unchanged if vals contains no NaNs. True is returned if d
-// was set to a NaN.
-func (c *Context) setIfNaN(d *Decimal, vals ...*Decimal) (bool, Condition, error) {
+// shouldSetAsNaN determines whether setAsNaN should be called, given
+// the provided values, where x is required and y is optional. It is
+// split from setAsNaN to permit inlining of this function.
+//gcassert:inline
+func (c *Context) shouldSetAsNaN(x, y *Decimal) bool {
+	return x.Form == NaNSignaling || x.Form == NaN ||
+		(y != nil && (y.Form == NaNSignaling || y.Form == NaN))
+}
+
+// setAsNaN sets d to the first NaNSignaling, or otherwise first NaN, of
+// x and y. x is required, y is optional. Expects one of the two inputs
+// to be NaN.
+func (c *Context) setAsNaN(d *Decimal, x, y *Decimal) (Condition, error) {
 	var nan *Decimal
-Loop:
-	for _, v := range vals {
-		switch v.Form {
-		case NaNSignaling:
-			nan = v
-			break Loop
-		case NaN:
-			if nan == nil {
-				nan = v
-			}
-		}
-	}
-	if nan == nil {
-		return false, 0, nil
+	// Per the method contract, NaNSignaling takes precedence over NaN.
+	if x.Form == NaNSignaling {
+		nan = x
+	} else if y != nil && y.Form == NaNSignaling {
+		nan = y
+	} else if x.Form == NaN {
+		nan = x
+	} else if y != nil && y.Form == NaN {
+		nan = y
+	} else {
+		return 0, errors.Errorf("no NaN value found; was shouldSetAsNaN called?")
 	}
 	d.Set(nan)
 	var res Condition
@@ -115,12 +122,12 @@ Loop:
 		d.Form = NaN
 	}
 	_, err := c.goError(res)
-	return true, res, err
+	return res, err
 }
 
 func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
-		return res, err
+	if c.shouldSetAsNaN(x, y) {
+		return c.setAsNaN(d, x, y)
 	}
 	xn := x.Negative
 	yn := y.Negative != subtract
@@ -156,7 +163,8 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	}
 	d.Exponent = s
 	d.Form = Finite
-	return c.Round(d, d)
+	res := c.round(d, d)
+	return c.goError(res)
 }
 
 // Add sets d to the sum x+y.
@@ -171,26 +179,28 @@ func (c *Context) Sub(d, x, y *Decimal) (Condition, error) {
 
 // Abs sets d to |x| (the absolute value of x).
 func (c *Context) Abs(d, x *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
-		return res, err
+	if c.shouldSetAsNaN(x, nil) {
+		return c.setAsNaN(d, x, nil)
 	}
 	d.Abs(x)
-	return c.Round(d, d)
+	res := c.round(d, d)
+	return c.goError(res)
 }
 
 // Neg sets d to -x.
 func (c *Context) Neg(d, x *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
-		return res, err
+	if c.shouldSetAsNaN(x, nil) {
+		return c.setAsNaN(d, x, nil)
 	}
 	d.Neg(x)
-	return c.Round(d, d)
+	res := c.round(d, d)
+	return c.goError(res)
 }
 
 // Mul sets d to the product x*y.
 func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
-		return res, err
+	if c.shouldSetAsNaN(x, y) {
+		return c.setAsNaN(d, x, y)
 	}
 	// The sign of the result is the exclusive or of the signs of the operands.
 	neg := x.Negative != y.Negative
@@ -207,15 +217,17 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
 	d.Negative = neg
 	d.Form = Finite
-	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
+	res := d.setExponent(c, unknownNumDigits, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
 	return c.goError(res)
 }
 
 func (c *Context) quoSpecials(d, x, y *Decimal, canClamp bool) (bool, Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
+	if c.shouldSetAsNaN(x, y) {
+		res, err := c.setAsNaN(d, x, y)
 		return true, res, err
 	}
+
 	// The sign of the result is the exclusive or of the signs of the operands.
 	neg := x.Negative != y.Negative
 	if xi, yi := x.Form == Infinite, y.Form == Infinite; xi || yi {
@@ -360,7 +372,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// The exponent of the result is computed by subtracting the sum of the
 	// original exponent of the divisor and the value of adjust at the end of
 	// the coefficient calculation from the original exponent of the dividend.
-	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
+	res |= quo.setExponent(c, unknownNumDigits, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 	quo.Negative = neg
 	d.Set(&quo)
 	return c.goError(res)
@@ -396,8 +408,8 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 // Rem sets d to the remainder part of the quotient x/y. If
 // the integer part cannot fit in d.Precision digits, an error is returned.
 func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
-		return res, err
+	if c.shouldSetAsNaN(x, y) {
+		return c.setAsNaN(d, x, y)
 	}
 
 	if x.Form != Finite {
@@ -439,8 +451,9 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 }
 
 func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
-		return set, res, err
+	if c.shouldSetAsNaN(x, nil) {
+		res, err := c.setAsNaN(d, x, nil)
+		return true, res, err
 	}
 	if x.Form == Infinite {
 		if x.Negative {
@@ -552,7 +565,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
 	d.Reduce(d) // Remove trailing zeros.
-	return nc.Round(d, d)
+	res := nc.round(d, d)
+	return nc.goError(res)
 }
 
 // Cbrt sets d to the cube root of x.
@@ -631,7 +645,8 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	}
 
 	z0.Set(x)
-	res, err := c.Round(d, &z)
+	res := c.round(d, &z)
+	res, err := c.goError(res)
 	d.Negative = neg
 
 	// Set z = d^3 to check for exactness.
@@ -650,8 +665,9 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 }
 
 func (c *Context) logSpecials(d, x *Decimal) (bool, Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
-		return set, res, err
+	if c.shouldSetAsNaN(x, nil) {
+		res, err := c.setAsNaN(d, x, nil)
+		return true, res, err
 	}
 	if x.Sign() < 0 {
 		d.Set(decimalNaN)
@@ -873,8 +889,8 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	// See: Variable Precision Exponential Function, T. E. Hull and A. Abrham, ACM
 	// Transactions on Mathematical Software, Vol 12 #2, pp79-91, ACM, June 1986.
 
-	if set, res, err := c.setIfNaN(d, x); set {
-		return res, err
+	if c.shouldSetAsNaN(x, nil) {
+		return c.setAsNaN(d, x, nil)
 	}
 	if x.Form == Infinite {
 		if x.Negative {
@@ -1037,8 +1053,8 @@ func (c *Context) integerPower(d, x *Decimal, y *BigInt) (Condition, error) {
 
 // Pow sets d = x**y.
 func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
-		return res, err
+	if c.shouldSetAsNaN(x, y) {
+		return c.setAsNaN(d, x, y)
 	}
 
 	var integ, frac Decimal
@@ -1145,8 +1161,8 @@ func (c *Context) Pow(d, x, y *Decimal) (Condition, error) {
 // Quantize adjusts and rounds x as necessary so it is represented with
 // exponent exp and stores the result in d.
 func (c *Context) Quantize(d, x *Decimal, exp int32) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
-		return res, err
+	if c.shouldSetAsNaN(x, nil) {
+		return c.setAsNaN(d, x, nil)
 	}
 	if x.Form == Infinite || exp < c.etiny() {
 		d.Set(decimalNaN)
@@ -1219,8 +1235,9 @@ func (c *Context) toIntegral(d, x *Decimal) Condition {
 }
 
 func (c *Context) toIntegralSpecials(d, x *Decimal) (bool, Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
-		return set, res, err
+	if c.shouldSetAsNaN(x, nil) {
+		res, err := c.setAsNaN(d, x, nil)
+		return true, res, err
 	}
 	if x.Form != Finite {
 		d.Set(x)
@@ -1272,13 +1289,15 @@ func (c *Context) Floor(d, x *Decimal) (Condition, error) {
 // Reduce sets d to x with all trailing zeros removed and returns the number
 // of zeros removed.
 func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
-	if set, res, err := c.setIfNaN(d, x); set {
+	if c.shouldSetAsNaN(x, nil) {
+		res, err := c.setAsNaN(d, x, nil)
 		return 0, res, err
 	}
 	neg := x.Negative
 	_, n := d.Reduce(x)
 	d.Negative = neg
-	res, err := c.Round(d, d)
+	res := c.round(d, d)
+	res, err := c.goError(res)
 	return n, res, err
 }
 

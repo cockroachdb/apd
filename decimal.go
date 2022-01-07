@@ -160,7 +160,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 	}
 	// No parse errors, can now flag as finite.
 	d.Form = Finite
-	return c.goError(d.setExponent(c, 0, exps...))
+	return c.goError(d.setExponent(c, unknownNumDigits, 0, exps...))
 }
 
 // NewFromString creates a new decimal from s. It has no restrictions on
@@ -197,14 +197,21 @@ func (c *Context) SetString(d *Decimal, s string) (*Decimal, Condition, error) {
 }
 
 // Set sets d's fields to the values of x and returns d.
+//gcassert:inline
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	if d == x {
 		return d
 	}
-	d.Negative = x.Negative
-	d.Coeff.Set(&x.Coeff)
-	d.Exponent = x.Exponent
+	return d.setSlow(x)
+}
+
+// setSlow is split from Set to allow the aliasing fast-path to be
+// inlined in callers.
+func (d *Decimal) setSlow(x *Decimal) *Decimal {
 	d.Form = x.Form
+	d.Negative = x.Negative
+	d.Exponent = x.Exponent
+	d.Coeff.Set(&x.Coeff)
 	return d
 }
 
@@ -276,14 +283,18 @@ func (d *Decimal) Float64() (float64, error) {
 
 const (
 	errExponentOutOfRangeStr = "exponent out of range"
+
+	unknownNumDigits = int64(-1)
 )
 
 // setExponent sets d's Exponent to the sum of xs. Each value and the sum
 // of xs must fit within an int32. An error occurs if the sum is outside of
-// the MaxExponent or MinExponent range. res is any Condition previously set
-// for this operation, which can cause Underflow to be set if, for example,
-// Inexact is already set.
-func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition {
+// the MaxExponent or MinExponent range. nd is the number of digits in d, as
+// computed by NumDigits. Callers can pass unknownNumDigits to indicate that
+// they have not yet computed this digit count, in which case setExponent will
+// do so. res is any Condition previously set for this operation, which can
+// cause Underflow to be set if, for example, Inexact is already set.
+func (d *Decimal) setExponent(c *Context, nd int64, res Condition, xs ...int64) Condition {
 	var sum int64
 	for _, x := range xs {
 		if x > MaxExponent {
@@ -296,7 +307,9 @@ func (d *Decimal) setExponent(c *Context, res Condition, xs ...int64) Condition 
 	}
 	r := int32(sum)
 
-	nd := d.NumDigits()
+	if nd == unknownNumDigits {
+		nd = d.NumDigits()
+	}
 	// adj is the adjusted exponent: exponent + clength - 1
 	adj := sum + nd - 1
 	// Make sure it is less than the system limits.
@@ -486,8 +499,8 @@ func (d *Decimal) cmpOrder() int {
 // This comparison respects the normal rules of special values (like NaN),
 // and does not compare them.
 func (c *Context) Cmp(d, x, y *Decimal) (Condition, error) {
-	if set, res, err := c.setIfNaN(d, x, y); set {
-		return res, err
+	if c.shouldSetAsNaN(x, y) {
+		return c.setAsNaN(d, x, y)
 	}
 	v := x.Cmp(y)
 	d.SetInt64(int64(v))
