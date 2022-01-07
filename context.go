@@ -211,7 +211,7 @@ func (c *Context) Mul(d, x, y *Decimal) (Condition, error) {
 	d.Coeff.Mul(&x.Coeff, &y.Coeff)
 	d.Negative = neg
 	d.Form = Finite
-	res := d.setExponent(c, 0, int64(x.Exponent), int64(y.Exponent))
+	res := d.setExponent(c, unknownNumDigits, 0, int64(x.Exponent), int64(y.Exponent))
 	res |= c.round(d, d)
 	return c.goError(res)
 }
@@ -364,7 +364,7 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// The exponent of the result is computed by subtracting the sum of the
 	// original exponent of the divisor and the value of adjust at the end of
 	// the coefficient calculation from the original exponent of the dividend.
-	res |= quo.setExponent(c, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
+	res |= quo.setExponent(c, unknownNumDigits, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
 	quo.Negative = neg
 	d.Set(&quo)
 	return c.goError(res)
