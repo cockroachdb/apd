@@ -79,6 +79,7 @@ func (c *Context) WithPrecision(p uint32) *Context {
 }
 
 // goError converts flags into an error based on c.Traps.
+//gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
 	return flags.GoError(c.Traps)
 }
@@ -156,7 +157,8 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	}
 	d.Exponent = s
 	d.Form = Finite
-	return c.Round(d, d)
+	res := c.round(d, d)
+	return c.goError(res)
 }
 
 // Add sets d to the sum x+y.
@@ -175,7 +177,8 @@ func (c *Context) Abs(d, x *Decimal) (Condition, error) {
 		return res, err
 	}
 	d.Abs(x)
-	return c.Round(d, d)
+	res := c.round(d, d)
+	return c.goError(res)
 }
 
 // Neg sets d to -x.
@@ -184,7 +187,8 @@ func (c *Context) Neg(d, x *Decimal) (Condition, error) {
 		return res, err
 	}
 	d.Neg(x)
-	return c.Round(d, d)
+	res := c.round(d, d)
+	return c.goError(res)
 }
 
 // Mul sets d to the product x*y.
@@ -552,7 +556,8 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
 	d.Reduce(d) // Remove trailing zeros.
-	return nc.Round(d, d)
+	res := nc.round(d, d)
+	return nc.goError(res)
 }
 
 // Cbrt sets d to the cube root of x.
@@ -631,7 +636,8 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 	}
 
 	z0.Set(x)
-	res, err := c.Round(d, &z)
+	res := c.round(d, &z)
+	res, err := c.goError(res)
 	d.Negative = neg
 
 	// Set z = d^3 to check for exactness.
@@ -1278,7 +1284,8 @@ func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 	neg := x.Negative
 	_, n := d.Reduce(x)
 	d.Negative = neg
-	res, err := c.Round(d, d)
+	res := c.round(d, d)
+	res, err := c.goError(res)
 	return n, res, err
 }
 
