@@ -19,6 +19,7 @@ import (
 	"math/big"
 	"math/bits"
 	"math/rand"
+	"strconv"
 	"unsafe"
 )
 
@@ -132,6 +133,7 @@ func (z *BigInt) inner(tmp *big.Int) *big.Int {
 }
 
 // innerOrNil is like inner, but returns a nil *big.Int if the receiver is nil.
+// NOTE: this is not inlined.
 func (z *BigInt) innerOrNil(tmp *big.Int) *big.Int {
 	if z == nil {
 		return nil
@@ -141,6 +143,7 @@ func (z *BigInt) innerOrNil(tmp *big.Int) *big.Int {
 
 // innerOrAlias is like inner, but returns the provided *big.Int if the receiver
 // and the other *BigInt argument reference the same object.
+// NOTE: this is not inlined.
 func (z *BigInt) innerOrAlias(tmp *big.Int, a *BigInt, ai *big.Int) *big.Int {
 	if a == z {
 		return ai
@@ -150,6 +153,7 @@ func (z *BigInt) innerOrAlias(tmp *big.Int, a *BigInt, ai *big.Int) *big.Int {
 
 // innerOrNilOrAlias is like inner, but with the added semantics specified for
 // both innerOrNil and innerOrAlias.
+// NOTE: this is not inlined.
 func (z *BigInt) innerOrNilOrAlias(tmp *big.Int, a *BigInt, ai *big.Int) *big.Int {
 	if z == nil {
 		return nil
@@ -381,8 +385,21 @@ func (z *BigInt) AndNot(x, y *BigInt) *BigInt {
 
 // Append calls (big.Int).Append.
 func (z *BigInt) Append(buf []byte, base int) []byte {
+	if z == nil {
+		// Fast-path that avoids innerOrNil, allowing inner to be inlined.
+		return append(buf, "<nil>"...)
+	}
+	if zVal, zNeg, ok := z.innerAsUint(); ok {
+		// Check if the base is supported by strconv.AppendUint.
+		if base >= 2 && base <= 36 {
+			if zNeg {
+				buf = append(buf, '-')
+			}
+			return strconv.AppendUint(buf, uint64(zVal), base)
+		}
+	}
 	var tmp1 big.Int
-	return z.innerOrNil(&tmp1).Append(buf, base)
+	return z.inner(&tmp1).Append(buf, base)
 }
 
 // Binomial calls (big.Int).Binomial.
@@ -883,8 +900,12 @@ func (z *BigInt) Sqrt(x *BigInt) *BigInt {
 
 // String calls (big.Int).String.
 func (z *BigInt) String() string {
+	if z == nil {
+		// Fast-path that avoids innerOrNil, allowing inner to be inlined.
+		return "<nil>"
+	}
 	var tmp1 big.Int
-	return z.innerOrNil(&tmp1).String()
+	return z.inner(&tmp1).String()
 }
 
 // Sub calls (big.Int).Sub.
@@ -906,8 +927,12 @@ func (z *BigInt) Sub(x, y *BigInt) *BigInt {
 
 // Text calls (big.Int).Text.
 func (z *BigInt) Text(base int) string {
+	if z == nil {
+		// Fast-path that avoids innerOrNil, allowing inner to be inlined.
+		return "<nil>"
+	}
 	var tmp1 big.Int
-	return z.innerOrNil(&tmp1).Text(base)
+	return z.inner(&tmp1).Text(base)
 }
 
 // TrailingZeroBits calls (big.Int).TrailingZeroBits.
