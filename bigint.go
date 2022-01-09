@@ -571,18 +571,43 @@ func (z *BigInt) GobDecode(buf []byte) error {
 
 // Int64 calls (big.Int).Int64.
 func (z *BigInt) Int64() int64 {
+	if bits.UintSize == 64 {
+		if zVal, zNeg, ok := z.innerAsUint(); ok {
+			// The unchecked cast from uint64 to int64 looks unsafe, but it is
+			// allowed and is identical to the logic in (big.Int).Int64. Per the
+			// method's contract:
+			// > If z cannot be represented in an int64, the result is undefined.
+			zi := int64(zVal)
+			if zNeg {
+				zi = -zi
+			}
+			return zi
+		}
+	}
 	var tmp1 big.Int
 	return z.inner(&tmp1).Int64()
 }
 
 // IsInt64 calls (big.Int).IsInt64.
 func (z *BigInt) IsInt64() bool {
+	if bits.UintSize == 64 {
+		if zVal, zNeg, ok := z.innerAsUint(); ok {
+			// From (big.Int).IsInt64.
+			zi := int64(zVal)
+			return zi >= 0 || zNeg && zi == -zi
+		}
+	}
 	var tmp1 big.Int
 	return z.inner(&tmp1).IsInt64()
 }
 
 // IsUint64 calls (big.Int).IsUint64.
 func (z *BigInt) IsUint64() bool {
+	if bits.UintSize == 64 {
+		if _, zNeg, ok := z.innerAsUint(); ok {
+			return !zNeg
+		}
+	}
 	var tmp1 big.Int
 	return z.inner(&tmp1).IsUint64()
 }
@@ -943,6 +968,11 @@ func (z *BigInt) TrailingZeroBits() uint {
 
 // Uint64 calls (big.Int).Uint64.
 func (z *BigInt) Uint64() uint64 {
+	if bits.UintSize == 64 {
+		if zVal, _, ok := z.innerAsUint(); ok {
+			return uint64(zVal)
+		}
+	}
 	var tmp1 big.Int
 	return z.inner(&tmp1).Uint64()
 }
