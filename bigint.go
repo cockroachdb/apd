@@ -1009,7 +1009,12 @@ func (z *BigInt) Xor(x, y *BigInt) *BigInt {
 // MathBigInt returns the math/big.Int representation of z.
 func (z *BigInt) MathBigInt() *big.Int {
 	var tmp1 big.Int
-	return z.inner(&tmp1)
+	zi := z.inner(&tmp1)
+	// NOTE: We can't return zi directly, because it may be pointing into z's
+	// _inline array. We have disabled escape analysis for such aliasing, so
+	// this would be unsafe as it would not force the receiver to escape and
+	// could leave the return value pointing into stack memory.
+	return new(big.Int).Set(zi)
 }
 
 // SetMathBigInt sets z to x and returns z.
