@@ -65,6 +65,14 @@ jobs:
           go get honnef.co/go/tools/cmd/staticcheck
           staticcheck ./...
 
+      - name: 'GCAssert'
+        # Only run gcassert on the latest versions of Go. Inlining heuristics
+        # change from version to version.
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.17' }}
+        run: |
+          go get github.com/jordanlewis/gcassert/cmd/gcassert
+          gcassert ./...
+
       - name: 'BuildTest for armv7'
         if: ${{ matrix.arch == 'armv7' }}
         env:

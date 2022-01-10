@@ -359,7 +359,7 @@ func (z *BigInt) Abs(x *BigInt) *BigInt {
 		z._inner = nil // !negSentinel
 		return z
 	}
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Abs(x.inner(&tmp2))
 	z.updateInner(zi)
@@ -376,7 +376,7 @@ func (z *BigInt) Add(x, y *BigInt) *BigInt {
 			}
 		}
 	}
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Add(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -385,7 +385,7 @@ func (z *BigInt) Add(x, y *BigInt) *BigInt {
 
 // And calls (big.Int).And.
 func (z *BigInt) And(x, y *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.And(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -394,7 +394,7 @@ func (z *BigInt) And(x, y *BigInt) *BigInt {
 
 // AndNot calls (big.Int).AndNot.
 func (z *BigInt) AndNot(x, y *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.AndNot(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -416,13 +416,13 @@ func (z *BigInt) Append(buf []byte, base int) []byte {
 			return strconv.AppendUint(buf, zVal, base)
 		}
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Append(buf, base)
 }
 
 // Binomial calls (big.Int).Binomial.
 func (z *BigInt) Binomial(n, k int64) *BigInt {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Binomial(n, k)
 	z.updateInner(zi)
@@ -435,7 +435,7 @@ func (z *BigInt) Bit(i int) uint {
 		// Optimization for common case: odd/even test of z.
 		return uint(z._inline[0] & 1)
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Bit(i)
 }
 
@@ -450,19 +450,19 @@ func (z *BigInt) BitLen() int {
 		}
 		return 0
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).BitLen()
 }
 
 // Bits calls (big.Int).Bits.
 func (z *BigInt) Bits() []big.Word {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Bits()
 }
 
 // Bytes calls (big.Int).Bytes.
 func (z *BigInt) Bytes() []byte {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Bytes()
 }
 
@@ -489,7 +489,7 @@ func (z *BigInt) Cmp(y *BigInt) (r int) {
 			return r
 		}
 	}
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Cmp(y.inner(&tmp2))
 }
 
@@ -506,13 +506,13 @@ func (z *BigInt) CmpAbs(y *BigInt) (r int) {
 			return r
 		}
 	}
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	return z.inner(&tmp1).CmpAbs(y.inner(&tmp2))
 }
 
 // Div calls (big.Int).Div.
 func (z *BigInt) Div(x, y *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Div(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -521,7 +521,7 @@ func (z *BigInt) Div(x, y *BigInt) *BigInt {
 
 // DivMod calls (big.Int).DivMod.
 func (z *BigInt) DivMod(x, y, m *BigInt) (*BigInt, *BigInt) {
-	var tmp1, tmp2, tmp3, tmp4 big.Int
+	var tmp1, tmp2, tmp3, tmp4 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	mi := m.inner(&tmp2)
 	// NOTE: innerOrAlias for the y param because (big.Int).DivMod needs to
@@ -534,7 +534,7 @@ func (z *BigInt) DivMod(x, y, m *BigInt) (*BigInt, *BigInt) {
 
 // Exp calls (big.Int).Exp.
 func (z *BigInt) Exp(x, y, m *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3, tmp4 big.Int
+	var tmp1, tmp2, tmp3, tmp4 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if zi.Exp(x.inner(&tmp2), y.inner(&tmp3), m.innerOrNil(&tmp4)) == nil {
 		return nil
@@ -545,13 +545,13 @@ func (z *BigInt) Exp(x, y, m *BigInt) *BigInt {
 
 // Format calls (big.Int).Format.
 func (z *BigInt) Format(s fmt.State, ch rune) {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	z.innerOrNil(&tmp1).Format(s, ch)
 }
 
 // GCD calls (big.Int).GCD.
 func (z *BigInt) GCD(x, y, a, b *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3, tmp4, tmp5 big.Int
+	var tmp1, tmp2, tmp3, tmp4, tmp5 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	ai := a.inner(&tmp2)
 	bi := b.inner(&tmp3)
@@ -572,13 +572,13 @@ func (z *BigInt) GCD(x, y, a, b *BigInt) *BigInt {
 
 // GobEncode calls (big.Int).GobEncode.
 func (z *BigInt) GobEncode() ([]byte, error) {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.innerOrNil(&tmp1).GobEncode()
 }
 
 // GobDecode calls (big.Int).GobDecode.
 func (z *BigInt) GobDecode(buf []byte) error {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if err := zi.GobDecode(buf); err != nil {
 		return err
@@ -600,7 +600,7 @@ func (z *BigInt) Int64() int64 {
 		}
 		return zi
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Int64()
 }
 
@@ -611,7 +611,7 @@ func (z *BigInt) IsInt64() bool {
 		zi := int64(zVal)
 		return zi >= 0 || zNeg && zi == -zi
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).IsInt64()
 }
 
@@ -620,13 +620,13 @@ func (z *BigInt) IsUint64() bool {
 	if _, zNeg, ok := z.innerAsUint64(); ok {
 		return !zNeg
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).IsUint64()
 }
 
 // Lsh calls (big.Int).Lsh.
 func (z *BigInt) Lsh(x *BigInt, n uint) *BigInt {
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Lsh(x.inner(&tmp2), n)
 	z.updateInner(zi)
@@ -635,19 +635,19 @@ func (z *BigInt) Lsh(x *BigInt, n uint) *BigInt {
 
 // MarshalJSON calls (big.Int).MarshalJSON.
 func (z *BigInt) MarshalJSON() ([]byte, error) {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.innerOrNil(&tmp1).MarshalJSON()
 }
 
 // MarshalText calls (big.Int).MarshalText.
 func (z *BigInt) MarshalText() (text []byte, err error) {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.innerOrNil(&tmp1).MarshalText()
 }
 
 // Mod calls (big.Int).Mod.
 func (z *BigInt) Mod(x, y *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	// NOTE: innerOrAlias for the y param because (big.Int).Mod needs to detect
 	// when y is aliased to the receiver.
@@ -658,7 +658,7 @@ func (z *BigInt) Mod(x, y *BigInt) *BigInt {
 
 // ModInverse calls (big.Int).ModInverse.
 func (z *BigInt) ModInverse(g, n *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if zi.ModInverse(g.inner(&tmp2), n.inner(&tmp3)) == nil {
 		return nil
@@ -669,7 +669,8 @@ func (z *BigInt) ModInverse(g, n *BigInt) *BigInt {
 
 // ModSqrt calls (big.Int).ModSqrt.
 func (z *BigInt) ModSqrt(x, p *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
+	var tmp3 big.Int       // escapes because of https://github.com/golang/go/pull/50527.
 	zi := z.inner(&tmp1)
 	if zi.ModSqrt(x.inner(&tmp2), p.inner(&tmp3)) == nil {
 		return nil
@@ -688,7 +689,7 @@ func (z *BigInt) Mul(x, y *BigInt) *BigInt {
 			}
 		}
 	}
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Mul(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -697,7 +698,7 @@ func (z *BigInt) Mul(x, y *BigInt) *BigInt {
 
 // MulRange calls (big.Int).MulRange.
 func (z *BigInt) MulRange(x, y int64) *BigInt {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.MulRange(x, y)
 	z.updateInner(zi)
@@ -715,7 +716,7 @@ func (z *BigInt) Neg(x *BigInt) *BigInt {
 		}
 		return z
 	}
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Neg(x.inner(&tmp2))
 	z.updateInner(zi)
@@ -724,7 +725,7 @@ func (z *BigInt) Neg(x *BigInt) *BigInt {
 
 // Not calls (big.Int).Not.
 func (z *BigInt) Not(x *BigInt) *BigInt {
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Not(x.inner(&tmp2))
 	z.updateInner(zi)
@@ -733,7 +734,7 @@ func (z *BigInt) Not(x *BigInt) *BigInt {
 
 // Or calls (big.Int).Or.
 func (z *BigInt) Or(x, y *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Or(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -742,7 +743,7 @@ func (z *BigInt) Or(x, y *BigInt) *BigInt {
 
 // ProbablyPrime calls (big.Int).ProbablyPrime.
 func (z *BigInt) ProbablyPrime(n int) bool {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).ProbablyPrime(n)
 }
 
@@ -756,7 +757,7 @@ func (z *BigInt) Quo(x, y *BigInt) *BigInt {
 			}
 		}
 	}
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Quo(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -776,7 +777,7 @@ func (z *BigInt) QuoRem(x, y, r *BigInt) (*BigInt, *BigInt) {
 			}
 		}
 	}
-	var tmp1, tmp2, tmp3, tmp4 big.Int
+	var tmp1, tmp2, tmp3, tmp4 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	ri := r.inner(&tmp2)
 	zi.QuoRem(x.inner(&tmp3), y.inner(&tmp4), ri)
@@ -787,7 +788,7 @@ func (z *BigInt) QuoRem(x, y, r *BigInt) (*BigInt, *BigInt) {
 
 // Rand calls (big.Int).Rand.
 func (z *BigInt) Rand(rnd *rand.Rand, n *BigInt) *BigInt {
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Rand(rnd, n.inner(&tmp2))
 	z.updateInner(zi)
@@ -804,7 +805,7 @@ func (z *BigInt) Rem(x, y *BigInt) *BigInt {
 			}
 		}
 	}
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Rem(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -813,7 +814,7 @@ func (z *BigInt) Rem(x, y *BigInt) *BigInt {
 
 // Rsh calls (big.Int).Rsh.
 func (z *BigInt) Rsh(x *BigInt, n uint) *BigInt {
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Rsh(x.inner(&tmp2), n)
 	z.updateInner(zi)
@@ -822,7 +823,7 @@ func (z *BigInt) Rsh(x *BigInt, n uint) *BigInt {
 
 // Scan calls (big.Int).Scan.
 func (z *BigInt) Scan(s fmt.ScanState, ch rune) error {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if err := zi.Scan(s, ch); err != nil {
 		return err
@@ -837,7 +838,7 @@ func (z *BigInt) Set(x *BigInt) *BigInt {
 		*z = *x
 		return z
 	}
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Set(x.inner(&tmp2))
 	z.updateInner(zi)
@@ -846,7 +847,7 @@ func (z *BigInt) Set(x *BigInt) *BigInt {
 
 // SetBit calls (big.Int).SetBit.
 func (z *BigInt) SetBit(x *BigInt, i int, b uint) *BigInt {
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.SetBit(x.inner(&tmp2), i, b)
 	z.updateInner(zi)
@@ -855,7 +856,7 @@ func (z *BigInt) SetBit(x *BigInt, i int, b uint) *BigInt {
 
 // SetBits calls (big.Int).SetBits.
 func (z *BigInt) SetBits(abs []big.Word) *BigInt {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.SetBits(abs)
 	z.updateInner(zi)
@@ -864,7 +865,7 @@ func (z *BigInt) SetBits(abs []big.Word) *BigInt {
 
 // SetBytes calls (big.Int).SetBytes.
 func (z *BigInt) SetBytes(buf []byte) *BigInt {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.SetBytes(buf)
 	z.updateInner(zi)
@@ -884,7 +885,7 @@ func (z *BigInt) SetInt64(x int64) *BigInt {
 
 // SetString calls (big.Int).SetString.
 func (z *BigInt) SetString(s string, base int) (*BigInt, bool) {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if _, ok := zi.SetString(s, base); !ok {
 		return nil, false
@@ -914,7 +915,7 @@ func (z *BigInt) Sign() int {
 
 // Sqrt calls (big.Int).Sqrt.
 func (z *BigInt) Sqrt(x *BigInt) *BigInt {
-	var tmp1, tmp2 big.Int
+	var tmp1, tmp2 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Sqrt(x.inner(&tmp2))
 	z.updateInner(zi)
@@ -927,7 +928,7 @@ func (z *BigInt) String() string {
 		// Fast-path that avoids innerOrNil, allowing inner to be inlined.
 		return "<nil>"
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).String()
 }
 
@@ -941,7 +942,7 @@ func (z *BigInt) Sub(x, y *BigInt) *BigInt {
 			}
 		}
 	}
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Sub(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -954,13 +955,13 @@ func (z *BigInt) Text(base int) string {
 		// Fast-path that avoids innerOrNil, allowing inner to be inlined.
 		return "<nil>"
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Text(base)
 }
 
 // TrailingZeroBits calls (big.Int).TrailingZeroBits.
 func (z *BigInt) TrailingZeroBits() uint {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).TrailingZeroBits()
 }
 
@@ -969,13 +970,13 @@ func (z *BigInt) Uint64() uint64 {
 	if zVal, _, ok := z.innerAsUint64(); ok {
 		return zVal
 	}
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	return z.inner(&tmp1).Uint64()
 }
 
 // UnmarshalJSON calls (big.Int).UnmarshalJSON.
 func (z *BigInt) UnmarshalJSON(text []byte) error {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if err := zi.UnmarshalJSON(text); err != nil {
 		return err
@@ -986,7 +987,7 @@ func (z *BigInt) UnmarshalJSON(text []byte) error {
 
 // UnmarshalText calls (big.Int).UnmarshalText.
 func (z *BigInt) UnmarshalText(text []byte) error {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if err := zi.UnmarshalText(text); err != nil {
 		return err
@@ -997,7 +998,7 @@ func (z *BigInt) UnmarshalText(text []byte) error {
 
 // Xor calls (big.Int).Xor.
 func (z *BigInt) Xor(x, y *BigInt) *BigInt {
-	var tmp1, tmp2, tmp3 big.Int
+	var tmp1, tmp2, tmp3 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Xor(x.inner(&tmp2), y.inner(&tmp3))
 	z.updateInner(zi)
@@ -1010,13 +1011,18 @@ func (z *BigInt) Xor(x, y *BigInt) *BigInt {
 
 // MathBigInt returns the math/big.Int representation of z.
 func (z *BigInt) MathBigInt() *big.Int {
-	var tmp1 big.Int
-	return z.inner(&tmp1)
+	var tmp1 big.Int //gcassert:noescape
+	zi := z.inner(&tmp1)
+	// NOTE: We can't return zi directly, because it may be pointing into z's
+	// _inline array. We have disabled escape analysis for such aliasing, so
+	// this would be unsafe as it would not force the receiver to escape and
+	// could leave the return value pointing into stack memory.
+	return new(big.Int).Set(zi)
 }
 
 // SetMathBigInt sets z to x and returns z.
 func (z *BigInt) SetMathBigInt(x *big.Int) *BigInt {
-	var tmp1 big.Int
+	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	zi.Set(x)
 	z.updateInner(zi)
