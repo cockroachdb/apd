@@ -532,7 +532,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				if err != nil {
 					t.Fatal(err)
 				}
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 20):
 				t.Fatalf("timeout")
 			}
 			if d.Coeff.Sign() < 0 {

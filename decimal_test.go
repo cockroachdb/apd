@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/bits"
 	"testing"
 	"unsafe"
 )
@@ -787,16 +788,30 @@ func TestReduce(t *testing.T) {
 // TestSizeof is meant to catch changes that unexpectedly increase
 // the size of the BigInt, Decimal, and Context structs.
 func TestSizeof(t *testing.T) {
+	// map[uint_size][type]sizeof
+	exp := map[int]map[string]uintptr{
+		32: {
+			"BigInt":  20,
+			"Decimal": 28,
+			"Context": 24,
+		},
+		64: {
+			"BigInt":  24,
+			"Decimal": 32,
+			"Context": 32,
+		},
+	}[bits.UintSize]
+
 	var b BigInt
-	if s := unsafe.Sizeof(b); s != 24 {
+	if s := unsafe.Sizeof(b); s != exp["BigInt"] {
 		t.Errorf("sizeof(BigInt) changed: %d", s)
 	}
 	var d Decimal
-	if s := unsafe.Sizeof(d); s != 32 {
+	if s := unsafe.Sizeof(d); s != exp["Decimal"] {
 		t.Errorf("sizeof(Decimal) changed: %d", s)
 	}
 	var c Context
-	if s := unsafe.Sizeof(c); s != 32 {
+	if s := unsafe.Sizeof(c); s != exp["Context"] {
 		t.Errorf("sizeof(Context) changed: %d", s)
 	}
 }
@@ -805,19 +820,43 @@ func TestSizeof(t *testing.T) {
 // returns the shallow size of the structs, the Size method reports the total
 // memory footprint of each struct and all referenced objects.
 func TestSize(t *testing.T) {
+	// map[uint_size][is_inline][type]size
+	exp := map[int]map[bool]map[string]uintptr{
+		32: {
+			true: {
+				"BigInt":  20,
+				"Decimal": 28,
+			},
+			false: {
+				"BigInt":  72,
+				"Decimal": 80,
+			},
+		},
+		64: {
+			true: {
+				"BigInt":  24,
+				"Decimal": 32,
+			},
+			false: {
+				"BigInt":  112,
+				"Decimal": 120,
+			},
+		},
+	}[bits.UintSize]
+
 	var d Decimal
-	if e, s := uintptr(32), d.Size(); e != s {
+	if e, s := exp[true]["Decimal"], d.Size(); e != s {
 		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
 	}
-	if e, s := uintptr(24), d.Coeff.Size(); e != s {
+	if e, s := exp[true]["BigInt"], d.Coeff.Size(); e != s {
 		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
 	}
 	// Set to an inlinable value.
 	d.SetInt64(1234)
-	if e, s := uintptr(32), d.Size(); e != s {
+	if e, s := exp[true]["Decimal"], d.Size(); e != s {
 		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
 	}
-	if e, s := uintptr(24), d.Coeff.Size(); e != s {
+	if e, s := exp[true]["BigInt"], d.Coeff.Size(); e != s {
 		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
 	}
 	// Set to a non-inlinable value.
@@ -828,10 +867,10 @@ func TestSize(t *testing.T) {
 		// Sanity-check, in case inlineWords changes.
 		t.Fatal("BigInt inlined large value. Did inlineWords change?")
 	}
-	if e, s := uintptr(120), d.Size(); e != s {
+	if e, s := exp[false]["Decimal"], d.Size(); e != s {
 		t.Errorf("(*Decimal).Size() != %d: %d", e, s)
 	}
-	if e, s := uintptr(112), d.Coeff.Size(); e != s {
+	if e, s := exp[false]["BigInt"], d.Coeff.Size(); e != s {
 		t.Errorf("(*BigInt).Size() != %d: %d", e, s)
 	}
 }
