@@ -1220,8 +1220,8 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 			// target eliminates this problem.
 
 			d.Exponent = -diff
-			// Avoid the c.Precision == 0 check.
-			res = nc.Rounding.Round(nc, d, d)
+			// Round even if nc.Precision == 0.
+			res = nc.Rounding.Round(nc, d, d, false /* disableIfPrecisionZero */)
 			// Adjust for 0.9 -> 1.0 rollover.
 			if d.Exponent > 0 {
 				d.Coeff.Mul(&d.Coeff, bigTen)
