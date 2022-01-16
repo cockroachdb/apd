@@ -73,6 +73,7 @@ func NewBigInt(x int64) *BigInt {
 var negSentinel = new(big.Int)
 
 // isInline returns whether the BigInt stores its value in its _inline array.
+//gcassert:inline
 func (z *BigInt) isInline() bool {
 	return z._inner == nil || z._inner == negSentinel
 }

@@ -81,6 +81,9 @@ func (c *Context) WithPrecision(p uint32) *Context {
 // goError converts flags into an error based on c.Traps.
 //gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
+	if flags == 0 {
+		return flags, nil
+	}
 	return flags.GoError(c.Traps)
 }
 
