@@ -21,13 +21,9 @@ func (c *Context) Round(d, x *Decimal) (Condition, error) {
 	return c.goError(c.round(d, x))
 }
 
+//gcassert:inline
 func (c *Context) round(d, x *Decimal) Condition {
-	if c.Precision == 0 {
-		d.Set(x)
-		return d.setExponent(c, unknownNumDigits, 0, int64(d.Exponent))
-	}
-	res := c.Rounding.Round(c, d, x)
-	return res
+	return c.Rounding.Round(c, d, x, true /* disableIfPrecisionZero */)
 }
 
 // Rounder specifies the behavior of rounding.
@@ -63,11 +59,16 @@ func (r Rounder) ShouldAddOne(result *BigInt, neg bool, half int) bool {
 }
 
 // Round sets d to rounded x.
-func (r Rounder) Round(c *Context, d, x *Decimal) Condition {
+func (r Rounder) Round(c *Context, d, x *Decimal, disableIfPrecisionZero bool) Condition {
 	d.Set(x)
 	nd := x.NumDigits()
 	xs := x.Sign()
 	var res Condition
+
+	if disableIfPrecisionZero && c.Precision == 0 {
+		// Rounding has been disabled.
+		return d.setExponent(c, nd, res, int64(d.Exponent))
+	}
 
 	// adj is the adjusted exponent: exponent + clength - 1
 	if adj := int64(x.Exponent) + nd - 1; xs != 0 && adj < int64(c.MinExponent) {
