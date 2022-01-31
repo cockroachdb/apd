@@ -296,88 +296,87 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// The sign of the result is the exclusive or of the signs of the operands.
 	neg := x.Negative != y.Negative
 
-	// An integer variable, adjust, is initialized to 0.
-	var adjust int64
-	// The result coefficient is initialized to 0.
-	var quo Decimal
+	// Shift the resulting exponent by the difference between the dividend and
+	// the divisor's exponent after performing arithmetic on the coefficients.
+	shift := int64(x.Exponent - y.Exponent)
+
 	var res Condition
-	var diff int64
-	if !x.IsZero() {
-		var dividend, divisor BigInt
-		dividend.Abs(&x.Coeff)
-		divisor.Abs(&y.Coeff)
+	if x.IsZero() {
+		d.Set(decimalZero)
+		d.Negative = neg
+		res |= d.setExponent(c, unknownNumDigits, res, shift)
+		return c.goError(res)
+	}
 
-		// The operand coefficients are adjusted so that the coefficient of the
-		// dividend is greater than or equal to the coefficient of the divisor and
-		// is also less than ten times the coefficient of the divisor, thus:
+	var dividend, divisor BigInt
+	dividend.Abs(&x.Coeff)
+	divisor.Abs(&y.Coeff)
 
-		// While the coefficient of the dividend is less than the coefficient of
-		// the divisor it is multiplied by 10 and adjust is incremented by 1.
-		for dividend.Cmp(&divisor) < 0 {
-			dividend.Mul(&dividend, bigTen)
-			adjust++
+	// The operand coefficients are adjusted so that the coefficient of the
+	// dividend is greater than or equal to the coefficient of the divisor and
+	// is also less than ten times the coefficient of the divisor. While doing
+	// so, keep track of how far the two have been adjusted.
+	var adjCoeffs int64
+
+	// While the coefficient of the dividend is less than the coefficient of
+	// the divisor it is multiplied by 10 and adjCoeffs is incremented by 1.
+	for dividend.Cmp(&divisor) < 0 {
+		dividend.Mul(&dividend, bigTen)
+		adjCoeffs++
+	}
+
+	// While the coefficient of the dividend is greater than or equal to ten
+	// times the coefficient of the divisor the coefficient of the divisor is
+	// multiplied by 10 and adjCoeffs is decremented by 1.
+	var tmp BigInt
+	for {
+		tmp.Mul(&divisor, bigTen)
+		if dividend.Cmp(&tmp) < 0 {
+			break
 		}
+		divisor.Set(&tmp)
+		adjCoeffs--
+	}
 
-		// While the coefficient of the dividend is greater than or equal to ten
-		// times the coefficient of the divisor the coefficient of the divisor is
-		// multiplied by 10 and adjust is decremented by 1.
-		var tmp BigInt
-		for {
-			tmp.Mul(&divisor, bigTen)
-			if dividend.Cmp(&tmp) < 0 {
-				break
-			}
-			divisor.Set(&tmp)
-			adjust--
-		}
+	// In order to compute the decimal remainder part, add enough 0s to the
+	// numerator to accurately round with the given precision. -1 because the
+	// previous adjustment ensured that the dividend is already greater than or
+	// equal to the divisor, so the result will always be greater than or equal
+	// to 1.
+	adjExp10 := int64(c.Precision - 1)
+	var tmpE BigInt
+	dividend.Mul(&dividend, tableExp10(adjExp10, &tmpE))
 
-		prec := int64(c.Precision)
+	// Perform the division.
+	var rem BigInt
+	d.Coeff.QuoRem(&dividend, &divisor, &rem)
+	d.Form = Finite
+	d.Negative = neg
 
-		// The following steps are then repeated until the division is complete:
-		for {
-			// While the coefficient of the divisor is smaller than or equal to the
-			// coefficient of the dividend the former is subtracted from the latter and
-			// the coefficient of the result is incremented by 1.
-			for divisor.Cmp(&dividend) <= 0 {
-				dividend.Sub(&dividend, &divisor)
-				quo.Coeff.Add(&quo.Coeff, bigOne)
-			}
-
-			// If the coefficient of the dividend is now 0 and adjust is greater than
-			// or equal to 0, or if the coefficient of the result has precision digits,
-			// the division is complete.
-			if (dividend.Sign() == 0 && adjust >= 0) || quo.NumDigits() == prec {
-				break
-			}
-
-			// Otherwise, the coefficients of the result and the dividend are multiplied
-			// by 10 and adjust is incremented by 1.
-			quo.Coeff.Mul(&quo.Coeff, bigTen)
-			dividend.Mul(&dividend, bigTen)
-			adjust++
-		}
-
-		// Use the adjusted exponent to determine if we are Subnormal. If so,
-		// don't round.
-		adj := int64(x.Exponent) + int64(-y.Exponent) - adjust + quo.NumDigits() - 1
-		// Any remainder (the final coefficient of the dividend) is recorded and
-		// taken into account for rounding.
-		if dividend.Sign() != 0 && adj >= int64(c.MinExponent) {
+	// If there was a remainder, it is taken into account for rounding. To do
+	// so, we determine whether the remainder was more or less than half of the
+	// divisor and round accordingly.
+	nd := NumDigits(&d.Coeff)
+	if rem.Sign() != 0 {
+		// Use the adjusted exponent to determine if we are Subnormal.
+		// If so, don't round. This computation of adj and the check
+		// against MinExponent mirrors the logic in setExponent.
+		adj := shift + (-adjCoeffs) + (-adjExp10) + nd - 1
+		if adj >= int64(c.MinExponent) {
 			res |= Inexact | Rounded
-			dividend.Mul(&dividend, bigTwo)
-			half := dividend.Cmp(&divisor)
-			if c.Rounding.ShouldAddOne(&quo.Coeff, quo.Negative, half) {
-				roundAddOne(&quo.Coeff, &diff)
+			rem.Mul(&rem, bigTwo)
+			half := rem.Cmp(&divisor)
+			if c.Rounding.ShouldAddOne(&d.Coeff, d.Negative, half) {
+				d.Coeff.Add(&d.Coeff, bigOne)
+				// The coefficient changed, so recompute num digits in
+				// setExponent.
+				nd = unknownNumDigits
 			}
 		}
 	}
 
-	// The exponent of the result is computed by subtracting the sum of the
-	// original exponent of the divisor and the value of adjust at the end of
-	// the coefficient calculation from the original exponent of the dividend.
-	res |= quo.setExponent(c, unknownNumDigits, res, int64(x.Exponent), int64(-y.Exponent), -adjust, diff)
-	quo.Negative = neg
-	d.Set(&quo)
+	res |= d.setExponent(c, nd, res, shift, -adjCoeffs, -adjExp10)
+	d.Reduce(d) // remove trailing zeros
 	return c.goError(res)
 }
 
@@ -567,7 +566,7 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	d.Exponent += int32(e / 2)
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
-	d.Reduce(d) // Remove trailing zeros.
+	d.Reduce(d) // remove trailing zeros
 	res := nc.round(d, d)
 	return nc.goError(res)
 }
