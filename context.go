@@ -316,26 +316,22 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// dividend is greater than or equal to the coefficient of the divisor and
 	// is also less than ten times the coefficient of the divisor. While doing
 	// so, keep track of how far the two have been adjusted.
-	var adjCoeffs int64
-
-	// While the coefficient of the dividend is less than the coefficient of
-	// the divisor it is multiplied by 10 and adjCoeffs is incremented by 1.
-	for dividend.Cmp(&divisor) < 0 {
+	ndDividend := NumDigits(&dividend)
+	ndDivisor := NumDigits(&divisor)
+	ndDiff := ndDividend - ndDivisor
+	var tmpE BigInt
+	if ndDiff < 0 {
+		// numDigits(dividend) < numDigits(divisor), multiply dividend by 10^diff.
+		dividend.Mul(&dividend, tableExp10(-ndDiff, &tmpE))
+	} else if ndDiff > 0 {
+		// numDigits(dividend) > numDigits(divisor), multiply divisor by 10^diff.
+		divisor.Mul(&divisor, tableExp10(ndDiff, &tmpE))
+	}
+	adjCoeffs := -ndDiff
+	if dividend.Cmp(&divisor) < 0 {
+		// dividend < divisor, multiply dividend by 10.
 		dividend.Mul(&dividend, bigTen)
 		adjCoeffs++
-	}
-
-	// While the coefficient of the dividend is greater than or equal to ten
-	// times the coefficient of the divisor the coefficient of the divisor is
-	// multiplied by 10 and adjCoeffs is decremented by 1.
-	var tmp BigInt
-	for {
-		tmp.Mul(&divisor, bigTen)
-		if dividend.Cmp(&tmp) < 0 {
-			break
-		}
-		divisor.Set(&tmp)
-		adjCoeffs--
 	}
 
 	// In order to compute the decimal remainder part, add enough 0s to the
@@ -344,7 +340,6 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// equal to the divisor, so the result will always be greater than or equal
 	// to 1.
 	adjExp10 := int64(c.Precision - 1)
-	var tmpE BigInt
 	dividend.Mul(&dividend, tableExp10(adjExp10, &tmpE))
 
 	// Perform the division.
