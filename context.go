@@ -371,7 +371,6 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	}
 
 	res |= d.setExponent(c, nd, res, shift, -adjCoeffs, -adjExp10)
-	d.Reduce(d) // remove trailing zeros
 	return c.goError(res)
 }
 
@@ -561,7 +560,6 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	d.Exponent += int32(e / 2)
 	nc.Precision = c.Precision
 	nc.Rounding = RoundHalfEven
-	d.Reduce(d) // remove trailing zeros
 	res := nc.round(d, d)
 	return nc.goError(res)
 }
