@@ -36,7 +36,8 @@ func ExampleContext_overflow() {
 			return
 		}
 	}
-	// Output: d:      998, overflow: false, err: <nil>
+	// Output:
+	// d:      998, overflow: false, err: <nil>
 	// d:      999, overflow: false, err: <nil>
 	// d: Infinity, overflow:  true, err: overflow
 }
@@ -75,7 +76,8 @@ func ExampleContext_Quantize() {
 		}
 		fmt.Println()
 	}
-	// Output: -3: 123.450
+	// Output:
+	// -3: 123.450
 	// -2: 123.45
 	// -1: 123.5 (inexact, rounded)
 	//  0: 123 (inexact, rounded)
@@ -96,7 +98,8 @@ func ExampleErrDecimal() {
 	ed.Sub(d, d, apd.New(1, 0)) // attempt to subtract 1
 	// The subtraction doesn't occur and doesn't change the error.
 	fmt.Printf("%s, err: %v\n", d, ed.Err())
-	// Output: 10, err: <nil>
+	// Output:
+	// 10, err: <nil>
 	// 30, err: <nil>
 	// Infinity, err: division by zero
 	// Infinity, err: division by zero
@@ -126,7 +129,8 @@ func ExampleContext_RoundToIntegralExact() {
 		}
 		fmt.Println()
 	}
-	// Output: input:  123.4, output: 123, integer: false, strict: false, res: inexact, rounded
+	// Output:
+	// input:  123.4, output: 123, integer: false, strict: false, res: inexact, rounded
 	// input:  123.0, output: 123, integer:  true, strict: false, res: rounded
 	// input:    123, output: 123, integer:  true, strict:  true, res:
 	// input:   12E1, output: 120, integer:  true, strict:  true, res:
