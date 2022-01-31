@@ -284,15 +284,6 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 		return res, err
 	}
 
-	if c.Precision > 5000 {
-		// High precision could result in a large number of iterations. Arbitrarily
-		// limit the precision to prevent runaway processes. This limit was chosen
-		// arbitrarily and could likely be increased or removed if the impact was
-		// measured. Until then, this is an attempt to prevent users from shooting
-		// themselves in the foot.
-		return 0, errors.New("Quo requires Precision <= 5000")
-	}
-
 	// The sign of the result is the exclusive or of the signs of the operands.
 	neg := x.Negative != y.Negative
 
