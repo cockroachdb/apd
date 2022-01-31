@@ -716,7 +716,7 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 	d.Set(x)
 
 	// Use a uint64 for the division if possible.
-	if d.Coeff.BitLen() <= 64 {
+	if d.Coeff.IsUint64() {
 		i := d.Coeff.Uint64()
 		for i >= 10000 && i%10000 == 0 {
 			i /= 10000
