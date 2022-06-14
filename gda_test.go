@@ -20,9 +20,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -171,8 +171,24 @@ func cleanNumber(s string) string {
 	return s
 }
 
+// Copy ioutil.ReadDir to avoid staticcheck warning on go1.19 and above. Replace
+// with a call to os.ReadDir when we remove support for go1.15 and below.
+func ReadDir(dirname string) ([]os.FileInfo, error) {
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, err
+	}
+	list, err := f.Readdir(-1)
+	f.Close()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })
+	return list, nil
+}
+
 func TestParseDecTest(t *testing.T) {
-	files, err := ioutil.ReadDir(testDir)
+	files, err := ReadDir(testDir)
 	if err != nil {
 		t.Fatal(err)
 	}
