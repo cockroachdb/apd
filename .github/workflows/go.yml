@@ -59,8 +59,8 @@ jobs:
         run: go vet -unsafeptr=false ./...
 
       - name: 'Staticcheck'
-        # staticcheck requires go1.14.
-        if: ${{ matrix.arch == 'x64' && matrix.go != '1.13' }}
+        # staticcheck requires go1.17.
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.17' }}
         run: |
           go get honnef.co/go/tools/cmd/staticcheck
           staticcheck ./...
