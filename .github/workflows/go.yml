@@ -24,6 +24,7 @@ jobs:
           - '1.15'
           - '1.16'
           - '1.17'
+          - '1.18'
 
     steps:
       - uses: actions/checkout@v2
@@ -62,7 +63,7 @@ jobs:
         # staticcheck requires go1.17.
         if: ${{ matrix.arch == 'x64' && matrix.go >= '1.17' }}
         run: |
-          go get honnef.co/go/tools/cmd/staticcheck
+          go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck ./...
 
       - name: 'GCAssert'
@@ -70,7 +71,7 @@ jobs:
         # change from version to version.
         if: ${{ matrix.arch == 'x64' && matrix.go >= '1.17' }}
         run: |
-          go get github.com/jordanlewis/gcassert/cmd/gcassert
+          go install github.com/jordanlewis/gcassert/cmd/gcassert@latest
           gcassert ./...
 
       - name: 'BuildTest for armv7'
