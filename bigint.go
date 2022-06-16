@@ -886,6 +886,10 @@ func (z *BigInt) SetInt64(x int64) *BigInt {
 
 // SetString calls (big.Int).SetString.
 func (z *BigInt) SetString(s string, base int) (*BigInt, bool) {
+	if i, err := strconv.ParseInt(s, base, 64); err == nil {
+		z.SetInt64(i)
+		return z, true
+	}
 	var tmp1 big.Int //gcassert:noescape
 	zi := z.inner(&tmp1)
 	if _, ok := zi.SetString(s, base); !ok {
