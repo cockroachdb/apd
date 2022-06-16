@@ -141,7 +141,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		return 0, nil
 	}
 
-	var exps []int64
+	exps := make([]int64, 0, 2)
 	if i := strings.IndexByte(s, 'e'); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
