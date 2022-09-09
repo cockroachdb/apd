@@ -15,12 +15,13 @@
 package apd
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"unsafe"
 
 	"database/sql/driver"
-	"github.com/pkg/errors"
 )
 
 // Decimal is an arbitrary-precision decimal. Its value is:
@@ -113,7 +114,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 	// Until there are no parse errors, leave as NaN.
 	d.Form = NaN
 	if strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+") {
-		return 0, errors.Errorf("could not parse: %s", orig)
+		return 0, fmt.Errorf("could not parse: %s", orig)
 	}
 	switch s {
 	case "infinity", "inf":
@@ -135,7 +136,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 			// We ignore these digits, but must verify them.
 			_, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
-				return 0, errors.Wrapf(err, "parse payload: %s", s)
+				return 0, fmt.Errorf("parse payload: %s: %w", s, err)
 			}
 		}
 		return 0, nil
@@ -145,7 +146,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 	if i := strings.IndexByte(s, 'e'); i >= 0 {
 		exp, err := strconv.ParseInt(s[i+1:], 10, 32)
 		if err != nil {
-			return 0, errors.Wrapf(err, "parse exponent: %s", s[i+1:])
+			return 0, fmt.Errorf("parse exponent: %s: %w", s[i+1:], err)
 		}
 		exps = append(exps, exp)
 		s = s[:i]
@@ -156,7 +157,7 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		s = s[:i] + s[i+1:]
 	}
 	if _, ok := d.Coeff.SetString(s, 10); !ok {
-		return 0, errors.Errorf("parse mantissa: %s", s)
+		return 0, fmt.Errorf("parse mantissa: %s", s)
 	}
 	// No parse errors, can now flag as finite.
 	d.Form = Finite
@@ -248,19 +249,19 @@ func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
 // int64, an error is returned.
 func (d *Decimal) Int64() (int64, error) {
 	if d.Form != Finite {
-		return 0, errors.Errorf("%s is not finite", d.String())
+		return 0, fmt.Errorf("%s is not finite", d.String())
 	}
 	var integ, frac Decimal
 	d.Modf(&integ, &frac)
 	if !frac.IsZero() {
-		return 0, errors.Errorf("%s: has fractional part", d.String())
+		return 0, fmt.Errorf("%s: has fractional part", d.String())
 	}
 	var ed ErrDecimal
 	if integ.Cmp(decimalMaxInt64) > 0 {
-		return 0, errors.Errorf("%s: greater than max int64", d.String())
+		return 0, fmt.Errorf("%s: greater than max int64", d.String())
 	}
 	if integ.Cmp(decimalMinInt64) < 0 {
-		return 0, errors.Errorf("%s: less than min int64", d.String())
+		return 0, fmt.Errorf("%s: less than min int64", d.String())
 	}
 	if err := ed.Err(); err != nil {
 		return 0, err
@@ -781,7 +782,7 @@ func (d *Decimal) Scan(src interface{}) error {
 		_, err := d.SetFloat64(src)
 		return err
 	default:
-		return errors.Errorf("could not convert %T to Decimal", src)
+		return fmt.Errorf("could not convert %T to Decimal", src)
 	}
 }
 

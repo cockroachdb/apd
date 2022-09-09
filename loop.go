@@ -7,9 +7,8 @@
 package apd
 
 import (
+	"fmt"
 	"math"
-
-	"github.com/pkg/errors"
 )
 
 type loop struct {
@@ -79,7 +78,7 @@ func (l *loop) done(z *Decimal) (bool, error) {
 	}
 	l.i++
 	if l.i == l.maxIterations {
-		return false, errors.Errorf(
+		return false, fmt.Errorf(
 			"%s %s: did not converge after %d iterations; prev,last result %s,%s delta %s precision: %d",
 			l.name, l.arg.String(), l.maxIterations, z.String(), l.prevZ.String(), l.delta.String(), l.precision,
 		)

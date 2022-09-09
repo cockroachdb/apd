@@ -15,9 +15,9 @@
 package apd
 
 import (
+	"errors"
+	"fmt"
 	"math"
-
-	"github.com/pkg/errors"
 )
 
 // Context maintains options for Decimal operations. It can safely be used
@@ -116,7 +116,7 @@ func (c *Context) setAsNaN(d *Decimal, x, y *Decimal) (Condition, error) {
 	} else if y != nil && y.Form == NaN {
 		nan = y
 	} else {
-		return 0, errors.Errorf("no NaN value found; was shouldSetAsNaN called?")
+		return 0, errors.New("no NaN value found; was shouldSetAsNaN called?")
 	}
 	d.Set(nan)
 	var res Condition
@@ -149,7 +149,7 @@ func (c *Context) add(d, x, y *Decimal, subtract bool) (Condition, error) {
 	var tmp BigInt
 	a, b, s, err := upscale(x, y, &tmp)
 	if err != nil {
-		return 0, errors.Wrap(err, "add")
+		return 0, fmt.Errorf("add: %w", err)
 	}
 	d.Negative = xn
 	if xn == yn {
@@ -379,7 +379,7 @@ func (c *Context) QuoInteger(d, x, y *Decimal) (Condition, error) {
 	var tmp BigInt
 	a, b, _, err := upscale(x, y, &tmp)
 	if err != nil {
-		return 0, errors.Wrap(err, "QuoInteger")
+		return 0, fmt.Errorf("QuoInteger: %w", err)
 	}
 	d.Coeff.Quo(a, b)
 	d.Form = Finite
@@ -421,7 +421,7 @@ func (c *Context) Rem(d, x, y *Decimal) (Condition, error) {
 	var tmp1 BigInt
 	a, b, s, err := upscale(x, y, &tmp1)
 	if err != nil {
-		return 0, errors.Wrap(err, "Rem")
+		return 0, fmt.Errorf("Rem: %w", err)
 	}
 	var tmp2 BigInt
 	tmp2.QuoRem(a, b, &d.Coeff)
@@ -858,7 +858,7 @@ func (c *Context) Log10(d, x *Decimal) (Condition, error) {
 	var z Decimal
 	_, err := nc.Ln(&z, x)
 	if err != nil {
-		return 0, errors.Wrap(err, "ln")
+		return 0, fmt.Errorf("ln: %w", err)
 	}
 	nc.Precision = c.Precision
 
@@ -942,7 +942,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	nc := c.WithPrecision(cp)
 	nc.Rounding = RoundHalfEven
 	if _, err := nc.Quo(&r, x, &k); err != nil {
-		return 0, errors.Wrap(err, "Quo")
+		return 0, fmt.Errorf("Quo: %w", err)
 	}
 	var ra Decimal
 	ra.Abs(&r)
@@ -951,7 +951,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	// Stage 3
 	rf, err := ra.Float64()
 	if err != nil {
-		return 0, errors.Wrap(err, "r.Float64")
+		return 0, fmt.Errorf("r.Float64: %w", err)
 	}
 	pf := float64(p)
 	nf := math.Ceil((1.435*pf - 1.182) / math.Log10(pf/rf))
@@ -983,11 +983,11 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 	var tmpE BigInt
 	ki, err := exp10(int64(t), &tmpE)
 	if err != nil {
-		return 0, errors.Wrap(err, "ki")
+		return 0, fmt.Errorf("ki: %w", err)
 	}
 	ires, err := nc.integerPower(d, &sum, ki)
 	if err != nil {
-		return 0, errors.Wrap(err, "integer power")
+		return 0, fmt.Errorf("integer power: %w", err)
 	}
 	res |= ires
 	nc.Precision = c.Precision
