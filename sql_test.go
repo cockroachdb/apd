@@ -12,6 +12,7 @@
 // implied. See the License for the specific language governing
 // permissions and limitations under the License.
 
+//go:build sql
 // +build sql
 
 package apd
@@ -34,8 +35,8 @@ func TestSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, _, err := NewFromString("1234.567e5")
-	if err != nil {
+	var a Decimal
+	if _, _, err = a.SetString("1234.567e5"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec("drop table if exists d"); err != nil {
@@ -52,14 +53,14 @@ func TestSQL(t *testing.T) {
 	}
 	var b, c, d Decimal
 	var nd NullDecimal
-	if err := db.QueryRow("select v, v::text, v::int, v::float, v from d").Scan(a, &b, &c, &d, &nd); err != nil {
+	if err := db.QueryRow("select v, v::text, v::int, v::float, v from d").Scan(&a, &b, &c, &d, &nd); err != nil {
 		t.Fatal(err)
 	}
 	want, _, err := NewFromString("123556700")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, v := range []*Decimal{a, &b, &c, &d, &nd.Decimal} {
+	for i, v := range []*Decimal{&a, &b, &c, &d, &nd.Decimal} {
 		if v.Cmp(want) != 0 {
 			t.Fatalf("%d: unexpected: %s, want: %s", i, v.String(), want.String())
 		}
