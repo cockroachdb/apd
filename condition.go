@@ -15,9 +15,9 @@
 package apd
 
 import (
+	"errors"
+	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Condition holds condition flags.
@@ -143,7 +143,7 @@ func (r Condition) String() string {
 		case Clamped:
 			s = "clamped"
 		default:
-			panic(errors.Errorf("unknown condition %d", i))
+			panic(fmt.Errorf("unknown condition %d", i))
 		}
 		names = append(names, s)
 	}
