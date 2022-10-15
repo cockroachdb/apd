@@ -26,8 +26,8 @@ import (
 // zeros (the 'g' format avoids the use of 'f' in this case). All other
 // formats always show the exact precision of the Decimal.
 func (d *Decimal) Text(format byte) string {
-	cap := 10 // TODO(gri) determine a good/better value here
-	return string(d.Append(make([]byte, 0, cap), format))
+	var buf [16]byte
+	return string(d.Append(buf[:0], format))
 }
 
 // String formats x like x.Text('G'). It matches the to-scientific-string
@@ -57,7 +57,8 @@ func (d *Decimal) Append(buf []byte, fmt byte) []byte {
 		return append(buf, "unknown"...)
 	}
 
-	digits := d.Coeff.String()
+	var scratch [16]byte
+	digits := d.Coeff.Append(scratch[:0], 10)
 	switch fmt {
 	case 'e', 'E':
 		return fmtE(buf, fmt, d, digits)
@@ -83,7 +84,7 @@ func (d *Decimal) Append(buf []byte, fmt byte) []byte {
 }
 
 // %e: d.ddddde±d
-func fmtE(buf []byte, fmt byte, d *Decimal, digits string) []byte {
+func fmtE(buf []byte, fmt byte, d *Decimal, digits []byte) []byte {
 	adj := int64(d.Exponent) + int64(len(digits)) - 1
 	buf = append(buf, digits[0])
 	if len(digits) > 1 {
@@ -103,7 +104,7 @@ func fmtE(buf []byte, fmt byte, d *Decimal, digits string) []byte {
 }
 
 // %f: ddddddd.ddddd
-func fmtF(buf []byte, d *Decimal, digits string) []byte {
+func fmtF(buf []byte, d *Decimal, digits []byte) []byte {
 	if d.Exponent < 0 {
 		if left := -int(d.Exponent) - len(digits); left >= 0 {
 			buf = append(buf, "0."...)

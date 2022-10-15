@@ -24,11 +24,11 @@ import (
 // runBenches benchmarks a given function on random decimals on combinations of
 // three parameters:
 //
-//   precision:    desired output precision
-//   inScale:      the scale of the input decimal: the absolute value will be between
-//                 10^inScale and 10^(inScale+1)
-//   inNumDigits:  number of digits in the input decimal; if negative the number
-//                 will be negative and the number of digits are the absolute value.
+//	precision:    desired output precision
+//	inScale:      the scale of the input decimal: the absolute value will be between
+//	              10^inScale and 10^(inScale+1)
+//	inNumDigits:  number of digits in the input decimal; if negative the number
+//	              will be negative and the number of digits are the absolute value.
 func runBenches(
 	b *testing.B, precision, inScale, inNumDigits []int, fn func(*testing.B, *Context, *Decimal),
 ) {
@@ -102,4 +102,23 @@ func BenchmarkLn(b *testing.B) {
 			}
 		},
 	)
+}
+
+func BenchmarkDecimalString(b *testing.B) {
+	rng := rand.New(rand.NewSource(461210934723948))
+	corpus := func() []Decimal {
+		res := make([]Decimal, 8192)
+		for i := range res {
+			_, err := res[i].SetFloat64(rng.Float64())
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+		return res
+	}()
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = corpus[rng.Intn(len(corpus))].String()
+	}
 }
