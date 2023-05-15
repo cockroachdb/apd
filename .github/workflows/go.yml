@@ -61,10 +61,10 @@ jobs:
         run: go vet -unsafeptr=false ./...
 
       - name: 'Staticcheck'
-        # staticcheck requires go1.17.
-        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.17' }}
+        # staticcheck requires go1.19.
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.19' }}
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install honnef.co/go/tools/cmd/staticcheck@v0.4.3
           staticcheck ./...
 
       - name: 'GCAssert'
