@@ -683,8 +683,26 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				if strings.HasPrefix(tc.Result, "SNAN") {
 					tc.Result = "sNaN"
 				}
-				if !strings.EqualFold(s, tc.Result) {
-					t.Fatalf("expected %s, got %s", tc.Result, s)
+				expected := tc.Result
+				// Adjust 0E- or -0E- tests to match PostgreSQL behavior.
+				// See: https://github.com/cockroachdb/cockroach/issues/102217.
+				if pos, neg := strings.HasPrefix(expected, "0E-"), strings.HasPrefix(expected, "-0E-"); pos || neg {
+					startIdx := 3
+					if neg {
+						startIdx = 4
+					}
+					p, err := strconv.ParseInt(expected[startIdx:], 10, 64)
+					if err != nil {
+						t.Fatalf("unexpected error converting int: %v", err)
+					}
+					expected = ""
+					if neg {
+						expected = "-"
+					}
+					expected += "0." + strings.Repeat("0", int(p))
+				}
+				if !strings.EqualFold(s, expected) {
+					t.Fatalf("expected %s, got %s", expected, s)
 				}
 				return
 			}

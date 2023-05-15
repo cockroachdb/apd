@@ -65,9 +65,19 @@ func (d *Decimal) Append(buf []byte, fmt byte) []byte {
 	case 'f':
 		return fmtF(buf, d, digits)
 	case 'g', 'G':
+		// Ensure that we correctly display all 0s like PostgreSQL does.
+		// For 0.00000000, the co-efficient is represented as 0
+		// and hence the digits is incorrectly 0 (for 1.000000, it'd be
+		// 10000000). Hence, pad the digit length before calculating the
+		// adjExponentLimit.
+		// See: https://github.com/cockroachdb/cockroach/issues/102217.
+		digitLen := len(digits)
+		if d.Coeff.BitLen() == 0 && d.Exponent < 0 {
+			digitLen += int(-d.Exponent)
+		}
 		// See: http://speleotrove.com/decimal/daconvs.html#reftostr
 		const adjExponentLimit = -6
-		adj := int(d.Exponent) + (len(digits) - 1)
+		adj := int(d.Exponent) + (digitLen - 1)
 		if d.Exponent <= 0 && adj >= adjExponentLimit {
 			return fmtF(buf, d, digits)
 		}

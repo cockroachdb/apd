@@ -75,4 +75,16 @@ func TestSQL(t *testing.T) {
 	if nd.Valid {
 		t.Fatal("expected null")
 	}
+
+	var g Decimal
+	if err := db.QueryRow("select 0::decimal(19,9)").Scan(&g); err != nil {
+		t.Fatal(err)
+	}
+	zeroD, _, err := NewFromString("0.000000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.String() != zeroD.String() {
+		t.Fatalf("expected 0::decimal(19.9) pg value %s match, found %s", g.String(), zeroD.String())
+	}
 }
