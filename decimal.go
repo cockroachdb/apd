@@ -26,7 +26,7 @@ import (
 
 // Decimal is an arbitrary-precision decimal. Its value is:
 //
-//     Negative × Coeff × 10**Exponent
+//	Negative × Coeff × 10**Exponent
 //
 // Coeff must be positive. If it is negative results may be incorrect and
 // apd may panic.
@@ -198,6 +198,7 @@ func (c *Context) SetString(d *Decimal, s string) (*Decimal, Condition, error) {
 }
 
 // Set sets d's fields to the values of x and returns d.
+//
 //gcassert:inline
 func (d *Decimal) Set(x *Decimal) *Decimal {
 	if d == x {
@@ -241,7 +242,8 @@ func (d *Decimal) setCoefficient(x int64) {
 // SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
 // hold the exact value of f.
 func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
-	_, _, err := d.SetString(strconv.FormatFloat(f, 'E', -1, 64))
+	var buf [32]byte // Avoid most of the allocations in strconv.
+	_, _, err := d.SetString(string(strconv.AppendFloat(buf[:0], f, 'E', -1, 64)))
 	return d, err
 }
 
@@ -425,22 +427,21 @@ func (d *Decimal) setBig(b *BigInt) *BigInt {
 // For example, the following values are ordered from lowest to highest. Note
 // the difference in ordering between 1.2300 and 1.23.
 //
-//   -NaN
-//   -NaNSignaling
-//   -Infinity
-//   -127
-//   -1.00
-//   -1
-//   -0.000
-//   -0
-//   0
-//   1.2300
-//   1.23
-//   1E+9
-//   Infinity
-//   NaNSignaling
-//   NaN
-//
+//	-NaN
+//	-NaNSignaling
+//	-Infinity
+//	-127
+//	-1.00
+//	-1
+//	-0.000
+//	-0
+//	0
+//	1.2300
+//	1.23
+//	1E+9
+//	Infinity
+//	NaNSignaling
+//	NaN
 func (d *Decimal) CmpTotal(x *Decimal) int {
 	do := d.cmpOrder()
 	xo := x.cmpOrder()
@@ -493,9 +494,9 @@ func (d *Decimal) cmpOrder() int {
 
 // Cmp compares x and y and sets d to:
 //
-//   -1 if x <  y
-//    0 if x == y
-//   +1 if x >  y
+//	-1 if x <  y
+//	 0 if x == y
+//	+1 if x >  y
 //
 // This comparison respects the normal rules of special values (like NaN),
 // and does not compare them.
@@ -510,11 +511,10 @@ func (c *Context) Cmp(d, x, y *Decimal) (Condition, error) {
 
 // Cmp compares d and x and returns:
 //
-//   -1 if d <  x
-//    0 if d == x
-//   +1 if d >  x
-//   undefined if d or x are NaN
-//
+//	-1 if d <  x
+//	 0 if d == x
+//	+1 if d >  x
+//	undefined if d or x are NaN
 func (d *Decimal) Cmp(x *Decimal) int {
 	ds := d.Sign()
 	xs := x.Sign()
@@ -600,7 +600,6 @@ func (d *Decimal) Cmp(x *Decimal) int {
 //
 //	-1 if d.Negative == true
 //	+1 if d.Negative == false
-//
 func (d *Decimal) Sign() int {
 	if d.Form == Finite && d.Coeff.Sign() == 0 {
 		return 0
@@ -803,15 +802,14 @@ func (d *Decimal) MarshalText() ([]byte, error) {
 // NullDecimal represents a string that may be null. NullDecimal implements
 // the database/sql.Scanner interface so it can be used as a scan destination:
 //
-//  var d NullDecimal
-//  err := db.QueryRow("SELECT num FROM foo WHERE id=?", id).Scan(&d)
-//  ...
-//  if d.Valid {
-//     // use d.Decimal
-//  } else {
-//     // NULL value
-//  }
-//
+//	var d NullDecimal
+//	err := db.QueryRow("SELECT num FROM foo WHERE id=?", id).Scan(&d)
+//	...
+//	if d.Valid {
+//	   // use d.Decimal
+//	} else {
+//	   // NULL value
+//	}
 type NullDecimal struct {
 	Decimal Decimal
 	Valid   bool // Valid is true if Decimal is not NULL

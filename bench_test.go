@@ -122,3 +122,23 @@ func BenchmarkDecimalString(b *testing.B) {
 		_ = corpus[rng.Intn(len(corpus))].String()
 	}
 }
+
+func BenchmarkDecimalSetFloat(b *testing.B) {
+	rng := rand.New(rand.NewSource(461210934723948))
+	corpus := func() []float64 {
+		res := make([]float64, 8192)
+		for i := range res {
+			res[i] = rng.ExpFloat64()
+		}
+		return res
+	}()
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var d Decimal
+		_, err := d.SetFloat64(corpus[rng.Intn(len(corpus))])
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
