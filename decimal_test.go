@@ -920,3 +920,11 @@ func TestJSONEncoding(t *testing.T) {
 		}
 	}
 }
+
+func TestLargeExpString(t *testing.T) {
+	d := Decimal{Negative: true, Exponent: -12345678}
+	s := d.String()
+	if exp, got := 1024, len(s); exp < got {
+		t.Fatalf("expected len(s) < %d, got %d", exp, got)
+	}
+}
