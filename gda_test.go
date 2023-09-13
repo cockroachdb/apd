@@ -695,11 +695,13 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 					if err != nil {
 						t.Fatalf("unexpected error converting int: %v", err)
 					}
-					expected = ""
-					if neg {
-						expected = "-"
+					if p <= -lowestZeroNegativeCoefficientCockroach {
+						expected = ""
+						if neg {
+							expected = "-"
+						}
+						expected += "0." + strings.Repeat("0", int(p))
 					}
-					expected += "0." + strings.Repeat("0", int(p))
 				}
 				if !strings.EqualFold(s, expected) {
 					t.Fatalf("expected %s, got %s", expected, s)

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
+	"strings"
 	"testing"
 	"unsafe"
 )
@@ -452,6 +453,18 @@ func TestFormat(t *testing.T) {
 			f: "0.000000000",
 			g: "0.000000000",
 			G: "0.000000000",
+		},
+		"0E-2000": {
+			e: "0e-2000",
+			f: "0." + strings.Repeat("0", 2000),
+			g: "0." + strings.Repeat("0", 2000),
+			G: "0." + strings.Repeat("0", 2000),
+		},
+		"0E-2001": {
+			e: "0e-2001",
+			f: "0." + strings.Repeat("0", 2001),
+			g: "0e-2001",
+			G: "0E-2001",
 		},
 	}
 	verbs := []string{"%e", "%E", "%f", "%g", "%G"}
