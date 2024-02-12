@@ -15,7 +15,11 @@
 package apd
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
+	"math"
+	"strconv"
 	"testing"
 )
 
@@ -108,4 +112,137 @@ func TestDecomposerCompose(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDecomposerDecompose_usesTheBufferForCoefficientWithSameSize(t *testing.T) {
+	tests := []struct {
+		value string
+	}{
+		{"0"},
+		{"1"},
+		{strconv.FormatUint(math.MaxUint32, 10)},
+		{strconv.FormatUint(math.MaxUint64, 10)},
+		{"18446744073709551616"}, // math.MaxUint64 + 1
+		{"36893488147419103230"}, // math.MaxUint64 * 2
+	}
+
+	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			value, _, err := NewFromString(test.value)
+			if err != nil {
+				t.Fatal("unexpected error", err)
+			}
+
+			buffer := make([]byte, 0, (value.Coeff.BitLen()+8-1)/8)
+
+			_, _, coef, _ := value.Decompose(buffer)
+			if !bytes.Equal(coef, value.Coeff.Bytes()) {
+				t.Fatalf("unexpected different coefficients: %s != %s", hex.EncodeToString(coef), hex.EncodeToString(value.Coeff.Bytes()))
+			}
+
+			var res BigInt
+			res.SetBytes(coef)
+			if res != value.Coeff {
+				t.Fatal("unexpected different results")
+			}
+		})
+	}
+}
+
+func TestDecomposerDecompose_usesTheBufferForCoefficientWithBiggerSize(t *testing.T) {
+	tests := []struct {
+		value string
+	}{
+		{"0"},
+		{"1"},
+		{strconv.FormatUint(math.MaxUint32, 10)},
+		{strconv.FormatUint(math.MaxUint64, 10)},
+		{"18446744073709551616"}, // math.MaxUint64 + 1
+		{"36893488147419103230"}, // math.MaxUint64 * 2
+	}
+
+	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			value, _, err := NewFromString(test.value)
+			if err != nil {
+				t.Fatal("unexpected error", err)
+			}
+
+			buffer := make([]byte, 0, 64)
+
+			_, _, coef, _ := value.Decompose(buffer)
+			if !bytes.Equal(coef, value.Coeff.Bytes()) {
+				t.Fatalf("unexpected different coefficients: %s != %s", hex.EncodeToString(coef), hex.EncodeToString(value.Coeff.Bytes()))
+			}
+
+			var res BigInt
+			res.SetBytes(coef)
+			if res != value.Coeff {
+				t.Fatal("unexpected different results")
+			}
+		})
+	}
+}
+
+func TestDecomposerDecompose_ignoresBufferIfItDoesNotFit(t *testing.T) {
+	value := New(42, 0)
+	buffer := make([]byte, 0)
+
+	_, _, coef, _ := value.Decompose(buffer)
+	if !bytes.Equal([]byte{42}, coef) {
+		t.Fatal("unexpected different buffers", coef)
+	}
+
+	_, _, coef, _ = value.Decompose(nil)
+	if !bytes.Equal([]byte{42}, coef) {
+		t.Fatal("unexpected different buffers with <nil>", coef)
+	}
+}
+
+func TestDecomposerDecompose_usesBufferWithNonZeroLength(t *testing.T) {
+	value := New(42, 0)
+	buffer := make([]byte, 4)
+
+	_, _, coef, _ := value.Decompose(buffer)
+	if !bytes.Equal([]byte{42}, coef) {
+		t.Fatal("unexpected different buffers", coef)
+	}
+}
+
+func TestDecomposerDecompose_usesBufferWithNonZeroCapacity(t *testing.T) {
+	value := New(42, 0)
+	buffer := make([]byte, 0, 4)
+
+	_, _, coef, _ := value.Decompose(buffer)
+	if !bytes.Equal([]byte{42}, coef) {
+		t.Fatal("unexpected different buffers", coef)
+	}
+}
+
+func TestDecomposerDecompose_extendsBufferWithNonZeroLength(t *testing.T) {
+	value := New(math.MaxInt64, 0)
+	buffer := make([]byte, 2)
+
+	_, _, coef, _ := value.Decompose(buffer)
+	if !bytes.Equal([]byte{127, 255, 255, 255, 255, 255, 255, 255}, coef) {
+		t.Fatal("unexpected different buffers", coef)
+	}
+}
+
+func BenchmarkDecomposerDecompose(b *testing.B) {
+	b.Run("no allocation", func(b *testing.B) {
+		buf := make([]byte, 0, 8)
+		value := New(42, -1)
+
+		for i := 0; i < b.N; i++ {
+			_, _, _, _ = value.Decompose(buf)
+		}
+	})
+	b.Run("one allocation", func(b *testing.B) {
+		value := New(42, -1)
+
+		for i := 0; i < b.N; i++ {
+			_, _, _, _ = value.Decompose(nil)
+		}
+	})
 }
