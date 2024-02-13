@@ -27,6 +27,8 @@ jobs:
           - '1.18'
           - '1.19'
           - '1.20'
+          - '1.21'
+          - '1.22'
 
     steps:
       - uses: actions/checkout@v2
@@ -71,9 +73,9 @@ jobs:
       - name: 'GCAssert'
         # Only run gcassert on the latest versions of Go. Inlining heuristics
         # change from version to version.
-        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.17' }}
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.18' }}
         run: |
-          go install github.com/jordanlewis/gcassert/cmd/gcassert@latest
+          go install github.com/jordanlewis/gcassert/cmd/gcassert@7b67d223
           gcassert ./...
 
       - name: 'BuildTest for armv7'
