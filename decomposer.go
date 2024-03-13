@@ -34,9 +34,11 @@ import "fmt"
 // Implementations must return an error if a NaN or Infinity is attempted to be set while neither
 // are supported.
 type decomposer interface {
-	// Decompose returns the internal decimal state into parts.
-	// If the provided buf has sufficient capacity, buf may be returned as the coefficient with
-	// the value set and length set as appropriate.
+	// Decompose returns the internal decimal state into parts. If the provided buf
+	// has sufficient capacity, buf may be returned as the coefficient with the
+	// value set and length set as appropriate. Note that it does not act like
+	// Append-like functions and does not fill necessarily from the beginning of the
+	// buffer.
 	Decompose(buf []byte) (form byte, negative bool, coefficient []byte, exponent int32)
 
 	// Compose sets the internal decimal value from parts. If the value cannot be
@@ -48,9 +50,11 @@ type decomposer interface {
 
 var _ decomposer = &Decimal{}
 
-// Decompose returns the internal decimal state into parts.
-// If the provided buf has sufficient capacity, buf may be returned as the coefficient with
-// the value set and length set as appropriate.
+// Decompose returns the internal decimal state into parts. If the provided buf
+// has sufficient capacity, buf may be returned as the coefficient with the
+// value set and length set as appropriate. Note that it does not act like
+// Append-like functions and does not fill necessarily from the beginning of the
+// buffer.
 func (d *Decimal) Decompose(buf []byte) (form byte, negative bool, coefficient []byte, exponent int32) {
 	switch d.Form {
 	default:
@@ -69,7 +73,19 @@ func (d *Decimal) Decompose(buf []byte) (form byte, negative bool, coefficient [
 	// Finite form.
 	negative = d.Negative
 	exponent = d.Exponent
-	coefficient = d.Coeff.Bytes()
+
+	sizeInBytes := (d.Coeff.BitLen() + 8 - 1) / 8 // math.Ceil(d.Coeff.BitLen()/8.0)
+	if cap(buf) >= sizeInBytes {
+		// It extends the buffer as the filling of bytes expects an already
+		// allocated slice.
+		buf = buf[:sizeInBytes]
+
+		// We can fit the coefficient in the given buffer which prevents an
+		// allocation.
+		coefficient = d.Coeff.FillBytes(buf)
+	} else {
+		coefficient = d.Coeff.Bytes()
+	}
 	return
 }
 
