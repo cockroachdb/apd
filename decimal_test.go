@@ -964,3 +964,33 @@ func TestJSONEncoding(t *testing.T) {
 		}
 	}
 }
+
+// TestNewFromStringInvalid tests that NewFromString produces
+// an error when parsing an invalid decimal.
+func TestNewFromStringInvalid(t *testing.T) {
+	tests := []struct {
+		input string
+	}{
+		{input: ".-5"},
+		{input: ".+5"},
+		{input: ".-0"},
+		{input: ".+0"},
+		{input: ".-123"},
+		{input: ".+123"},
+		{input: "1.-2"},
+		{input: "1.+2"},
+		{input: ".1-2"},
+		{input: ".1+2"},
+		{input: ".-5e1"},
+		{input: ".+5e1"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			d, _, err := NewFromString(tc.input)
+			if err == nil {
+				t.Fatalf("expected error for %q, but parsed as: %s (Negative=%v, Coeff=%s)",
+					tc.input, d.String(), d.Negative, d.Coeff.String())
+			}
+		})
+	}
+}
