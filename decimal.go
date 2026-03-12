@@ -156,6 +156,11 @@ func (d *Decimal) setString(c *Context, s string) (Condition, error) {
 		exps = append(exps, -exp)
 		s = s[:i] + s[i+1:]
 	}
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			return 0, fmt.Errorf("parse mantissa: %s", s)
+		}
+	}
 	if _, ok := d.Coeff.SetString(s, 10); !ok {
 		return 0, fmt.Errorf("parse mantissa: %s", s)
 	}
