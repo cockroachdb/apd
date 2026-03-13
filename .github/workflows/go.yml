@@ -69,10 +69,10 @@ jobs:
       - name: 'GCAssert'
         # Only run gcassert on the latest versions of Go. Inlining heuristics
         # change from version to version.
-        # gcassert@7b67d223 uses x/tools v0.17.0, which doesn't support Go 1.24+.
-        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.22' && matrix.go < '1.24' }}
+        # gcassert requires go1.22+.
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.22' }}
         run: |
-          go install github.com/jordanlewis/gcassert/cmd/gcassert@7b67d223
+          go install github.com/jordanlewis/gcassert/cmd/gcassert@ad3fae17aff
           gcassert ./...
 
       - name: 'BuildTest for armv7'
