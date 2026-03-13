@@ -19,21 +19,18 @@ jobs:
           - armv7
           - aarch64
         go:
-          - '1.15'
-          - '1.16'
-          - '1.17'
-          - '1.18'
           - '1.19'
           - '1.20'
           - '1.21'
           - '1.22'
           - '1.23'
+          - '1.24'
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: '${{ matrix.go }}'
 
@@ -63,16 +60,17 @@ jobs:
         run: go vet -unsafeptr=false ./...
 
       - name: 'Staticcheck'
-        # staticcheck requires go1.22.
-        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.22' }}
+        # staticcheck 2025.1.1 requires go1.23.
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.23' }}
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@v0.5.0
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
           staticcheck ./...
 
       - name: 'GCAssert'
         # Only run gcassert on the latest versions of Go. Inlining heuristics
         # change from version to version.
-        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.18' }}
+        # gcassert@7b67d223 uses x/tools v0.17.0, which doesn't support Go 1.24+.
+        if: ${{ matrix.arch == 'x64' && matrix.go >= '1.22' && matrix.go < '1.24' }}
         run: |
           go install github.com/jordanlewis/gcassert/cmd/gcassert@7b67d223
           gcassert ./...
@@ -91,13 +89,11 @@ jobs:
         run: go test -c ./...
 
       - name: 'Test and Bench on ${{ matrix.arch }}'
-        # arch != 'x64': we already tested on x86 above.
-        # go != '1.13': go1.13 + arm is significantly slower, so don't run test suite.
-        if: ${{ matrix.arch != 'x64' && matrix.go != '1.13' }}
-        uses: uraimo/run-on-arch-action@v2.1.1
+        if: ${{ matrix.arch != 'x64' }}
+        uses: uraimo/run-on-arch-action@v3
         with:
           arch: ${{ matrix.arch }}
-          distro: ubuntu20.04
+          distro: ubuntu24.04
           dockerRunArgs: --mount type=bind,source="$(pwd)",target=/checkout,readonly
           run: |
             find /checkout -name '*.test' -type f -executable -print0 | xargs -0 -I '{}' sh -c '{} -test.run=. -test.bench=. -test.benchtime=1x -test.v'
