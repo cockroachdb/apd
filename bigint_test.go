@@ -1094,6 +1094,74 @@ func TestBigIntMulRangeZ(t *testing.T) {
 	}
 }
 
+func TestBigIntNoNegativeZero(t *testing.T) {
+	zero := NewBigInt(0)
+	negOne := NewBigInt(-1)
+	one := NewBigInt(1)
+	negTwo := NewBigInt(-2)
+
+	t.Run("Mul", func(t *testing.T) {
+		// (-1) * 0 should be 0, not negative zero
+		var result BigInt
+		result.Mul(negOne, zero)
+		if result.Sign() != 0 {
+			t.Errorf("(-1) * 0: got Sign() = %d, want 0", result.Sign())
+		}
+		if result.Cmp(zero) != 0 {
+			t.Errorf("(-1) * 0: got Cmp(0) = %d, want 0", result.Cmp(zero))
+		}
+
+		// 0 * (-1) should be 0, not negative zero
+		result.Mul(zero, negOne)
+		if result.Sign() != 0 {
+			t.Errorf("0 * (-1): got Sign() = %d, want 0", result.Sign())
+		}
+	})
+
+	t.Run("Quo", func(t *testing.T) {
+		// 0 / (-1) should be 0, not negative zero
+		var result BigInt
+		result.Quo(zero, negOne)
+		if result.Sign() != 0 {
+			t.Errorf("0 / (-1): got Sign() = %d, want 0", result.Sign())
+		}
+		if result.Cmp(zero) != 0 {
+			t.Errorf("0 / (-1): got Cmp(0) = %d, want 0", result.Cmp(zero))
+		}
+
+		// 1 / (-2) should be 0, not negative zero
+		result.Quo(one, negTwo)
+		if result.Sign() != 0 {
+			t.Errorf("1 / (-2): got Sign() = %d, want 0", result.Sign())
+		}
+	})
+
+	t.Run("Rem", func(t *testing.T) {
+		// (-2) % 2 should be 0, not negative zero
+		var result BigInt
+		two := NewBigInt(2)
+		result.Rem(negTwo, two)
+		if result.Sign() != 0 {
+			t.Errorf("(-2) %% 2: got Sign() = %d, want 0", result.Sign())
+		}
+		if result.Cmp(zero) != 0 {
+			t.Errorf("(-2) %% 2: got Cmp(0) = %d, want 0", result.Cmp(zero))
+		}
+	})
+
+	t.Run("QuoRem", func(t *testing.T) {
+		// 0 / (-1) via QuoRem
+		var quo, rem BigInt
+		quo.QuoRem(zero, negOne, &rem)
+		if quo.Sign() != 0 {
+			t.Errorf("QuoRem(0, -1): quo Sign() = %d, want 0", quo.Sign())
+		}
+		if rem.Sign() != 0 {
+			t.Errorf("QuoRem(0, -1): rem Sign() = %d, want 0", rem.Sign())
+		}
+	})
+}
+
 func TestBigIntBinomial(t *testing.T) {
 	var z BigInt
 	for _, test := range []struct {

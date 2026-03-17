@@ -325,7 +325,7 @@ func addInline(xVal, yVal uint64, xNeg, yNeg bool) (zVal uint64, zNeg, ok bool) 
 //gcassert:inline
 func mulInline(xVal, yVal uint64, xNeg, yNeg bool) (zVal uint64, zNeg, ok bool) {
 	hi, lo := bits.Mul64(xVal, yVal)
-	neg := xNeg != yNeg
+	neg := xNeg != yNeg && lo != 0
 	overflow := hi != 0
 	return lo, neg, !overflow
 }
@@ -336,7 +336,7 @@ func quoInline(xVal, yVal uint64, xNeg, yNeg bool) (quoVal uint64, quoNeg, ok bo
 		return 0, false, false
 	}
 	quo := xVal / yVal
-	neg := xNeg != yNeg
+	neg := xNeg != yNeg && quo != 0
 	return quo, neg, true
 }
 
@@ -346,7 +346,7 @@ func remInline(xVal, yVal uint64, xNeg, yNeg bool) (remVal uint64, remNeg, ok bo
 		return 0, false, false
 	}
 	rem := xVal % yVal
-	return rem, xNeg, true
+	return rem, xNeg && rem != 0, true
 }
 
 ///////////////////////////////////////////////////////////////////////////////
