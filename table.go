@@ -52,6 +52,7 @@ func init() {
 }
 
 // NumDigits returns the number of decimal digits of d.Coeff.
+//
 //gcassert:inline
 func (d *Decimal) NumDigits() int64 {
 	return NumDigits(&d.Coeff)
@@ -94,7 +95,7 @@ func NumDigits(b *BigInt) int64 {
 	var a *BigInt
 	if b.Sign() < 0 {
 		var tmpA BigInt
-		a := &tmpA
+		a = &tmpA
 		a.Abs(b)
 	} else {
 		a = b
