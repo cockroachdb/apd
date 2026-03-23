@@ -171,3 +171,30 @@ func TestTableExp10(t *testing.T) {
 		}
 	}
 }
+
+// TestNumDigitsLargeNegative is a regression test for a bug where NumDigits
+// would panic with a nil pointer dereference when processing large negative
+// numbers (more than 128 bits). Seen in
+// https://github.com/cockroachdb/cockroach/issues/165525.
+func TestNumDigitsLargeNegative(t *testing.T) {
+	// Create a BigInt directly with more than 128 bits.
+	var b BigInt
+	b.SetInt64(2)
+	exp := NewBigInt(200)
+	b.Exp(&b, exp, nil)
+	b.Neg(&b)
+
+	numDigits := NumDigits(&b)
+	// 2^200 has 61 decimal digits.
+	expectedDigits := int64(61)
+	if numDigits != expectedDigits {
+		t.Errorf("expected %d digits, got %d", expectedDigits, numDigits)
+	}
+
+	// Also test via Decimal.
+	d := NewWithBigInt(&b, 0)
+	numDigits2 := d.NumDigits()
+	if numDigits2 != expectedDigits {
+		t.Errorf("expected %d digits via Decimal, got %d", expectedDigits, numDigits2)
+	}
+}
