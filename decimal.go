@@ -489,6 +489,30 @@ func (d *Decimal) CmpTotal(x *Decimal) int {
 	}
 }
 
+// CmpTotalMag compares the magnitudes of d and x using the total ordering, and
+// returns -1, 0 or +1. It is equivalent to d.Abs().CmpTotal(x.Abs()) but does
+// not modify d or x. See CmpTotal for the definition of the total ordering.
+func (d *Decimal) CmpTotalMag(x *Decimal) int {
+	var da, xa Decimal
+	da.Abs(d)
+	xa.Abs(x)
+	return da.CmpTotal(&xa)
+}
+
+// SameQuantum reports whether d and x have the same exponent. Two infinities
+// are considered to have the same quantum, as are two NaNs (signaling or quiet);
+// a special value and a finite value never do.
+func (d *Decimal) SameQuantum(x *Decimal) bool {
+	dSpecial := d.Form != Finite
+	xSpecial := x.Form != Finite
+	if dSpecial || xSpecial {
+		dNaN := d.Form == NaN || d.Form == NaNSignaling
+		xNaN := x.Form == NaN || x.Form == NaNSignaling
+		return (d.Form == Infinite && x.Form == Infinite) || (dNaN && xNaN)
+	}
+	return d.Exponent == x.Exponent
+}
+
 func (d *Decimal) cmpOrder() int {
 	v := int(d.Form) + 1
 	if d.Negative {
