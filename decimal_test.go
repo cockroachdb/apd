@@ -702,6 +702,41 @@ func TestQuantize(t *testing.T) {
 	}
 }
 
+func TestQuantizeRounding(t *testing.T) {
+	tests := []struct {
+		s      string
+		e      int32
+		rnd    Rounder
+		expect string
+	}{
+		{s: "0.002", e: -1, rnd: RoundCeiling, expect: "0.1"},
+		{s: "1.002", e: -1, rnd: RoundCeiling, expect: "1.1"},
+		{s: "-0.002", e: -1, rnd: RoundCeiling, expect: "-0.0"},
+		{s: "0.002", e: -1, rnd: RoundFloor, expect: "0.0"},
+		{s: "-0.002", e: -1, rnd: RoundFloor, expect: "-0.1"},
+		{s: "0.002", e: -1, rnd: RoundUp, expect: "0.1"},
+		{s: "0.002", e: -1, rnd: RoundDown, expect: "0.0"},
+		{s: "0.04", e: -1, rnd: RoundHalfUp, expect: "0.0"},
+		{s: "0.05", e: -1, rnd: RoundHalfUp, expect: "0.1"},
+		{s: "0.05", e: -1, rnd: RoundHalfEven, expect: "0.0"},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %d %s", tc.s, tc.e, tc.rnd), func(t *testing.T) {
+			c := Context{Precision: 100, Rounding: tc.rnd, MaxExponent: 1000, MinExponent: -1000, Traps: DefaultTraps}
+			d, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.Quantize(d, d, tc.e); err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("expected: %s, got: %s", tc.expect, s)
+			}
+		})
+	}
+}
+
 func TestCmpOrder(t *testing.T) {
 	tests := []struct {
 		s     string

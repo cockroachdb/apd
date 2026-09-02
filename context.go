@@ -1182,7 +1182,13 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
 			if !d.IsZero() {
+				var discard Decimal
+				discard.Coeff.Set(&d.Coeff)
+				discard.Exponent = -diff
 				d.Coeff.SetInt64(0)
+				if c.Rounding.ShouldAddOne(&d.Coeff, d.Negative, discard.Cmp(decimalHalf)) {
+					d.Coeff.SetInt64(1)
+				}
 				res = Inexact | Rounded
 			}
 		} else {
