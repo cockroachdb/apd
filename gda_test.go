@@ -846,13 +846,6 @@ var GDAignore = map[string]bool{
 }
 
 var GDAignoreFlags = map[string]bool{
-	// unflagged clamped
-	"sqtx9024": true,
-	"sqtx9025": true,
-	"sqtx9026": true,
-	"sqtx9027": true,
-	"sqtx9038": true,
-	"sqtx9039": true,
-	"sqtx9040": true,
+	// apd does not implement the clamp context directive.
 	"sqtx9045": true,
 }

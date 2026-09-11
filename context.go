@@ -461,8 +461,23 @@ func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, er
 		}
 	case 0:
 		d.Set(x)
-		d.Exponent /= factor
-		return true, 0, nil
+		// The ideal exponent is the operand's exponent divided by factor,
+		// rounded towards negative infinity; Go's / truncates towards zero.
+		e := x.Exponent / factor
+		if x.Exponent%factor != 0 && x.Exponent < 0 {
+			e--
+		}
+		var res Condition
+		if etiny := c.etiny(); e < etiny {
+			e = etiny
+			res = Clamped
+		} else if e > c.MaxExponent {
+			e = c.MaxExponent
+			res = Clamped
+		}
+		d.Exponent = e
+		res, err := c.goError(res)
+		return true, res, err
 	}
 	return false, 0, nil
 }
