@@ -240,6 +240,17 @@ func TestModf(t *testing.T) {
 			if frac.CmpTotal(frac2) != 0 {
 				t.Fatalf("got %s, expected %s", frac2, frac)
 			}
+
+			integ3, frac3 := new(Decimal).Set(x), new(Decimal)
+			integ3.Modf(integ3, frac3)
+			if integ.CmpTotal(integ3) != 0 || frac.CmpTotal(frac3) != 0 {
+				t.Fatalf("integ aliased: got %s, %s, expected %s, %s", integ3, frac3, integ, frac)
+			}
+			integ4, frac4 := new(Decimal), new(Decimal).Set(x)
+			frac4.Modf(integ4, frac4)
+			if integ.CmpTotal(integ4) != 0 || frac.CmpTotal(frac4) != 0 {
+				t.Fatalf("frac aliased: got %s, %s, expected %s, %s", integ4, frac4, integ, frac)
+			}
 		})
 	}
 
@@ -353,15 +364,17 @@ func TestFloat64(t *testing.T) {
 
 func TestCeil(t *testing.T) {
 	tests := map[float64]int64{
-		0:    0,
-		-0.1: 0,
-		0.1:  1,
-		-0.9: 0,
-		0.9:  1,
-		-1:   -1,
-		1:    1,
-		-1.1: -1,
-		1.1:  2,
+		0:     0,
+		-0.1:  0,
+		0.1:   1,
+		-0.01: 0,
+		0.01:  1,
+		-0.9:  0,
+		0.9:   1,
+		-1:    -1,
+		1:     1,
+		-1.1:  -1,
+		1.1:   2,
 	}
 
 	for f, r := range tests {
@@ -387,15 +400,17 @@ func TestCeil(t *testing.T) {
 
 func TestFloor(t *testing.T) {
 	tests := map[float64]int64{
-		0:    0,
-		-0.1: -1,
-		0.1:  0,
-		-0.9: -1,
-		0.9:  0,
-		-1:   -1,
-		1:    1,
-		-1.1: -2,
-		1.1:  1,
+		0:     0,
+		-0.1:  -1,
+		0.1:   0,
+		-0.01: -1,
+		0.01:  0,
+		-0.9:  -1,
+		0.9:   0,
+		-1:    -1,
+		1:     1,
+		-1.1:  -2,
+		1.1:   1,
 	}
 
 	for f, r := range tests {

@@ -633,13 +633,13 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 
 	// No fractional part.
 	if d.Exponent > 0 {
+		if integ != nil {
+			integ.Set(d)
+		}
 		if frac != nil {
 			frac.Negative = neg
 			frac.Exponent = 0
 			frac.Coeff.SetInt64(0)
-		}
-		if integ != nil {
-			integ.Set(d)
 		}
 		return
 	}
@@ -647,13 +647,13 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	exp := -int64(d.Exponent)
 	// d < 0 because exponent is larger than number of digits.
 	if exp > nd {
+		if frac != nil {
+			frac.Set(d)
+		}
 		if integ != nil {
 			integ.Negative = neg
 			integ.Exponent = 0
 			integ.Coeff.SetInt64(0)
-		}
-		if frac != nil {
-			frac.Set(d)
 		}
 		return
 	}
@@ -664,8 +664,6 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	var icoeff *BigInt
 	if integ != nil {
 		icoeff = &integ.Coeff
-		integ.Exponent = 0
-		integ.Negative = neg
 	} else {
 		// This is the integ == nil branch, and we already checked if both integ and
 		// frac were nil above, so frac can never be nil in this branch.
@@ -680,6 +678,10 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 		// This is the frac == nil, which means integ must not be nil since they both
 		// can't be due to the check above.
 		icoeff.Quo(&d.Coeff, e)
+	}
+	if integ != nil {
+		integ.Exponent = 0
+		integ.Negative = neg
 	}
 }
 
