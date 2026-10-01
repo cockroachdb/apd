@@ -702,6 +702,148 @@ func TestQuantize(t *testing.T) {
 	}
 }
 
+func TestQuantizeExponentLimits(t *testing.T) {
+	currency := Context{Precision: 17, MaxExponent: 9, MinExponent: -8, Rounding: RoundHalfUp}
+	widePrecision := currency
+	widePrecision.Precision = 20
+	positiveMinimum := Context{Precision: 3, MaxExponent: 2, MinExponent: 0, Rounding: RoundHalfUp}
+	subnormal := Context{Precision: 3, MaxExponent: 2, MinExponent: -2, Rounding: RoundHalfUp}
+	carry := Context{Precision: 3, MaxExponent: 1, MinExponent: -2, Rounding: RoundHalfUp}
+	carryOverflow := carry
+	carryOverflow.Precision = 1
+	type testCase struct {
+		name    string
+		context Context
+		input   string
+		exp     int32
+		want    string
+		flags   Condition
+	}
+	tests := []testCase{
+		{"database scale", currency, "6410.000000000000000000", -8, "6410.00000000", Rounded},
+		{"same scale", currency, "6410.00000000", -8, "6410.00000000", 0},
+		{"increase scale", currency, "6410.0", -8, "6410.00000000", 0},
+		{"discard nonzero", currency, "6410.000000001000000000", -8, "6410.00000000", Rounded | Inexact},
+		{"cents", Context{Precision: 6, MaxExponent: 3, MinExponent: -2}, "6410.000000000000000000", -2, "6410.00", Rounded},
+		{"precision overflow", currency, "1000000000", -8, "NaN", InvalidOperation},
+		{"precision carry", currency, "999999999.999999995", -8, "NaN", InvalidOperation},
+		{"exponent overflow", widePrecision, "10000000000", 0, "NaN", InvalidOperation},
+		{"exponent carry", widePrecision, "9999999999.5", 0, "NaN", InvalidOperation},
+		{"target above maximum", currency, "0", 10, "NaN", InvalidOperation},
+		{"target below etiny", currency, "0", -25, "NaN", InvalidOperation},
+		{"zero retained precision", positiveMinimum, "0.50", 0, "1", Rounded | Inexact},
+		{"negative zero", positiveMinimum, "-0.49", 0, "-0", Rounded | Inexact},
+		{"carry", carry, "9.99", -1, "10.0", Rounded | Inexact},
+		{"carry past precision", carryOverflow, "9.99", 0, "NaN", InvalidOperation},
+		{"exact subnormal", subnormal, "0.0001", -4, "0.0001", Subnormal},
+		{"rounded subnormal", subnormal, "0.00120", -4, "0.0012", Rounded | Subnormal},
+		{"inexact subnormal", subnormal, "0.00124", -4, "0.0012", Rounded | Inexact | Subnormal},
+		{"carry to normal", subnormal, "0.00999", -3, "0.010", Rounded | Inexact},
+		{"round to zero", subnormal, "-0.00001", -3, "-0.000", Rounded | Inexact},
+		{"already zero", subnormal, "-0.00000", -3, "-0.000", 0},
+	}
+	for _, rounding := range []struct {
+		mode         Rounder
+		positiveEven string
+		negativeEven string
+		positiveOdd  string
+		negativeOdd  string
+	}{
+		{RoundDown, "6410.00000000", "-6410.00000000", "6410.00000001", "-6410.00000001"},
+		{RoundHalfUp, "6410.00000001", "-6410.00000001", "6410.00000002", "-6410.00000002"},
+		{RoundHalfEven, "6410.00000000", "-6410.00000000", "6410.00000002", "-6410.00000002"},
+		{RoundCeiling, "6410.00000001", "-6410.00000000", "6410.00000002", "-6410.00000001"},
+		{RoundFloor, "6410.00000000", "-6410.00000001", "6410.00000001", "-6410.00000002"},
+		{RoundHalfDown, "6410.00000000", "-6410.00000000", "6410.00000001", "-6410.00000001"},
+		{RoundUp, "6410.00000001", "-6410.00000001", "6410.00000002", "-6410.00000002"},
+		{Round05Up, "6410.00000001", "-6410.00000001", "6410.00000001", "-6410.00000001"},
+	} {
+		c := currency
+		c.Rounding = rounding.mode
+		for _, tie := range []struct{ input, want string }{
+			{"6410.000000005000000000", rounding.positiveEven},
+			{"-6410.000000005000000000", rounding.negativeEven},
+			{"6410.000000015000000000", rounding.positiveOdd},
+			{"-6410.000000015000000000", rounding.negativeOdd},
+		} {
+			tests = append(tests, testCase{string(rounding.mode) + " " + tie.input, c, tie.input, -8, tie.want, Rounded | Inexact})
+		}
+	}
+	base := BaseContext
+	for _, tc := range tests {
+		for _, alias := range []bool{false, true} {
+			for _, traps := range []Condition{0, DefaultTraps, Rounded, Inexact, Underflow} {
+				t.Run(fmt.Sprintf("%s/alias=%t/traps=%d", tc.name, alias, traps), func(t *testing.T) {
+					c := tc.context
+					c.Traps = traps
+					originalContext := c
+					x := newDecimal(t, &BaseContext, tc.input)
+					originalInput := new(Decimal).Set(x)
+					var result Decimal
+					d := &result
+					if alias {
+						d = x
+					}
+					flags, err := c.Quantize(d, x, tc.exp)
+					want := newDecimal(t, &BaseContext, tc.want)
+					if d.Form != want.Form || d.Negative != want.Negative || d.Exponent != want.Exponent || d.Coeff.Cmp(&want.Coeff) != 0 {
+						t.Fatalf("got %#v, want %#v", d, want)
+					}
+					if flags != tc.flags {
+						t.Fatalf("got flags %s (%d), want %s (%d)", flags, flags, tc.flags, tc.flags)
+					}
+					if (err != nil) != (tc.flags&traps != 0) {
+						t.Fatalf("got error %v with flags %s and traps %s", err, flags, traps)
+					}
+					if tc.flags == Rounded && traps == Rounded && err.Error() != "rounded" {
+						t.Fatalf("got error %q, want rounded", err)
+					}
+					if c != originalContext || (!alias && x.CmpTotal(originalInput) != 0) {
+						t.Fatal("context or separate operand changed")
+					}
+				})
+			}
+		}
+	}
+	if BaseContext != base {
+		t.Fatal("BaseContext changed")
+	}
+}
+
+func TestIntegralTemporaryExponentLimits(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{"123.4", "123"}, {"-123.4", "-123"}, {"9.9", "10"}, {"-9.9", "-10"},
+	} {
+		for _, alias := range []bool{false, true} {
+			for _, exact := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/alias=%t/exact=%t", tc.input, alias, exact), func(t *testing.T) {
+					c := Context{Precision: 1, MaxExponent: 0, MinExponent: 0, Traps: DefaultTraps}
+					x := newDecimal(t, &BaseContext, tc.input)
+					var result Decimal
+					d := &result
+					if alias {
+						d = x
+					}
+					var flags Condition
+					var err error
+					if exact {
+						flags, err = c.RoundToIntegralExact(d, x)
+					} else {
+						flags, err = c.RoundToIntegralValue(d, x)
+					}
+					wantFlags := Condition(0)
+					if exact {
+						wantFlags = Rounded | Inexact
+					}
+					if err != nil || d.Form != Finite || d.Exponent != 0 || d.String() != tc.want || flags != wantFlags {
+						t.Fatalf("got %s (%#v), flags %s, error %v; want %s, flags %s", d, d, flags, err, tc.want, wantFlags)
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestCmpOrder(t *testing.T) {
 	tests := []struct {
 		s     string

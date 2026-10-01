@@ -79,6 +79,7 @@ func (c *Context) WithPrecision(p uint32) *Context {
 }
 
 // goError converts flags into an error based on c.Traps.
+//
 //gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
 	if flags == 0 {
@@ -95,6 +96,7 @@ func (c *Context) etiny() int32 {
 // shouldSetAsNaN determines whether setAsNaN should be called, given
 // the provided values, where x is required and y is optional. It is
 // split from setAsNaN to permit inlining of this function.
+//
 //gcassert:inline
 func (c *Context) shouldSetAsNaN(x, y *Decimal) bool {
 	return x.Form == NaNSignaling || x.Form == NaN ||
@@ -1187,6 +1189,8 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 			}
 		} else {
 			nc := c.WithPrecision(uint32(p))
+			nc.MaxExponent = MaxExponent
+			nc.MinExponent = MinExponent
 
 			// The idea here is that the resulting d.Exponent after rounding will be 0. We
 			// have a number of, say, 5 digits, but p (our precision) above is set at, say,
@@ -1199,8 +1203,9 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 			// instead of setting d.Exponent = -diff and adjusting it to zero. Although
 			// this computes the correct result, it fails the Max/MinExponent checks
 			// during Round and raises underflow flags. Quantize (as per the spec)
-			// is guaranteed to not raise underflow, and using 0 instead of exp as the
-			// target eliminates this problem.
+			// is guaranteed to not raise underflow. Using 0 as the target and the system
+			// exponent limits avoids applying the caller's limits to the scaled value.
+			// Quantize checks the restored result against the original context.
 
 			d.Exponent = -diff
 			// Round even if nc.Precision == 0.
