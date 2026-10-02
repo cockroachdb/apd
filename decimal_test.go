@@ -248,6 +248,46 @@ func TestModf(t *testing.T) {
 	a.Modf(nil, nil)
 }
 
+func TestModfResetsNonFiniteDestination(t *testing.T) {
+	// A reused Infinity or NaN is still that form until Form is cleared,
+	// so the coefficient written below is not the value Modf returns.
+	x := New(15, -1) // 1.5
+	integ, frac := New(0, 0), New(0, 0)
+	if _, _, err := integ.SetString("Inf"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := frac.SetString("NaN"); err != nil {
+		t.Fatal(err)
+	}
+	x.Modf(integ, frac)
+	if integ.Form != Finite || integ.Cmp(New(1, 0)) != 0 {
+		t.Fatalf("integ = %s (form %v), want 1", integ, integ.Form)
+	}
+	if frac.Form != Finite || frac.Cmp(New(5, -1)) != 0 {
+		t.Fatalf("frac = %s (form %v), want 0.5", frac, frac.Form)
+	}
+
+	tiny := New(1, -5) // 0.00001
+	out := New(0, 0)
+	if _, _, err := out.SetString("Inf"); err != nil {
+		t.Fatal(err)
+	}
+	tiny.Modf(out, nil)
+	if out.Form != Finite || out.Cmp(New(0, 0)) != 0 {
+		t.Fatalf("integ = %s (form %v), want 0", out, out.Form)
+	}
+
+	whole := New(2, 1) // 20
+	part := New(0, 0)
+	if _, _, err := part.SetString("NaN"); err != nil {
+		t.Fatal(err)
+	}
+	whole.Modf(nil, part)
+	if part.Form != Finite || part.Cmp(New(0, 0)) != 0 {
+		t.Fatalf("frac = %s (form %v), want 0", part, part.Form)
+	}
+}
+
 func TestInt64(t *testing.T) {
 	tests := []struct {
 		x   string
