@@ -34,19 +34,28 @@ type tableVal struct {
 }
 
 func init() {
+	// Each power of ten is ten times the previous one,
+	// which is much cheaper than computing each power on its own.
+	pow10LookupTable[0].SetInt64(1)
+	for i := 1; i <= powerTenTableSize; i++ {
+		pow10LookupTable[i].Mul(&pow10LookupTable[i-1], bigTen)
+	}
+
+	// The border for 2^(i-1) is the smallest power of ten above it,
+	// and its number of digits is that power's exponent.
 	curVal := NewBigInt(1)
-	curExp := new(BigInt)
+	digits := 1
 	for i := 1; i <= digitsTableSize; i++ {
 		if i > 1 {
 			curVal.Lsh(curVal, 1)
 		}
+		for curVal.Cmp(&pow10LookupTable[digits]) >= 0 {
+			digits++
+		}
 
 		elem := &digitsLookupTable[i]
-		elem.digits = int64(len(curVal.String()))
-
-		elem.border.SetInt64(10)
-		curExp.SetInt64(elem.digits)
-		elem.border.Exp(&elem.border, curExp, nil)
+		elem.digits = int64(digits)
+		elem.border.Set(&pow10LookupTable[digits])
 		elem.nborder.Neg(&elem.border)
 	}
 }
@@ -113,12 +122,6 @@ func NumDigits(b *BigInt) int64 {
 const powerTenTableSize = 128
 
 var pow10LookupTable [powerTenTableSize + 1]BigInt
-
-func init() {
-	for i := int64(0); i <= powerTenTableSize; i++ {
-		setBigWithPow(&pow10LookupTable[i], i)
-	}
-}
 
 func setBigWithPow(res *BigInt, pow int64) {
 	var tmp BigInt
