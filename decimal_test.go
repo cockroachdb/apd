@@ -798,6 +798,49 @@ func TestNeg(t *testing.T) {
 	}
 }
 
+func TestPowExactInteger(t *testing.T) {
+	tests := []struct {
+		x, y, expect string
+		exp          int32
+		cond         Condition
+	}{
+		{"2", "-1", "0.5", -1, 0},
+		{"2", "-3", "0.125", -3, 0},
+		{"10", "-2", "0.01", -2, 0},
+		{"5", "-2", "0.04", -2, 0},
+		{"2", "3", "8", 0, 0},
+		{"10", "3", "1000", 0, 0},
+		{"3", "-1", "0.3333333333333333333333333333333333", -34, Inexact | Rounded},
+	}
+	c := BaseContext.WithPrecision(34)
+	for _, tc := range tests {
+		t.Run(tc.x+"**"+tc.y, func(t *testing.T) {
+			x, _, err := NewFromString(tc.x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			y, _, err := NewFromString(tc.y)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var d Decimal
+			res, err := c.Pow(&d, x, y)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.Text('f'); s != tc.expect {
+				t.Errorf("got %s, expected %s", s, tc.expect)
+			}
+			if d.Exponent != tc.exp {
+				t.Errorf("got exponent %d, expected %d", d.Exponent, tc.exp)
+			}
+			if res != tc.cond {
+				t.Errorf("got condition %v, expected %v", res, tc.cond)
+			}
+		})
+	}
+}
+
 func TestReduce(t *testing.T) {
 	tests := map[string]int{
 		"-0":        0,

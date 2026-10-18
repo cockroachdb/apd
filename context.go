@@ -1033,6 +1033,9 @@ func (c *Context) integerPower(d, x *Decimal, y *BigInt) (Condition, error) {
 
 	if neg {
 		ed.Quo(z, decimalOne, z)
+		if ed.Err() == nil && !ed.Flags.Inexact() {
+			z.Reduce(z)
+		}
 	}
 	return ed.Flags, ed.Err()
 }
