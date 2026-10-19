@@ -309,6 +309,27 @@ func TestQuoErr(t *testing.T) {
 	}
 }
 
+// TestExpSeriesErr verifies that an error raised while Exp sums its series is
+// returned to the caller instead of being dropped.
+func TestExpSeriesErr(t *testing.T) {
+	// With MinExponent -20, the term 1E-20/2 in the series is subnormal and
+	// trips the Subnormal trap.
+	c := Context{
+		Precision:   30,
+		MaxExponent: 20,
+		MinExponent: -20,
+		Traps:       DefaultTraps,
+	}
+	x := New(1, -20)
+	d := New(42, 0)
+	_, err := c.Exp(d, x)
+	if err == nil {
+		if expected := "1.00000000000000000001000000000"; d.String() != expected {
+			t.Fatalf("expected %s or an error, got %s with no error", expected, d)
+		}
+	}
+}
+
 func TestConditionString(t *testing.T) {
 	tests := map[Condition]string{
 		Overflow:             "overflow",

@@ -975,7 +975,7 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 		// sum = sum + 1
 		ed.Add(&sum, &sum, decimalOne)
 	}
-	if err != ed.Err() {
+	if err := ed.Err(); err != nil {
 		return 0, err
 	}
 
