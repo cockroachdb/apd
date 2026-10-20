@@ -14,7 +14,12 @@
 
 package apd
 
-import "math"
+import (
+	"fmt"
+	"math"
+	"math/big"
+	"strings"
+)
 
 var (
 	bigOne  = NewBigInt(1)
@@ -60,30 +65,71 @@ type constWithPrecision struct {
 	vals      []Decimal
 }
 
+// makeConstWithPrecision takes a positive plain decimal string: digits with
+// an optional '.', and no sign or exponent. Any other input, including "0",
+// panics.
 func makeConstWithPrecision(strVal string) *constWithPrecision {
-	c := &constWithPrecision{}
-	if _, _, err := c.unrounded.SetString(strVal); err != nil {
-		panic(err)
+	// Decimal.SetString and Context.Round are expensive at init time with this
+	// many digits, as they need powers of ten far beyond pow10LookupTable.
+	// Build the decimals from the positive constant's digits directly instead,
+	// rounding them as RoundHalfUp would.
+	digits, exp := strVal, int32(0)
+	if i := strings.IndexByte(strVal, '.'); i >= 0 {
+		digits = strVal[:i] + strVal[i+1:]
+		exp = -int32(len(strVal) - i - 1)
 	}
+	digits = strings.TrimLeft(digits, "0")
+	c := &constWithPrecision{unrounded: decimalFromDigits(digits, exp)}
 	// The length of the string might be one higher than the available precision
 	// (because of the decimal point), but that's ok.
 	maxPrec := uint32(len(strVal))
 	for p := uint32(1); p < maxPrec; p *= 2 {
-		var d Decimal
-
-		ctx := Context{
-			Precision:   p,
-			Rounding:    RoundHalfUp,
-			MaxExponent: MaxExponent,
-			MinExponent: MinExponent,
-		}
-		_, err := ctx.Round(&d, &c.unrounded)
-		if err != nil {
-			panic(err)
-		}
-		c.vals = append(c.vals, d)
+		c.vals = append(c.vals, decimalFromDigits(roundDigitsHalfUp(digits, exp, p)))
 	}
 	return c
+}
+
+// roundDigitsHalfUp rounds the positive decimal digits*10^exp
+// to the given precision with RoundHalfUp. digits must have no
+// leading zeros, and precision must be greater than zero.
+func roundDigitsHalfUp(digits string, exp int32, precision uint32) (string, int32) {
+	if uint32(len(digits)) <= precision {
+		return digits, exp
+	}
+	exp += int32(uint32(len(digits)) - precision)
+	roundUp := digits[precision] >= '5'
+	digits = digits[:precision]
+	if !roundUp {
+		return digits, exp
+	}
+	b := []byte(digits)
+	i := len(b) - 1
+	for ; i >= 0 && b[i] == '9'; i-- {
+		b[i] = '0'
+	}
+	if i >= 0 {
+		b[i]++
+	} else {
+		// All nines rounded up to a power of ten,
+		// which needs one more digit than the precision allows.
+		b[0] = '1'
+		exp++
+	}
+	return string(b), exp
+}
+
+func decimalFromDigits(digits string, exp int32) Decimal {
+	coeff := new(big.Int)
+	if _, ok := coeff.SetString(digits, 10); !ok {
+		panic(fmt.Sprintf("invalid digits %q", digits))
+	}
+	var d Decimal
+	// Keep the coefficient in a heap-allocated big.Int even when it would fit
+	// inline, as Context.Round did; BenchmarkLn is a few percent slower
+	// with the low-precision constants stored inline.
+	d.Coeff._inner = coeff
+	d.Exponent = exp
+	return d
 }
 
 // get returns the given constant, rounded down to a precision at least as high

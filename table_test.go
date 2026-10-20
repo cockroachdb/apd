@@ -170,6 +170,13 @@ func TestTableExp10(t *testing.T) {
 			t.Errorf("%d: expected PowerOfTenDec(%d) to give %s, got %s", i, test.pow, test.str, s)
 		}
 	}
+	for i := int64(0); i <= powerTenTableSize; i++ {
+		var tmpE BigInt
+		want := "1" + strings.Repeat("0", int(i))
+		if s := tableExp10(i, &tmpE).String(); s != want {
+			t.Errorf("expected tableExp10(%d) to give %s, got %s", i, want, s)
+		}
+	}
 }
 
 // TestNumDigitsLargeNegative is a regression test for a bug where NumDigits
