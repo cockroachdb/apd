@@ -65,6 +65,9 @@ type constWithPrecision struct {
 	vals      []Decimal
 }
 
+// makeConstWithPrecision takes a positive plain decimal string: digits with
+// an optional '.', and no sign or exponent. Any other input, including "0",
+// panics.
 func makeConstWithPrecision(strVal string) *constWithPrecision {
 	// Decimal.SetString and Context.Round are expensive at init time with this
 	// many digits, as they need powers of ten far beyond pow10LookupTable.
@@ -87,7 +90,8 @@ func makeConstWithPrecision(strVal string) *constWithPrecision {
 }
 
 // roundDigitsHalfUp rounds the positive decimal digits*10^exp
-// to the given precision with RoundHalfUp.
+// to the given precision with RoundHalfUp. digits must have no
+// leading zeros, and precision must be greater than zero.
 func roundDigitsHalfUp(digits string, exp int32, precision uint32) (string, int32) {
 	if uint32(len(digits)) <= precision {
 		return digits, exp

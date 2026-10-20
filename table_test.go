@@ -174,7 +174,7 @@ func TestTableExp10(t *testing.T) {
 		var tmpE BigInt
 		want := "1" + strings.Repeat("0", int(i))
 		if s := tableExp10(i, &tmpE).String(); s != want {
-			t.Errorf("expected PowerOfTenDec(%d) to give %s, got %s", i, want, s)
+			t.Errorf("expected tableExp10(%d) to give %s, got %s", i, want, s)
 		}
 	}
 }

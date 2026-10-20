@@ -34,6 +34,9 @@ type tableVal struct {
 }
 
 func init() {
+	// The powers of ten must be built first, because the digits table
+	// below reads them to find the border for each bit count.
+	//
 	// Each power of ten is ten times the previous one,
 	// which is much cheaper than computing each power on its own.
 	pow10LookupTable[0].SetInt64(1)
