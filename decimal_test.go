@@ -994,3 +994,58 @@ func TestNewFromStringInvalid(t *testing.T) {
 		})
 	}
 }
+
+func TestRemUnlimitedPrecision(t *testing.T) {
+	for _, tc := range []struct{ x, y, want string }{
+		{"100E100", "10E1", "0E1"},
+		{"123456789012345678901234567890", "7", "0"},
+		{"123.45", "10", "3.45"},
+		{"-123.45", "10", "-3.45"},
+		{"123.45", "-10", "3.45"},
+		{"0.01", "1", "0.01"},
+		{"-10", "5", "-0"},
+		{"-0", "3", "-0"},
+	} {
+		t.Run(tc.x+"/"+tc.y, func(t *testing.T) {
+			for _, alias := range []string{"neither", "x", "y"} {
+				t.Run(alias, func(t *testing.T) {
+					x := newDecimal(t, &BaseContext, tc.x)
+					y := newDecimal(t, &BaseContext, tc.y)
+					want := newDecimal(t, &BaseContext, tc.want)
+					d := new(Decimal)
+					if alias == "x" {
+						d = x
+					}
+					if alias == "y" {
+						d = y
+					}
+					flags, err := BaseContext.Rem(d, x, y)
+					if err != nil || flags != 0 {
+						t.Fatalf("flags %s, error %v", flags, err)
+					}
+					if d.CmpTotal(want) != 0 {
+						t.Fatalf("got %s, want %s", d, want)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRemLimitedPrecision(t *testing.T) {
+	x, y := New(12345, 0), New(10, 0)
+	var d Decimal
+	flags, err := BaseContext.WithPrecision(3).Rem(&d, x, y)
+	if flags != DivisionImpossible || err == nil || d.Form != NaN {
+		t.Fatalf("got %s, flags %s, error %v", &d, flags, err)
+	}
+	flags, err = BaseContext.WithPrecision(4).Rem(&d, x, y)
+	if flags != 0 || err != nil || d.Cmp(New(5, 0)) != 0 {
+		t.Fatalf("got %s, flags %s, error %v", &d, flags, err)
+	}
+	x, y = New(100, 100), New(10, 1)
+	flags, err = BaseContext.WithPrecision(1).Rem(&d, x, y)
+	if flags != DivisionImpossible || err == nil || d.Form != NaN {
+		t.Fatalf("got %s, flags %s, error %v", &d, flags, err)
+	}
+}
