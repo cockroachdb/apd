@@ -360,6 +360,15 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 				roundAddOne(&d.Coeff, &removed)
 			}
 		}
+	} else if n := adjCoeffs + adjExp10; n > 0 {
+		// An exact quotient takes the ideal exponent, the dividend's less the
+		// divisor's, or the closest the coefficient allows: it is n below the
+		// ideal, so remove up to n trailing zeros.
+		removed = trimZeros(&d.Coeff, n)
+		nd -= removed
+	} else if n < 0 {
+		// The ideal exponent needs more than Precision digits.
+		res |= Rounded
 	}
 
 	res |= d.setExponent(c, nd, res, shift, -adjCoeffs, -adjExp10, removed)
@@ -549,6 +558,10 @@ func (c *Context) Sqrt(d, x *Decimal) (Condition, error) {
 	if err := ed.Err(); err != nil {
 		return 0, err
 	}
+
+	// Keep the loop's p digits so that an exact root still rounds to
+	// Precision digits.
+	approx.padDigits(int64(p))
 
 	d.Set(&approx)
 	d.Exponent += int32(e / 2)
@@ -993,6 +1006,9 @@ func (c *Context) Exp(d, x *Decimal) (Condition, error) {
 		return 0, fmt.Errorf("integer power: %w", err)
 	}
 	res |= ires
+	// The result is always inexact, so keep Precision digits even when the
+	// series for a small x is exact.
+	d.padDigits(int64(c.Precision))
 	nc.Precision = c.Precision
 	res |= nc.round(d, d)
 	return c.goError(res)

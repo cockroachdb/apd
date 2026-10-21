@@ -58,9 +58,9 @@ func ExampleContext_inexact() {
 		}
 	}
 	// Output:
-	// d:  9.0000, inexact: false, err: <nil>
-	// d:  3.0000, inexact: false, err: <nil>
-	// d:  1.0000, inexact: false, err: <nil>
+	// d:       9, inexact: false, err: <nil>
+	// d:       3, inexact: false, err: <nil>
+	// d:       1, inexact: false, err: <nil>
 	// d: 0.33333, inexact:  true, err: <nil>
 }
 
