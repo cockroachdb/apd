@@ -343,6 +343,9 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 	// so, we determine whether the remainder was more or less than half of the
 	// divisor and round accordingly.
 	nd := NumDigits(&d.Coeff)
+	// removed counts trailing digits removed after the division, each
+	// raising the exponent by one.
+	var removed int64
 	if rem.Sign() != 0 {
 		// Use the adjusted exponent to determine if we are Subnormal.
 		// If so, don't round. This computation of adj and the check
@@ -353,15 +356,13 @@ func (c *Context) Quo(d, x, y *Decimal) (Condition, error) {
 			rem.Mul(&rem, bigTwo)
 			half := rem.Cmp(&divisor)
 			if c.Rounding.ShouldAddOne(&d.Coeff, d.Negative, half) {
-				d.Coeff.Add(&d.Coeff, bigOne)
-				// The coefficient changed, so recompute num digits in
-				// setExponent.
-				nd = unknownNumDigits
+				// roundAddOne drops the digit a carry adds, keeping Precision digits.
+				roundAddOne(&d.Coeff, &removed)
 			}
 		}
 	}
 
-	res |= d.setExponent(c, nd, res, shift, -adjCoeffs, -adjExp10)
+	res |= d.setExponent(c, nd, res, shift, -adjCoeffs, -adjExp10, removed)
 	return c.goError(res)
 }
 

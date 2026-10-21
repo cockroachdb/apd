@@ -316,8 +316,8 @@ func TestQuoExponent(t *testing.T) {
 		x, y, want string
 		res        Condition
 	}{
-		{9, "999999999.5", "1", "1000000000", Inexact | Rounded}, // TODO: One digit too many.
-		{6, "999999999", "1", "1.000000E+9", Inexact | Rounded},  // TODO: One digit too many.
+		{9, "999999999.5", "1", "1.00000000E+9", Inexact | Rounded},
+		{6, "999999999", "1", "1.00000E+9", Inexact | Rounded},
 	}
 	for _, tc := range tests {
 		x := newDecimal(t, testCtx, tc.x)

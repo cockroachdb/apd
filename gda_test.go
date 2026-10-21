@@ -710,8 +710,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			}
 			r := newDecimal(t, testCtx, tc.Result)
 			var equal bool
-			if d.Form == Finite {
-				// Don't worry about trailing zeros being inequal in CmpTotal.
+			// Don't worry about trailing zeros being inequal in CmpTotal,
+			// except for an inexact Quo, which keeps Precision digits.
+			if d.Form == Finite && !(tc.Operation == "divide" && res.Inexact()) {
 				equal = d.Cmp(r) == 0 && d.Negative == r.Negative
 			} else {
 				equal = d.CmpTotal(r) == 0
