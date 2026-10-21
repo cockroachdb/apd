@@ -309,6 +309,28 @@ func TestQuoErr(t *testing.T) {
 	}
 }
 
+// TestQuoExponent checks that an inexact quotient keeps Precision digits.
+func TestQuoExponent(t *testing.T) {
+	tests := []struct {
+		p          uint32
+		x, y, want string
+		res        Condition
+	}{
+		{9, "999999999.5", "1", "1000000000", Inexact | Rounded}, // TODO: One digit too many.
+		{6, "999999999", "1", "1.000000E+9", Inexact | Rounded},  // TODO: One digit too many.
+	}
+	for _, tc := range tests {
+		x := newDecimal(t, testCtx, tc.x)
+		y := newDecimal(t, testCtx, tc.y)
+		d := new(Decimal)
+		res, err := BaseContext.WithPrecision(tc.p).Quo(d, x, y)
+		if got := d.String(); got != tc.want || res != tc.res || err != nil {
+			t.Errorf("%s/%s at precision %d: got %s (%s), %v; expected %s (%s)",
+				tc.x, tc.y, tc.p, got, res, err, tc.want, tc.res)
+		}
+	}
+}
+
 func TestConditionString(t *testing.T) {
 	tests := map[Condition]string{
 		Overflow:             "overflow",
