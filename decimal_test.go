@@ -835,6 +835,36 @@ func TestReduce(t *testing.T) {
 	}
 }
 
+// TestRootZeroTraps checks that a root of zero whose exponent is clamped
+// into the context's range returns an error when Clamped is trapped. The
+// GDA vectors cover the exponent and condition but cannot set Traps.
+func TestRootZeroTraps(t *testing.T) {
+	c := &Context{Precision: 4, MaxExponent: 9, MinExponent: -9, Rounding: RoundHalfUp, Traps: Clamped}
+	tests := []struct {
+		op   string
+		root func(d, x *Decimal) (Condition, error)
+		x    string
+	}{
+		{op: "sqrt", root: c.Sqrt, x: "0E-25"},
+		{op: "sqrt", root: c.Sqrt, x: "0E+20"},
+		{op: "cbrt", root: c.Cbrt, x: "0E-37"},
+		{op: "cbrt", root: c.Cbrt, x: "0E+30"},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s %s", tc.op, tc.x), func(t *testing.T) {
+			x := newDecimal(t, testCtx, tc.x)
+			d := new(Decimal)
+			_, err := tc.root(d, x)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if err.Error() != Clamped.String() {
+				t.Fatalf("expected %s, got %s", Clamped, err)
+			}
+		})
+	}
+}
+
 // TestSizeof is meant to catch changes that unexpectedly increase
 // the size of the BigInt, Decimal, and Context structs.
 func TestSizeof(t *testing.T) {
