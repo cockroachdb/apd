@@ -251,6 +251,16 @@ func TestModf(t *testing.T) {
 			if integ.CmpTotal(integ4) != 0 || frac.CmpTotal(frac4) != 0 {
 				t.Fatalf("frac aliased: got %s, %s, expected %s, %s", integ4, frac4, integ, frac)
 			}
+			x5 := new(Decimal).Set(x)
+			x5.Modf(x5, nil)
+			if integ.CmpTotal(x5) != 0 {
+				t.Fatalf("integ aliased, frac nil: got %s, expected %s", x5, integ)
+			}
+			x6 := new(Decimal).Set(x)
+			x6.Modf(nil, x6)
+			if frac.CmpTotal(x6) != 0 {
+				t.Fatalf("frac aliased, integ nil: got %s, expected %s", x6, frac)
+			}
 		})
 	}
 
@@ -383,6 +393,11 @@ func TestCeil(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			sep := new(Decimal)
+			_, err = testCtx.Ceil(sep, d)
+			if err != nil {
+				t.Fatal(err)
+			}
 			_, err = testCtx.Ceil(d, d)
 			if err != nil {
 				t.Fatal(err)
@@ -393,6 +408,9 @@ func TestCeil(t *testing.T) {
 			}
 			if i != r {
 				t.Fatalf("got %v, expected %v", i, r)
+			}
+			if sep.CmpTotal(d) != 0 {
+				t.Fatalf("aliased: got %s, expected %s", d, sep)
 			}
 		})
 	}
@@ -419,6 +437,11 @@ func TestFloor(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			sep := new(Decimal)
+			_, err = testCtx.Floor(sep, d)
+			if err != nil {
+				t.Fatal(err)
+			}
 			_, err = testCtx.Floor(d, d)
 			if err != nil {
 				t.Fatal(err)
@@ -429,6 +452,9 @@ func TestFloor(t *testing.T) {
 			}
 			if i != r {
 				t.Fatalf("got %v, expected %v", i, r)
+			}
+			if sep.CmpTotal(d) != 0 {
+				t.Fatalf("aliased: got %s, expected %s", d, sep)
 			}
 		})
 	}

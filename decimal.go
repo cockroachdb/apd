@@ -623,7 +623,8 @@ func (d *Decimal) IsZero() bool {
 // Modf sets integ to the integral part of d and frac to the fractional part
 // such that d = integ+frac. If d is negative, both integ or frac will be either
 // 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be <= 0.
-// Either argument can be nil, preventing it from being set.
+// Either argument can be nil, preventing it from being set. integ or frac may
+// be d itself; integ and frac must not be the same Decimal.
 func (d *Decimal) Modf(integ, frac *Decimal) {
 	if integ == nil && frac == nil {
 		return
@@ -645,7 +646,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	}
 	nd := d.NumDigits()
 	exp := -int64(d.Exponent)
-	// d < 0 because exponent is larger than number of digits.
+	// |d| < 1 because the exponent is larger than the number of digits.
 	if exp > nd {
 		if frac != nil {
 			frac.Set(d)
@@ -679,6 +680,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 		// can't be due to the check above.
 		icoeff.Quo(&d.Coeff, e)
 	}
+	// These writes come after every read of d because integ may alias d.
 	if integ != nil {
 		integ.Exponent = 0
 		integ.Negative = neg
