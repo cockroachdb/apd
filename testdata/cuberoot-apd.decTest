@@ -16,9 +16,9 @@ cbtx002 cuberoot -1 -> -1
 cbtx003 cuberoot 1.00 -> 1.0
 cbtx004 cuberoot -1.00 -> -1.0
 cbtx005 cuberoot 0 -> 0
-cbtx006 cuberoot 00.0 -> 0
-cbtx007 cuberoot 0.00 -> 0
-cbtx008 cuberoot 00.00 -> 0
+cbtx006 cuberoot 00.0 -> 0.0
+cbtx007 cuberoot 0.00 -> 0.0
+cbtx008 cuberoot 00.00 -> 0.0
 cbtx009 cuberoot 00 -> 0
 
 cbtx010 cuberoot -2 -> -1.25992105 Inexact Rounded
@@ -33,7 +33,7 @@ cbtx018 cuberoot -0E+10 -> -0E+3
 cbtx019 cuberoot -0E+11 -> -0E+3
 cbtx020 cuberoot -0E+12 -> -0E+4
 cbtx021 cuberoot -00 -> -0
-cbtx022 cuberoot 0E+5 -> 0
+cbtx022 cuberoot 0E+5 -> 0E+1
 cbtx023 cuberoot 8.0 -> 2.0
 cbtx024 cuberoot 8.00 -> 2.0
 
@@ -89,6 +89,22 @@ cbtx086 cuberoot 343 -> 7
 cbtx087 cuberoot 512 -> 8
 cbtx088 cuberoot 729 -> 9
 cbtx089 cuberoot 1000 -> 10
+
+-- out-of-bounds zeros; Etiny is -12
+precision: 4
+maxExponent: 9
+minExponent: -9
+cbtx910 cuberoot 0E-36 -> 0E-12
+cbtx911 cuberoot 0E-37 -> 0E-12 Clamped
+cbtx912 cuberoot 0E-40 -> 0E-12 Clamped
+cbtx913 cuberoot -0E-37 -> -0E-12 Clamped
+cbtx920 cuberoot 0E+27 -> 0E+9
+cbtx921 cuberoot 0E+30 -> 0E+9 Clamped
+cbtx922 cuberoot 0E+33 -> 0E+9 Clamped
+cbtx923 cuberoot -0E+30 -> -0E+9 Clamped
+precision: 9
+maxExponent: 999
+minExponent: -999
 
 -- others
 precision: 5
