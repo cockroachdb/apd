@@ -79,6 +79,7 @@ func (c *Context) WithPrecision(p uint32) *Context {
 }
 
 // goError converts flags into an error based on c.Traps.
+//
 //gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
 	if flags == 0 {
@@ -95,6 +96,7 @@ func (c *Context) etiny() int32 {
 // shouldSetAsNaN determines whether setAsNaN should be called, given
 // the provided values, where x is required and y is optional. It is
 // split from setAsNaN to permit inlining of this function.
+//
 //gcassert:inline
 func (c *Context) shouldSetAsNaN(x, y *Decimal) bool {
 	return x.Form == NaNSignaling || x.Form == NaN ||
@@ -698,169 +700,10 @@ func (c *Context) logSpecials(d, x *Decimal) (bool, Condition, error) {
 
 // Ln sets d to the natural log of x.
 func (c *Context) Ln(d, x *Decimal) (Condition, error) {
-	// See: On the Use of Iteration Methods for Approximating the Natural
-	// Logarithm, James F. Epperson, The American Mathematical Monthly, Vol. 96,
-	// No. 9, November 1989, pp. 831-835.
-
 	if set, res, err := c.logSpecials(d, x); set {
 		return res, err
 	}
-
-	// The internal precision needs to be a few digits higher because errors in
-	// series/iterations add up.
-	p := c.Precision + 2
-
-	nc := c.WithPrecision(p)
-	nc.Rounding = RoundHalfEven
-	ed := MakeErrDecimal(nc)
-
-	var tmp1, tmp2, tmp3, tmp4, z, resAdjust Decimal
-	z.Set(x)
-
-	// To get an initial estimate, we first reduce the input range to the interval
-	// [0.1, 1) by changing the exponent, and later adjust the result by a
-	// multiple of ln(10).
-	//
-	// However, this does not work well for z very close to 1, where the result is
-	// very close to 0. For example:
-	//   z     = 1.00001
-	//   ln(z) = 0.00000999995
-	// If we adjust by 10:
-	//   z'     = 0.100001
-	//   ln(z') = -2.30257509304
-	//   ln(10) =  2.30258509299
-	//   ln(z)  =  0.00001000...
-	//
-	// The issue is that we may need to calculate a much higher (~double)
-	// precision for ln(z) because many of the significant digits cancel out.
-	//
-	// Halley's iteration has a similar problem when z is close to 1: in this case
-	// the correction term (exp(a_n) - z) needs to be calculated to a high
-	// precision. So for z close to 1 (before scaling) we use a power series
-	// instead (which converges very rapidly in this range).
-
-	// tmp1 = z - 1
-	ed.Sub(&tmp1, &z, decimalOne)
-	// tmp3 = 0.1
-	tmp3.SetFinite(1, -1)
-
-	usePowerSeries := false
-
-	if tmp2.Abs(&tmp1).Cmp(&tmp3) <= 0 {
-		usePowerSeries = true
-	} else {
-		// Reduce input to range [0.1, 1).
-		expDelta := int32(z.NumDigits()) + z.Exponent
-		z.Exponent -= expDelta
-
-		// We multiplied the input by 10^-expDelta, we will need to add
-		//   ln(10^expDelta) = expDelta * ln(10)
-		// to the result.
-		resAdjust.setCoefficient(int64(expDelta))
-		ed.Mul(&resAdjust, &resAdjust, decimalLn10.get(p))
-
-		// tmp1 = z - 1
-		ed.Sub(&tmp1, &z, decimalOne)
-
-		if tmp2.Abs(&tmp1).Cmp(&tmp3) <= 0 {
-			usePowerSeries = true
-		} else {
-			// Compute an initial estimate using floats.
-			zFloat, err := z.Float64()
-			if err != nil {
-				// We know that z is in a reasonable range; no errors should happen during conversion.
-				return 0, err
-			}
-			if _, err := tmp1.SetFloat64(math.Log(zFloat)); err != nil {
-				return 0, err
-			}
-		}
-	}
-
-	if usePowerSeries {
-		// We use the power series:
-		//   ln(1+x) = 2 sum [ 1 / (2n+1) * (x / (x+2))^(2n+1) ]
-		//
-		// This converges rapidly for small x.
-		// See https://en.wikipedia.org/wiki/Logarithm#Power_series
-
-		// tmp1 is already x
-
-		// tmp3 = x + 2
-		ed.Add(&tmp3, &tmp1, decimalTwo)
-
-		// tmp2 = (x / (x+2))
-		ed.Quo(&tmp2, &tmp1, &tmp3)
-
-		// tmp1 = tmp3 = 2 * (x / (x+2))
-		ed.Add(&tmp3, &tmp2, &tmp2)
-		tmp1.Set(&tmp3)
-
-		var eps Decimal
-		eps.Coeff.Set(bigOne)
-		eps.Exponent = -int32(p)
-		for n := 1; ; n++ {
-
-			// tmp3 *= (x / (x+2))^2
-			ed.Mul(&tmp3, &tmp3, &tmp2)
-			ed.Mul(&tmp3, &tmp3, &tmp2)
-
-			// tmp4 = 2n+1
-			tmp4.SetFinite(int64(2*n+1), 0)
-
-			ed.Quo(&tmp4, &tmp3, &tmp4)
-
-			ed.Add(&tmp1, &tmp1, &tmp4)
-
-			if tmp4.Abs(&tmp4).Cmp(&eps) <= 0 {
-				break
-			}
-		}
-	} else {
-		// Use Halley's Iteration.
-		// We use a bit more precision than the context asks for in newLoop because
-		// this is not the final result.
-		for loop := nc.newLoop("ln", x, c.Precision+1, 1); ; {
-			// tmp1 = a_n (either from initial estimate or last iteration)
-
-			// tmp2 = exp(a_n)
-			ed.Exp(&tmp2, &tmp1)
-
-			// tmp3 = exp(a_n) - z
-			ed.Sub(&tmp3, &tmp2, &z)
-
-			// tmp3 = 2 * (exp(a_n) - z)
-			ed.Add(&tmp3, &tmp3, &tmp3)
-
-			// tmp4 = exp(a_n) + z
-			ed.Add(&tmp4, &tmp2, &z)
-
-			// tmp2 = 2 * (exp(a_n) - z) / (exp(a_n) + z)
-			ed.Quo(&tmp2, &tmp3, &tmp4)
-
-			// tmp1 = a_(n+1) = a_n - 2 * (exp(a_n) - z) / (exp(a_n) + z)
-			ed.Sub(&tmp1, &tmp1, &tmp2)
-
-			if done, err := loop.done(&tmp1); err != nil {
-				return 0, err
-			} else if done {
-				break
-			}
-			if err := ed.Err(); err != nil {
-				return 0, err
-			}
-		}
-	}
-
-	// Apply the adjustment due to the initial rescaling.
-	ed.Add(&tmp1, &tmp1, &resAdjust)
-
-	if err := ed.Err(); err != nil {
-		return 0, err
-	}
-	res := c.round(d, &tmp1)
-	res |= Inexact
-	return c.goError(res)
+	return c.lnRounded(d, x)
 }
 
 // Log10 sets d to the base 10 log of x.
