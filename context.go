@@ -1201,7 +1201,13 @@ func (c *Context) quantize(d, v *Decimal, exp int32) Condition {
 		p := int32(d.NumDigits()) - diff
 		if p < 0 {
 			if !d.IsZero() {
+				// The coefficient has fewer digits than diff, so the discarded value is
+				// below a tenth of a unit in the last place and always less than one half.
+				// Only sign- or zero-driven rounders (ceiling, floor, up, 05up) can round up.
 				d.Coeff.SetInt64(0)
+				if c.Rounding.ShouldAddOne(&d.Coeff, d.Negative, -1) {
+					d.Coeff.SetInt64(1)
+				}
 				res = Inexact | Rounded
 			}
 		} else {

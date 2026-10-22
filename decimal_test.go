@@ -743,6 +743,113 @@ func TestQuantize(t *testing.T) {
 	}
 }
 
+func TestQuantizeRounding(t *testing.T) {
+	tests := []struct {
+		s      string
+		e      int32
+		rnd    Rounder
+		expect string
+		cond   Condition
+	}{
+		{s: "0.002", e: -1, rnd: RoundCeiling, expect: "0.1", cond: Inexact | Rounded},
+		{s: "1.002", e: -1, rnd: RoundCeiling, expect: "1.1", cond: Inexact | Rounded},
+		{s: "-0.002", e: -1, rnd: RoundCeiling, expect: "-0.0", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundFloor, expect: "0.0", cond: Inexact | Rounded},
+		{s: "-0.002", e: -1, rnd: RoundFloor, expect: "-0.1", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundUp, expect: "0.1", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundDown, expect: "0.0", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: Round05Up, expect: "0.1", cond: Inexact | Rounded},
+		{s: "-0.002", e: -1, rnd: Round05Up, expect: "-0.1", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundHalfDown, expect: "0.0", cond: Inexact | Rounded},
+		{s: "0.04", e: -1, rnd: RoundHalfUp, expect: "0.0", cond: Inexact | Rounded},
+		{s: "0.05", e: -1, rnd: RoundHalfUp, expect: "0.1", cond: Inexact | Rounded},
+		{s: "0.05", e: -1, rnd: RoundHalfEven, expect: "0.0", cond: Inexact | Rounded},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %d %s", tc.s, tc.e, tc.rnd), func(t *testing.T) {
+			c := Context{Precision: 100, Rounding: tc.rnd, MaxExponent: 1000, MinExponent: -1000, Traps: DefaultTraps}
+			d, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err := c.Quantize(d, d, tc.e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("expected: %s, got: %s", tc.expect, s)
+			}
+			if res != tc.cond {
+				t.Fatalf("expected condition: %s, got: %s", tc.cond, res)
+			}
+			// Repeat with a separate destination; the input must be unchanged.
+			x, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var sep Decimal
+			if _, err := c.Quantize(&sep, x, tc.e); err != nil {
+				t.Fatal(err)
+			}
+			if sep.CmpTotal(d) != 0 {
+				t.Fatalf("expected: %s, got: %s", d, &sep)
+			}
+			if s := x.String(); s != tc.s {
+				t.Fatalf("input changed: expected: %s, got: %s", tc.s, s)
+			}
+		})
+	}
+}
+
+func TestRoundToIntegralRounding(t *testing.T) {
+	tests := []struct {
+		s      string
+		rnd    Rounder
+		expect string
+		cond   Condition
+	}{
+		{s: "0.05", rnd: RoundCeiling, expect: "1", cond: Inexact | Rounded},
+		{s: "-0.05", rnd: RoundFloor, expect: "-1", cond: Inexact | Rounded},
+		{s: "0.002", rnd: Round05Up, expect: "1", cond: Inexact | Rounded},
+		{s: "0.05", rnd: RoundHalfUp, expect: "0", cond: Inexact | Rounded},
+		{s: "0.05", rnd: RoundDown, expect: "0", cond: Inexact | Rounded},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %s", tc.s, tc.rnd), func(t *testing.T) {
+			c := Context{Precision: 100, Rounding: tc.rnd, MaxExponent: 1000, MinExponent: -1000, Traps: DefaultTraps}
+			x, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var d Decimal
+			res, err := c.RoundToIntegralValue(&d, x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("RoundToIntegralValue: expected: %s, got: %s", tc.expect, s)
+			}
+			if res != 0 {
+				t.Fatalf("RoundToIntegralValue: expected no condition, got: %s", res)
+			}
+			x, _, err = NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err = c.RoundToIntegralExact(&d, x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("RoundToIntegralExact: expected: %s, got: %s", tc.expect, s)
+			}
+			if res != tc.cond {
+				t.Fatalf("RoundToIntegralExact: expected condition: %s, got: %s", tc.cond, res)
+			}
+		})
+	}
+}
+
 func TestCmpOrder(t *testing.T) {
 	tests := []struct {
 		s     string
