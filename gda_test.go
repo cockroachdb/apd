@@ -618,8 +618,12 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 				// after the operation is done. Since this isn't happening, things are being
 				// rounded when they shouldn't because the coefficient has so many trailing 0s.
 				// Manually remove Rounded flag from context until the TODO is fixed.
-				res &= ^Rounded
-				rcond &= ^Rounded
+				// Quo is fixed, except that setExponent reports a clamped zero as
+				// Rounded.
+				if tc.Operation != "divide" || d.IsZero() {
+					res &= ^Rounded
+					rcond &= ^Rounded
+				}
 
 				switch tc.Operation {
 				case "log10":
@@ -710,8 +714,9 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			}
 			r := newDecimal(t, testCtx, tc.Result)
 			var equal bool
-			if d.Form == Finite {
-				// Don't worry about trailing zeros being inequal in CmpTotal.
+			// Don't worry about trailing zeros being inequal in CmpTotal,
+			// except for Quo, which follows the specified exponent.
+			if d.Form == Finite && tc.Operation != "divide" {
 				equal = d.Cmp(r) == 0 && d.Negative == r.Negative
 				// Cmp treats every zero as equal, so check the exponent of
 				// a zero result too, unless the vector is a known mismatch.

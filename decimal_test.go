@@ -330,6 +330,56 @@ func TestQuoErr(t *testing.T) {
 	}
 }
 
+// TestQuoExponent checks that an inexact quotient keeps Precision digits and
+// an exact one takes the ideal exponent, or the closest one within the
+// precision.
+func TestQuoExponent(t *testing.T) {
+	tests := []struct {
+		p          uint32
+		x, y, want string
+		res        Condition
+	}{
+		{9, "999999999.5", "1", "1.00000000E+9", Inexact | Rounded},
+		{6, "999999999", "1", "1.00000E+9", Inexact | Rounded},
+		{34, "6.00", "3", "2.00", 0},
+		{34, "1", "4", "0.25", 0},
+		{34, "1000000", "1E+4", "100.0000", 0},
+		{9, "1000000000000", "1", "1.00000000E+12", Rounded},
+	}
+	for _, tc := range tests {
+		x := newDecimal(t, testCtx, tc.x)
+		y := newDecimal(t, testCtx, tc.y)
+		d := new(Decimal)
+		res, err := BaseContext.WithPrecision(tc.p).Quo(d, x, y)
+		if got := d.String(); got != tc.want || res != tc.res || err != nil {
+			t.Errorf("%s/%s at precision %d: got %s (%s), %v; expected %s (%s)",
+				tc.x, tc.y, tc.p, got, res, err, tc.want, tc.res)
+		}
+	}
+}
+
+// TestExpDigits checks that Exp keeps Precision digits even when its series
+// is short and exact.
+func TestExpDigits(t *testing.T) {
+	tests := []struct {
+		p       uint32
+		x, want string
+	}{
+		{34, "6.4E-25", "1.000000000000000000000000640000000"},
+		{34, "1.25E-30", "1.000000000000000000000000000001250"},
+		{29, "5E-21", "1.0000000000000000000050000000"},
+	}
+	for _, tc := range tests {
+		x := newDecimal(t, testCtx, tc.x)
+		d := new(Decimal)
+		_, err := BaseContext.WithPrecision(tc.p).Exp(d, x)
+		if got := d.String(); got != tc.want || err != nil {
+			t.Errorf("exp(%s) at precision %d: got %s, %v; expected %s",
+				tc.x, tc.p, got, err, tc.want)
+		}
+	}
+}
+
 func TestConditionString(t *testing.T) {
 	tests := map[Condition]string{
 		Overflow:             "overflow",

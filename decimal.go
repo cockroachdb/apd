@@ -17,6 +17,8 @@ package apd
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/bits"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -378,6 +380,17 @@ func (d *Decimal) setExponent(c *Context, nd int64, res Condition, xs ...int64) 
 	return res
 }
 
+// padDigits gives d n digits by appending trailing zeros, keeping its value.
+// Operations computed through [Context.Quo], which reduces exact quotients,
+// pad their result before rounding to Precision digits.
+func (d *Decimal) padDigits(n int64) {
+	if pad := n - d.NumDigits(); pad > 0 {
+		var tmpE BigInt
+		d.Coeff.Mul(&d.Coeff, tableExp10(pad, &tmpE))
+		d.Exponent -= int32(pad)
+	}
+}
+
 // upscale converts a and b to BigInts with the same scaling. It returns
 // them with this scaling, along with the scaling. An error can be produced
 // if the resulting scale factor is out of range. The tmp argument must be
@@ -712,52 +725,68 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 		d.Set(x)
 		return d, 0
 	}
-	var nd int
-	neg := false
-	switch x.Sign() {
-	case 0:
-		nd = int(d.NumDigits())
+	if x.Sign() == 0 {
+		nd := int(d.NumDigits())
 		d.SetInt64(0)
 		return d, nd - 1
-	case -1:
-		neg = true
 	}
 	d.Set(x)
-
-	// Use a uint64 for the division if possible.
-	if d.Coeff.IsUint64() {
-		i := d.Coeff.Uint64()
-		for i >= 10000 && i%10000 == 0 {
-			i /= 10000
-			nd += 4
-		}
-		for i%10 == 0 {
-			i /= 10
-			nd++
-		}
-		if nd != 0 {
-			d.Exponent += int32(nd)
-			d.Coeff.SetUint64(i)
-			d.Negative = neg
-		}
-		return d, nd
-	}
-
-	// Divide by 10 in a loop. In benchmarks of reduce0.decTest, this is 20%
-	// faster than converting to a string and trimming the 0s from the end.
-	var z, r BigInt
-	d.setBig(&z)
-	for {
-		z.QuoRem(&d.Coeff, bigTen, &r)
-		if r.Sign() == 0 {
-			d.Coeff.Set(&z)
-			nd++
-		} else {
-			break
-		}
-	}
+	nd := int(trimZeros(&d.Coeff, math.MaxInt64))
 	d.Exponent += int32(nd)
 	return d, nd
+}
+
+// trimZeros removes up to limit trailing zeros from the nonzero coefficient b
+// and returns how many it removed.
+func trimZeros(b *BigInt, limit int64) int64 {
+	var n int64
+
+	// Use a uint64 for the division if possible.
+	if b.IsUint64() {
+		i := b.Uint64()
+		for n+4 <= limit && i%10000 == 0 {
+			i /= 10000
+			n += 4
+		}
+		for n < limit && i%10 == 0 {
+			i /= 10
+			n++
+		}
+		if n != 0 {
+			b.SetUint64(i)
+		}
+		return n
+	}
+
+	// A trailing decimal zero is also a trailing binary zero.
+	if tz := int64(b.TrailingZeroBits()); tz < limit {
+		limit = tz
+	}
+	if limit == 0 {
+		return 0
+	}
+	// Most coefficients have no trailing zero; one cheap division settles that.
+	var q, r, tmpE BigInt
+	if q.QuoRem(b, bigTen, &r); r.Sign() != 0 {
+		return 0
+	}
+	// Divide by 10^k for each power of two k within the bound, largest first,
+	// so that the divisions grow with the logarithm of the zeros.
+	for k := int64(1) << bits.Len64(uint64(limit)) >> 1; k > 0; k >>= 1 {
+		if n+k > limit {
+			continue
+		}
+		q.QuoRem(b, tableExp10(k, &tmpE), &r)
+		if r.Sign() == 0 {
+			b.Set(&q)
+			n += k
+			if b.IsUint64() {
+				// The uint64 loop above is cheaper for what remains.
+				return n + trimZeros(b, limit-n)
+			}
+		}
+	}
+	return n
 }
 
 const decimalSize = unsafe.Sizeof(Decimal{})
