@@ -104,6 +104,20 @@ func BenchmarkLn(b *testing.B) {
 	)
 }
 
+func BenchmarkLog10(b *testing.B) {
+	precision := []int{2, 10, 100}
+	scale := []int{-100, -10, -2, 2, 10, 100}
+	digits := []int{2, 10, 100}
+	runBenches(
+		b, precision, scale, digits,
+		func(b *testing.B, ctx *Context, x *Decimal) {
+			if _, err := ctx.Log10(&Decimal{}, x); err != nil {
+				b.Fatal(err)
+			}
+		},
+	)
+}
+
 func BenchmarkDecimalString(b *testing.B) {
 	rng := rand.New(rand.NewSource(461210934723948))
 	corpus := func() []Decimal {

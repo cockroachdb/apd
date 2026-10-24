@@ -713,6 +713,11 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			if d.Form == Finite {
 				// Don't worry about trailing zeros being inequal in CmpTotal.
 				equal = d.Cmp(r) == 0 && d.Negative == r.Negative
+				// Cmp treats every zero as equal, so check the exponent of
+				// a zero result too, unless the vector is a known mismatch.
+				if equal && d.IsZero() && !GDAignoreZeroExponent[tc.ID] {
+					equal = d.Exponent == r.Exponent
+				}
 			} else {
 				equal = d.CmpTotal(r) == 0
 			}
@@ -846,13 +851,51 @@ var GDAignore = map[string]bool{
 }
 
 var GDAignoreFlags = map[string]bool{
-	// unflagged clamped
-	"sqtx9024": true,
-	"sqtx9025": true,
-	"sqtx9026": true,
-	"sqtx9027": true,
-	"sqtx9038": true,
-	"sqtx9039": true,
-	"sqtx9040": true,
+	// apd does not implement the clamp context directive.
 	"sqtx9045": true,
+}
+
+// GDAignoreZeroExponent lists vectors whose zero result has the wrong
+// exponent. Only the exponent comparison is skipped for them; their value
+// and flag checks still run.
+var GDAignoreZeroExponent = map[string]bool{
+	// want 0E+1 through 0E+3, got 0
+	"plux120": true,
+	"plux121": true,
+	"plux122": true,
+	"plux125": true,
+	"plux126": true,
+	"plux127": true,
+
+	// want 0 or -0, got 0E-1001 or -0E-1001
+	"redx218": true,
+	"redx219": true,
+	"redx220": true,
+	"redx238": true,
+	"redx239": true,
+	"redx240": true,
+
+	// want 0E+1 through 0E+5 or -0E+1 through -0E+5, got 0 or -0
+	"intx134": true,
+	"intx135": true,
+	"intx136": true,
+	"intx137": true,
+	"intx138": true,
+	"intx147": true,
+	"intx148": true,
+	"intx149": true,
+	"intx150": true,
+	"intx151": true,
+
+	// want 0E+1 through 0E+5 or -0E+1 through -0E+5, got 0 or -0
+	"intxx134": true,
+	"intxx135": true,
+	"intxx136": true,
+	"intxx137": true,
+	"intxx138": true,
+	"intxx147": true,
+	"intxx148": true,
+	"intxx149": true,
+	"intxx150": true,
+	"intxx151": true,
 }

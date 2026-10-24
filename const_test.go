@@ -31,4 +31,38 @@ func TestConstWithPrecision(t *testing.T) {
 			t.Errorf("%d: expected %s, got %s", i, e, s)
 		}
 	}
+
+	// The values must match what Decimal.SetString and Context.Round give.
+	for _, s := range []string{
+		strLn10, strInvLn10,
+		"123.456789", "0.00456", "9.9996", "99999", "0.95", "1.5", "7",
+	} {
+		c := makeConstWithPrecision(s)
+		check := func(p uint32, got, want *Decimal) {
+			t.Helper()
+			if got.Coeff.Cmp(&want.Coeff) != 0 || got.Exponent != want.Exponent ||
+				got.Form != want.Form || got.Negative != want.Negative {
+				t.Errorf("%.10s at precision %d: got %v (%v, %d), want %v (%v, %d)",
+					s, p, got, &got.Coeff, got.Exponent, want, &want.Coeff, want.Exponent)
+			}
+		}
+		var unrounded Decimal
+		if _, _, err := unrounded.SetString(s); err != nil {
+			t.Fatal(err)
+		}
+		check(0, &c.unrounded, &unrounded)
+		for i, p := 0, uint32(1); p < uint32(len(s)); i, p = i+1, p*2 {
+			ctx := Context{
+				Precision:   p,
+				Rounding:    RoundHalfUp,
+				MaxExponent: MaxExponent,
+				MinExponent: MinExponent,
+			}
+			var want Decimal
+			if _, err := ctx.Round(&want, &unrounded); err != nil {
+				t.Fatal(err)
+			}
+			check(p, &c.vals[i], &want)
+		}
+	}
 }

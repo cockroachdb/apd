@@ -240,6 +240,27 @@ func TestModf(t *testing.T) {
 			if frac.CmpTotal(frac2) != 0 {
 				t.Fatalf("got %s, expected %s", frac2, frac)
 			}
+
+			integ3, frac3 := new(Decimal).Set(x), new(Decimal)
+			integ3.Modf(integ3, frac3)
+			if integ.CmpTotal(integ3) != 0 || frac.CmpTotal(frac3) != 0 {
+				t.Fatalf("integ aliased: got %s, %s, expected %s, %s", integ3, frac3, integ, frac)
+			}
+			integ4, frac4 := new(Decimal), new(Decimal).Set(x)
+			frac4.Modf(integ4, frac4)
+			if integ.CmpTotal(integ4) != 0 || frac.CmpTotal(frac4) != 0 {
+				t.Fatalf("frac aliased: got %s, %s, expected %s, %s", integ4, frac4, integ, frac)
+			}
+			x5 := new(Decimal).Set(x)
+			x5.Modf(x5, nil)
+			if integ.CmpTotal(x5) != 0 {
+				t.Fatalf("integ aliased, frac nil: got %s, expected %s", x5, integ)
+			}
+			x6 := new(Decimal).Set(x)
+			x6.Modf(nil, x6)
+			if frac.CmpTotal(x6) != 0 {
+				t.Fatalf("frac aliased, integ nil: got %s, expected %s", x6, frac)
+			}
 		})
 	}
 
@@ -393,20 +414,27 @@ func TestFloat64(t *testing.T) {
 
 func TestCeil(t *testing.T) {
 	tests := map[float64]int64{
-		0:    0,
-		-0.1: 0,
-		0.1:  1,
-		-0.9: 0,
-		0.9:  1,
-		-1:   -1,
-		1:    1,
-		-1.1: -1,
-		1.1:  2,
+		0:     0,
+		-0.1:  0,
+		0.1:   1,
+		-0.01: 0,
+		0.01:  1,
+		-0.9:  0,
+		0.9:   1,
+		-1:    -1,
+		1:     1,
+		-1.1:  -1,
+		1.1:   2,
 	}
 
 	for f, r := range tests {
 		t.Run(fmt.Sprint(f), func(t *testing.T) {
 			d, err := new(Decimal).SetFloat64(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sep := new(Decimal)
+			_, err = testCtx.Ceil(sep, d)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -421,26 +449,36 @@ func TestCeil(t *testing.T) {
 			if i != r {
 				t.Fatalf("got %v, expected %v", i, r)
 			}
+			if sep.CmpTotal(d) != 0 {
+				t.Fatalf("aliased: got %s, expected %s", d, sep)
+			}
 		})
 	}
 }
 
 func TestFloor(t *testing.T) {
 	tests := map[float64]int64{
-		0:    0,
-		-0.1: -1,
-		0.1:  0,
-		-0.9: -1,
-		0.9:  0,
-		-1:   -1,
-		1:    1,
-		-1.1: -2,
-		1.1:  1,
+		0:     0,
+		-0.1:  -1,
+		0.1:   0,
+		-0.01: -1,
+		0.01:  0,
+		-0.9:  -1,
+		0.9:   0,
+		-1:    -1,
+		1:     1,
+		-1.1:  -2,
+		1.1:   1,
 	}
 
 	for f, r := range tests {
 		t.Run(fmt.Sprint(f), func(t *testing.T) {
 			d, err := new(Decimal).SetFloat64(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sep := new(Decimal)
+			_, err = testCtx.Floor(sep, d)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -455,7 +493,59 @@ func TestFloor(t *testing.T) {
 			if i != r {
 				t.Fatalf("got %v, expected %v", i, r)
 			}
+			if sep.CmpTotal(d) != 0 {
+				t.Fatalf("aliased: got %s, expected %s", d, sep)
+			}
 		})
+	}
+}
+
+func TestCeilFloorNonFinite(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+		cond Condition
+	}{
+		{name: "Infinity", in: "Infinity", want: "Infinity"},
+		{name: "-Infinity", in: "-Infinity", want: "-Infinity"},
+		{name: "NaN", in: "NaN", want: "NaN"},
+		{name: "sNaN", in: "sNaN", want: "NaN", cond: InvalidOperation},
+	}
+	for _, tc := range cases {
+		for _, op := range []string{"ceil", "floor"} {
+			for _, aliased := range []bool{true, false} {
+				t.Run(op+"-"+tc.name+"-aliased-"+fmt.Sprint(aliased), func(t *testing.T) {
+					src := new(Decimal)
+					if _, _, err := src.SetString(tc.in); err != nil {
+						t.Fatal(err)
+					}
+					dst := src
+					if !aliased {
+						dst = new(Decimal)
+					}
+					var cond Condition
+					var err error
+					if op == "ceil" {
+						cond, err = testCtx.Ceil(dst, src)
+					} else {
+						cond, err = testCtx.Floor(dst, src)
+					}
+					if tc.cond == 0 && err != nil {
+						t.Fatal(err)
+					}
+					if tc.cond != 0 && err == nil {
+						t.Fatal("expected InvalidOperation")
+					}
+					if cond != tc.cond {
+						t.Fatalf("cond %v, want %v", cond, tc.cond)
+					}
+					if dst.String() != tc.want {
+						t.Fatalf("got %s, want %s", dst, tc.want)
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -742,6 +832,113 @@ func TestQuantize(t *testing.T) {
 	}
 }
 
+func TestQuantizeRounding(t *testing.T) {
+	tests := []struct {
+		s      string
+		e      int32
+		rnd    Rounder
+		expect string
+		cond   Condition
+	}{
+		{s: "0.002", e: -1, rnd: RoundCeiling, expect: "0.1", cond: Inexact | Rounded},
+		{s: "1.002", e: -1, rnd: RoundCeiling, expect: "1.1", cond: Inexact | Rounded},
+		{s: "-0.002", e: -1, rnd: RoundCeiling, expect: "-0.0", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundFloor, expect: "0.0", cond: Inexact | Rounded},
+		{s: "-0.002", e: -1, rnd: RoundFloor, expect: "-0.1", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundUp, expect: "0.1", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundDown, expect: "0.0", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: Round05Up, expect: "0.1", cond: Inexact | Rounded},
+		{s: "-0.002", e: -1, rnd: Round05Up, expect: "-0.1", cond: Inexact | Rounded},
+		{s: "0.002", e: -1, rnd: RoundHalfDown, expect: "0.0", cond: Inexact | Rounded},
+		{s: "0.04", e: -1, rnd: RoundHalfUp, expect: "0.0", cond: Inexact | Rounded},
+		{s: "0.05", e: -1, rnd: RoundHalfUp, expect: "0.1", cond: Inexact | Rounded},
+		{s: "0.05", e: -1, rnd: RoundHalfEven, expect: "0.0", cond: Inexact | Rounded},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %d %s", tc.s, tc.e, tc.rnd), func(t *testing.T) {
+			c := Context{Precision: 100, Rounding: tc.rnd, MaxExponent: 1000, MinExponent: -1000, Traps: DefaultTraps}
+			d, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err := c.Quantize(d, d, tc.e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("expected: %s, got: %s", tc.expect, s)
+			}
+			if res != tc.cond {
+				t.Fatalf("expected condition: %s, got: %s", tc.cond, res)
+			}
+			// Repeat with a separate destination; the input must be unchanged.
+			x, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var sep Decimal
+			if _, err := c.Quantize(&sep, x, tc.e); err != nil {
+				t.Fatal(err)
+			}
+			if sep.CmpTotal(d) != 0 {
+				t.Fatalf("expected: %s, got: %s", d, &sep)
+			}
+			if s := x.String(); s != tc.s {
+				t.Fatalf("input changed: expected: %s, got: %s", tc.s, s)
+			}
+		})
+	}
+}
+
+func TestRoundToIntegralRounding(t *testing.T) {
+	tests := []struct {
+		s      string
+		rnd    Rounder
+		expect string
+		cond   Condition
+	}{
+		{s: "0.05", rnd: RoundCeiling, expect: "1", cond: Inexact | Rounded},
+		{s: "-0.05", rnd: RoundFloor, expect: "-1", cond: Inexact | Rounded},
+		{s: "0.002", rnd: Round05Up, expect: "1", cond: Inexact | Rounded},
+		{s: "0.05", rnd: RoundHalfUp, expect: "0", cond: Inexact | Rounded},
+		{s: "0.05", rnd: RoundDown, expect: "0", cond: Inexact | Rounded},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s: %s", tc.s, tc.rnd), func(t *testing.T) {
+			c := Context{Precision: 100, Rounding: tc.rnd, MaxExponent: 1000, MinExponent: -1000, Traps: DefaultTraps}
+			x, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var d Decimal
+			res, err := c.RoundToIntegralValue(&d, x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("RoundToIntegralValue: expected: %s, got: %s", tc.expect, s)
+			}
+			if res != 0 {
+				t.Fatalf("RoundToIntegralValue: expected no condition, got: %s", res)
+			}
+			x, _, err = NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err = c.RoundToIntegralExact(&d, x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Fatalf("RoundToIntegralExact: expected: %s, got: %s", tc.expect, s)
+			}
+			if res != tc.cond {
+				t.Fatalf("RoundToIntegralExact: expected condition: %s, got: %s", tc.cond, res)
+			}
+		})
+	}
+}
+
 func TestCmpOrder(t *testing.T) {
 	tests := []struct {
 		s     string
@@ -870,6 +1067,36 @@ func TestReduce(t *testing.T) {
 			_, got := d.Reduce(d)
 			if n != got {
 				t.Fatalf("got %v, expected %v", got, n)
+			}
+		})
+	}
+}
+
+// TestRootZeroTraps checks that a root of zero whose exponent is clamped
+// into the context's range returns an error when Clamped is trapped. The
+// GDA vectors cover the exponent and condition but cannot set Traps.
+func TestRootZeroTraps(t *testing.T) {
+	c := &Context{Precision: 4, MaxExponent: 9, MinExponent: -9, Rounding: RoundHalfUp, Traps: Clamped}
+	tests := []struct {
+		op   string
+		root func(d, x *Decimal) (Condition, error)
+		x    string
+	}{
+		{op: "sqrt", root: c.Sqrt, x: "0E-25"},
+		{op: "sqrt", root: c.Sqrt, x: "0E+20"},
+		{op: "cbrt", root: c.Cbrt, x: "0E-37"},
+		{op: "cbrt", root: c.Cbrt, x: "0E+30"},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s %s", tc.op, tc.x), func(t *testing.T) {
+			x := newDecimal(t, testCtx, tc.x)
+			d := new(Decimal)
+			_, err := tc.root(d, x)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if err.Error() != Clamped.String() {
+				t.Fatalf("expected %s, got %s", Clamped, err)
 			}
 		})
 	}
@@ -1032,5 +1259,60 @@ func TestNewFromStringInvalid(t *testing.T) {
 					tc.input, d.String(), d.Negative, d.Coeff.String())
 			}
 		})
+	}
+}
+
+func TestRemUnlimitedPrecision(t *testing.T) {
+	for _, tc := range []struct{ x, y, want string }{
+		{"100E100", "10E1", "0E1"},
+		{"123456789012345678901234567890", "7", "0"},
+		{"123.45", "10", "3.45"},
+		{"-123.45", "10", "-3.45"},
+		{"123.45", "-10", "3.45"},
+		{"0.01", "1", "0.01"},
+		{"-10", "5", "-0"},
+		{"-0", "3", "-0"},
+	} {
+		t.Run(tc.x+"/"+tc.y, func(t *testing.T) {
+			for _, alias := range []string{"neither", "x", "y"} {
+				t.Run(alias, func(t *testing.T) {
+					x := newDecimal(t, &BaseContext, tc.x)
+					y := newDecimal(t, &BaseContext, tc.y)
+					want := newDecimal(t, &BaseContext, tc.want)
+					d := new(Decimal)
+					if alias == "x" {
+						d = x
+					}
+					if alias == "y" {
+						d = y
+					}
+					flags, err := BaseContext.Rem(d, x, y)
+					if err != nil || flags != 0 {
+						t.Fatalf("flags %s, error %v", flags, err)
+					}
+					if d.CmpTotal(want) != 0 {
+						t.Fatalf("got %s, want %s", d, want)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRemLimitedPrecision(t *testing.T) {
+	x, y := New(12345, 0), New(10, 0)
+	var d Decimal
+	flags, err := BaseContext.WithPrecision(3).Rem(&d, x, y)
+	if flags != DivisionImpossible || err == nil || d.Form != NaN {
+		t.Fatalf("got %s, flags %s, error %v", &d, flags, err)
+	}
+	flags, err = BaseContext.WithPrecision(4).Rem(&d, x, y)
+	if flags != 0 || err != nil || d.Cmp(New(5, 0)) != 0 {
+		t.Fatalf("got %s, flags %s, error %v", &d, flags, err)
+	}
+	x, y = New(100, 100), New(10, 1)
+	flags, err = BaseContext.WithPrecision(1).Rem(&d, x, y)
+	if flags != DivisionImpossible || err == nil || d.Form != NaN {
+		t.Fatalf("got %s, flags %s, error %v", &d, flags, err)
 	}
 }

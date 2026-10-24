@@ -623,7 +623,9 @@ func (d *Decimal) IsZero() bool {
 // Modf sets integ to the integral part of d and frac to the fractional part
 // such that d = integ+frac. If d is negative, both integ or frac will be either
 // 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be <= 0.
-// Both results are finite. Either argument can be nil, preventing it from being set.
+// d must be finite; both results are finite with Form set.
+// Either argument can be nil, preventing it from being set. integ or frac may
+// be d itself; integ and frac must not be the same Decimal.
 func (d *Decimal) Modf(integ, frac *Decimal) {
 	if integ == nil && frac == nil {
 		return
@@ -633,29 +635,29 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 
 	// No fractional part.
 	if d.Exponent > 0 {
+		if integ != nil {
+			integ.Set(d)
+		}
 		if frac != nil {
 			frac.Form = Finite
 			frac.Negative = neg
 			frac.Exponent = 0
 			frac.Coeff.SetInt64(0)
 		}
-		if integ != nil {
-			integ.Set(d)
-		}
 		return
 	}
 	nd := d.NumDigits()
 	exp := -int64(d.Exponent)
-	// d < 0 because exponent is larger than number of digits.
+	// |d| < 1 because the exponent is larger than the number of digits.
 	if exp > nd {
+		if frac != nil {
+			frac.Set(d)
+		}
 		if integ != nil {
 			integ.Form = Finite
 			integ.Negative = neg
 			integ.Exponent = 0
 			integ.Coeff.SetInt64(0)
-		}
-		if frac != nil {
-			frac.Set(d)
 		}
 		return
 	}
@@ -666,9 +668,6 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	var icoeff *BigInt
 	if integ != nil {
 		icoeff = &integ.Coeff
-		integ.Form = Finite
-		integ.Exponent = 0
-		integ.Negative = neg
 	} else {
 		// This is the integ == nil branch, and we already checked if both integ and
 		// frac were nil above, so frac can never be nil in this branch.
@@ -684,6 +683,12 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 		// This is the frac == nil, which means integ must not be nil since they both
 		// can't be due to the check above.
 		icoeff.Quo(&d.Coeff, e)
+	}
+	// These writes come after every read of d because integ may alias d.
+	if integ != nil {
+		integ.Form = Finite
+		integ.Exponent = 0
+		integ.Negative = neg
 	}
 }
 
