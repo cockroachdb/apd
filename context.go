@@ -79,6 +79,7 @@ func (c *Context) WithPrecision(p uint32) *Context {
 }
 
 // goError converts flags into an error based on c.Traps.
+//
 //gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
 	if flags == 0 {
@@ -95,6 +96,7 @@ func (c *Context) etiny() int32 {
 // shouldSetAsNaN determines whether setAsNaN should be called, given
 // the provided values, where x is required and y is optional. It is
 // split from setAsNaN to permit inlining of this function.
+//
 //gcassert:inline
 func (c *Context) shouldSetAsNaN(x, y *Decimal) bool {
 	return x.Form == NaNSignaling || x.Form == NaN ||
@@ -1279,6 +1281,9 @@ func (c *Context) RoundToIntegralExact(d, x *Decimal) (Condition, error) {
 
 // Ceil sets d to the smallest integer >= x.
 func (c *Context) Ceil(d, x *Decimal) (Condition, error) {
+	if set, res, err := c.toIntegralSpecials(d, x); set {
+		return res, err
+	}
 	var frac Decimal
 	x.Modf(d, &frac)
 	if frac.Sign() > 0 {
@@ -1289,6 +1294,9 @@ func (c *Context) Ceil(d, x *Decimal) (Condition, error) {
 
 // Floor sets d to the largest integer <= x.
 func (c *Context) Floor(d, x *Decimal) (Condition, error) {
+	if set, res, err := c.toIntegralSpecials(d, x); set {
+		return res, err
+	}
 	var frac Decimal
 	x.Modf(d, &frac)
 	if frac.Sign() < 0 {

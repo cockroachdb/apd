@@ -269,6 +269,46 @@ func TestModf(t *testing.T) {
 	a.Modf(nil, nil)
 }
 
+func TestModfResetsNonFiniteDestination(t *testing.T) {
+	// A reused Infinity or NaN is still that form until Form is cleared,
+	// so the coefficient written below is not the value Modf returns.
+	x := New(15, -1) // 1.5
+	integ, frac := New(0, 0), New(0, 0)
+	if _, _, err := integ.SetString("Inf"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := frac.SetString("NaN"); err != nil {
+		t.Fatal(err)
+	}
+	x.Modf(integ, frac)
+	if integ.Form != Finite || integ.Cmp(New(1, 0)) != 0 {
+		t.Fatalf("integ = %s (form %v), want 1", integ, integ.Form)
+	}
+	if frac.Form != Finite || frac.Cmp(New(5, -1)) != 0 {
+		t.Fatalf("frac = %s (form %v), want 0.5", frac, frac.Form)
+	}
+
+	tiny := New(1, -5) // 0.00001
+	out := New(0, 0)
+	if _, _, err := out.SetString("Inf"); err != nil {
+		t.Fatal(err)
+	}
+	tiny.Modf(out, nil)
+	if out.Form != Finite || out.Cmp(New(0, 0)) != 0 {
+		t.Fatalf("integ = %s (form %v), want 0", out, out.Form)
+	}
+
+	whole := New(2, 1) // 20
+	part := New(0, 0)
+	if _, _, err := part.SetString("NaN"); err != nil {
+		t.Fatal(err)
+	}
+	whole.Modf(nil, part)
+	if part.Form != Finite || part.Cmp(New(0, 0)) != 0 {
+		t.Fatalf("frac = %s (form %v), want 0", part, part.Form)
+	}
+}
+
 func TestInt64(t *testing.T) {
 	tests := []struct {
 		x   string
@@ -457,6 +497,55 @@ func TestFloor(t *testing.T) {
 				t.Fatalf("aliased: got %s, expected %s", d, sep)
 			}
 		})
+	}
+}
+
+func TestCeilFloorNonFinite(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+		cond Condition
+	}{
+		{name: "Infinity", in: "Infinity", want: "Infinity"},
+		{name: "-Infinity", in: "-Infinity", want: "-Infinity"},
+		{name: "NaN", in: "NaN", want: "NaN"},
+		{name: "sNaN", in: "sNaN", want: "NaN", cond: InvalidOperation},
+	}
+	for _, tc := range cases {
+		for _, op := range []string{"ceil", "floor"} {
+			for _, aliased := range []bool{true, false} {
+				t.Run(op+"-"+tc.name+"-aliased-"+fmt.Sprint(aliased), func(t *testing.T) {
+					src := new(Decimal)
+					if _, _, err := src.SetString(tc.in); err != nil {
+						t.Fatal(err)
+					}
+					dst := src
+					if !aliased {
+						dst = new(Decimal)
+					}
+					var cond Condition
+					var err error
+					if op == "ceil" {
+						cond, err = testCtx.Ceil(dst, src)
+					} else {
+						cond, err = testCtx.Floor(dst, src)
+					}
+					if tc.cond == 0 && err != nil {
+						t.Fatal(err)
+					}
+					if tc.cond != 0 && err == nil {
+						t.Fatal("expected InvalidOperation")
+					}
+					if cond != tc.cond {
+						t.Fatalf("cond %v, want %v", cond, tc.cond)
+					}
+					if dst.String() != tc.want {
+						t.Fatalf("got %s, want %s", dst, tc.want)
+					}
+				})
+			}
+		}
 	}
 }
 

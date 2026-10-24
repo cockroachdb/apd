@@ -623,6 +623,7 @@ func (d *Decimal) IsZero() bool {
 // Modf sets integ to the integral part of d and frac to the fractional part
 // such that d = integ+frac. If d is negative, both integ or frac will be either
 // 0 or negative. integ.Exponent will be >= 0; frac.Exponent will be <= 0.
+// d must be finite; both results are finite with Form set.
 // Either argument can be nil, preventing it from being set. integ or frac may
 // be d itself; integ and frac must not be the same Decimal.
 func (d *Decimal) Modf(integ, frac *Decimal) {
@@ -638,6 +639,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 			integ.Set(d)
 		}
 		if frac != nil {
+			frac.Form = Finite
 			frac.Negative = neg
 			frac.Exponent = 0
 			frac.Coeff.SetInt64(0)
@@ -652,6 +654,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 			frac.Set(d)
 		}
 		if integ != nil {
+			integ.Form = Finite
 			integ.Negative = neg
 			integ.Exponent = 0
 			integ.Coeff.SetInt64(0)
@@ -673,6 +676,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 
 	if frac != nil {
 		icoeff.QuoRem(&d.Coeff, e, &frac.Coeff)
+		frac.Form = Finite
 		frac.Exponent = d.Exponent
 		frac.Negative = neg
 	} else {
@@ -682,6 +686,7 @@ func (d *Decimal) Modf(integ, frac *Decimal) {
 	}
 	// These writes come after every read of d because integ may alias d.
 	if integ != nil {
+		integ.Form = Finite
 		integ.Exponent = 0
 		integ.Negative = neg
 	}
