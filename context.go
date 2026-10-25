@@ -1052,6 +1052,12 @@ func (c *Context) integerPower(d, x *Decimal, y *BigInt) (Condition, error) {
 
 	if neg {
 		ed.Quo(z, decimalOne, z)
+		if ed.Err() == nil && !ed.Flags.Inexact() {
+			// The result is exact. Any Rounded flag so far came from dropping
+			// zero digits at the internal precision, so it doesn't apply.
+			z.Reduce(z)
+			ed.Flags &^= Rounded
+		}
 	}
 	return ed.Flags, ed.Err()
 }

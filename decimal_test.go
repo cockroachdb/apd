@@ -946,6 +946,65 @@ func TestNeg(t *testing.T) {
 	}
 }
 
+func TestPowExactInteger(t *testing.T) {
+	// Expected results and conditions match Python's decimal module.
+	tests := []struct {
+		x, y   string
+		prec   uint32
+		expect string
+		exp    int32
+		cond   Condition
+	}{
+		{"2", "-1", 34, "0.5", -1, 0},
+		{"2", "-3", 34, "0.125", -3, 0},
+		{"10", "-2", 34, "0.01", -2, 0},
+		{"5", "-2", 34, "0.04", -2, 0},
+		{"2", "3", 34, "8", 0, 0},
+		{"10", "3", 34, "1000", 0, 0},
+		{"3", "-1", 34, "0.3333333333333333333333333333333333", -34, Inexact | Rounded},
+		// x**|y| exceeds the internal precision, but only by zero digits.
+		{"10", "-50", 34, "1E-50", -50, 0},
+		// Bases with a fractional part, trailing zeros or a non-zero exponent.
+		{"0.5", "-2", 34, "4", 0, 0},
+		{"0.1", "-1", 34, "1E+1", 1, 0},
+		{"2.50", "-1", 34, "0.4", -1, 0},
+		{"1E+2", "-2", 34, "0.0001", -4, 0},
+		{"1.0", "-3", 34, "1", 0, 0},
+		{"-2", "-3", 34, "-0.125", -3, 0},
+		// Exact, with more digits than fit in a smaller context.
+		{"5", "-60", 34, "1.152921504606846976E-42", -60, 0},
+		{"5", "-60", 10, "1.152921505E-42", -51, Inexact | Rounded},
+		{"2", "-1", 0, "0.5", -1, 0},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s**%s/prec=%d", tc.x, tc.y, tc.prec), func(t *testing.T) {
+			c := BaseContext.WithPrecision(tc.prec)
+			x, _, err := NewFromString(tc.x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			y, _, err := NewFromString(tc.y)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var d Decimal
+			res, err := c.Pow(&d, x, y)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := d.String(); s != tc.expect {
+				t.Errorf("got %s, expected %s", s, tc.expect)
+			}
+			if d.Exponent != tc.exp {
+				t.Errorf("got exponent %d, expected %d", d.Exponent, tc.exp)
+			}
+			if res != tc.cond {
+				t.Errorf("got condition %v, expected %v", res, tc.cond)
+			}
+		})
+	}
+}
+
 func TestReduce(t *testing.T) {
 	tests := map[string]int{
 		"-0":        0,
