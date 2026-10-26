@@ -1308,8 +1308,11 @@ func (c *Context) Reduce(d, x *Decimal) (int, Condition, error) {
 	_, n := d.Reduce(x)
 	d.Negative = neg
 	res := c.round(d, d)
+	// Rounding up can carry into new trailing zeros, as in 9999 at precision 3.
+	_, m := d.Reduce(d)
+	d.Negative = neg
 	res, err := c.goError(res)
-	return n, res, err
+	return n + m, res, err
 }
 
 // exp10 returns x, 10^x. An error is returned if x is too large.

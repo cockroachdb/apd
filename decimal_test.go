@@ -983,6 +983,39 @@ func TestReduce(t *testing.T) {
 	}
 }
 
+// TestContextReduceRounding checks that Context.Reduce removes the trailing
+// zeros that rounding to the precision can produce.
+func TestContextReduceRounding(t *testing.T) {
+	c := &Context{Precision: 3, MaxExponent: 999, MinExponent: -999, Rounding: RoundHalfUp}
+	tests := []struct {
+		x, want string
+		n       int
+	}{
+		{x: "9999", want: "1E+4", n: 2},
+		{x: "-99.99", want: "-1E+2", n: 2},
+		{x: "1.2300", want: "1.23", n: 2},
+		{x: "-0.0001E-999", want: "-0", n: 0},
+		{x: "0.999E-999", want: "1E-999", n: 2},
+		{x: "0.099E-999", want: "1E-1000", n: 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.x, func(t *testing.T) {
+			x, _, err := NewFromString(tc.x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var d Decimal
+			n, _, err := c.Reduce(&d, x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := d.String(); got != tc.want || n != tc.n {
+				t.Fatalf("got %s (n=%d), expected %s (n=%d)", got, n, tc.want, tc.n)
+			}
+		})
+	}
+}
+
 // TestRootZeroTraps checks that a root of zero whose exponent is clamped
 // into the context's range returns an error when Clamped is trapped. The
 // GDA vectors cover the exponent and condition but cannot set Traps.
