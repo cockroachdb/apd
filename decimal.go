@@ -349,7 +349,7 @@ func (d *Decimal) setExponent(c *Context, nd int64, res Condition, xs ...int64) 
 			frac.Abs(&frac)
 			if !frac.IsZero() {
 				res |= Inexact
-				if c.Rounding.ShouldAddOne(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
+				if c.Rounding.ShouldAddOne(&integ.Coeff, d.Negative, frac.Cmp(decimalHalf)) {
 					integ.Coeff.Add(&integ.Coeff, bigOne)
 				}
 			}
@@ -365,8 +365,16 @@ func (d *Decimal) setExponent(c *Context, nd int64, res Condition, xs ...int64) 
 			res |= Clamped
 			r = c.MaxExponent
 		} else {
-			res |= Overflow | Inexact
-			d.Form = Infinite
+			res |= Overflow | Inexact | Rounded
+			if c.Precision > 0 && !c.Rounding.overflowsToInfinity(d.Negative) {
+				// Directed rounding toward zero clamps to the largest finite
+				// magnitude, Nmax, instead of overflowing to infinity.
+				var tmp BigInt
+				d.Coeff.Sub(tableExp10(int64(c.Precision), &tmp), bigOne)
+				r = c.MaxExponent - int32(c.Precision) + 1
+			} else {
+				d.Form = Infinite
+			}
 		}
 	}
 
@@ -490,13 +498,40 @@ func (d *Decimal) CmpTotal(x *Decimal) int {
 }
 
 // CmpTotalMag compares the magnitudes of d and x using the total ordering, and
-// returns -1, 0 or +1. It is equivalent to d.Abs().CmpTotal(x.Abs()) but does
-// not modify d or x. See CmpTotal for the definition of the total ordering.
+// returns -1, 0 or +1. It is equivalent to CmpTotal on the absolute values of d
+// and x, but does not modify or copy them. See CmpTotal for the definition of
+// the total ordering.
+//
+// NaN payloads are not retained by apd, so two NaNs of the same kind always
+// compare equal.
 func (d *Decimal) CmpTotalMag(x *Decimal) int {
-	var da, xa Decimal
-	da.Abs(d)
-	xa.Abs(x)
-	return da.CmpTotal(&xa)
+	if d.Form < x.Form {
+		return -1
+	}
+	if d.Form > x.Form {
+		return 1
+	}
+
+	switch d.Form {
+	case Finite:
+		if c := d.cmpAbs(x); c != 0 {
+			return c
+		}
+		// Magnitudes are equal, compare exponents.
+		if d.Exponent < x.Exponent {
+			return -1
+		}
+		if d.Exponent > x.Exponent {
+			return 1
+		}
+		return 0
+
+	case Infinite:
+		return 0
+
+	default:
+		return d.Coeff.Cmp(&x.Coeff)
+	}
 }
 
 // SameQuantum reports whether d and x have the same exponent. Two infinities
@@ -576,21 +611,39 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		return lt
 	}
 
-	if d.Exponent == x.Exponent {
-		cmp := d.Coeff.Cmp(&x.Coeff)
-		if ds < 0 {
-			cmp = -cmp
+	cmp := d.cmpAbs(x)
+	if ds < 0 {
+		cmp = -cmp
+	}
+	return cmp
+}
+
+// cmpAbs compares the magnitudes of the finite values d and x, and returns -1,
+// 0 or +1.
+func (d *Decimal) cmpAbs(x *Decimal) int {
+	dz, xz := d.Coeff.Sign() == 0, x.Coeff.Sign() == 0
+	if dz || xz {
+		switch {
+		case dz && xz:
+			return 0
+		case dz:
+			return -1
+		default:
+			return 1
 		}
-		return cmp
+	}
+
+	if d.Exponent == x.Exponent {
+		return d.Coeff.Cmp(&x.Coeff)
 	}
 
 	// Next compare adjusted exponents.
 	dn := d.NumDigits() + int64(d.Exponent)
 	xn := x.NumDigits() + int64(x.Exponent)
 	if dn < xn {
-		return lt
+		return -1
 	} else if dn > xn {
-		return gt
+		return 1
 	}
 
 	// Now have to use aligned BigInts. This function previously used upscale to
@@ -612,9 +665,6 @@ func (d *Decimal) Cmp(x *Decimal) int {
 		dScaled.Set(&d.Coeff)
 		dScaled.Mul(&dScaled, tableExp10(int64(d.Exponent)-int64(x.Exponent), &tmpE))
 		cmp = dScaled.Cmp(&x.Coeff)
-	}
-	if ds < 0 {
-		cmp = -cmp
 	}
 	return cmp
 }
@@ -722,6 +772,16 @@ func (d *Decimal) Neg(x *Decimal) *Decimal {
 func (d *Decimal) Abs(x *Decimal) *Decimal {
 	d.Set(x)
 	d.Negative = false
+	return d
+}
+
+// CopySign sets d to x with the sign of y and returns d. Only the sign is
+// affected: no rounding is performed, and NaN operands are copied as is.
+func (d *Decimal) CopySign(x, y *Decimal) *Decimal {
+	// Read y's sign first, in case d and y are the same.
+	neg := y.Negative
+	d.Set(x)
+	d.Negative = neg
 	return d
 }
 

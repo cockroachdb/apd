@@ -213,13 +213,23 @@ var GDAfiles = []string{
 	"base",
 	"compare",
 	"comparetotal",
+	"comparetotmag",
+	"copysign",
 	"divide",
 	"divideint",
 	"exp",
 	"ln",
 	"log10",
+	"logb",
+	"max",
+	"maxmag",
+	"min",
+	"minmag",
 	"minus",
 	"multiply",
+	"nextminus",
+	"nextplus",
+	"nexttoward",
 	"plus",
 	"power",
 	"powersqrt",
@@ -228,6 +238,8 @@ var GDAfiles = []string{
 	"reduce",
 	"remainder",
 	"rounding",
+	"samequantum",
+	"scaleb",
 	"squareroot",
 	"subtract",
 	"tointegral",
@@ -259,6 +271,8 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 		res, err = c.Add(d, x, y)
 	case "compare":
 		res, err = c.Cmp(d, x, y)
+	case "copysign":
+		d.CopySign(x, y)
 	case "cuberoot":
 		res, err = c.Cbrt(d, x)
 	case "divide":
@@ -271,10 +285,26 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 		res, err = c.Ln(d, x)
 	case "log10":
 		res, err = c.Log10(d, x)
+	case "logb":
+		res, err = c.LogB(d, x)
+	case "max":
+		res, err = c.Max(d, x, y)
+	case "maxmag":
+		res, err = c.MaxAbs(d, x, y)
+	case "min":
+		res, err = c.Min(d, x, y)
+	case "minmag":
+		res, err = c.MinAbs(d, x, y)
 	case "minus":
 		res, err = c.Neg(d, x)
 	case "multiply":
 		res, err = c.Mul(d, x, y)
+	case "nextminus":
+		res, err = c.NextMinus(d, x)
+	case "nextplus":
+		res, err = c.NextPlus(d, x)
+	case "nexttoward":
+		res, err = c.NextToward(d, x, y)
 	case "plus":
 		res, err = c.Add(d, x, decimalZero)
 	case "power":
@@ -285,6 +315,8 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 		_, res, err = c.Reduce(d, x)
 	case "remainder":
 		res, err = c.Rem(d, x, y)
+	case "scaleb":
+		res, err = c.ScaleB(d, x, y)
 	case "squareroot":
 		res, err = c.Sqrt(d, x)
 	case "subtract":
@@ -297,6 +329,10 @@ func (tc TestCase) Run(c *Context, done chan error, d, x, y *Decimal) (res Condi
 	// Below used only in benchmarks. Tests call it themselves.
 	case "comparetotal":
 		x.CmpTotal(y)
+	case "comparetotmag":
+		x.CmpTotalMag(y)
+	case "samequantum":
+		x.SameQuantum(y)
 	case "tosci":
 		_ = x.String()
 
@@ -521,6 +557,14 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 					var c int
 					c = operands[0].CmpTotal(operands[1])
 					d.SetInt64(int64(c))
+				case "comparetotmag":
+					d.SetInt64(int64(operands[0].CmpTotalMag(operands[1])))
+				case "samequantum":
+					var v int64
+					if operands[0].SameQuantum(operands[1]) {
+						v = 1
+					}
+					d.SetInt64(v)
 				default:
 					var wg sync.WaitGroup
 					wg.Add(2)
@@ -710,7 +754,7 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			}
 			r := newDecimal(t, testCtx, tc.Result)
 			var equal bool
-			if d.Form == Finite {
+			if d.Form == Finite && !strictResultOps[tc.Operation] {
 				// Don't worry about trailing zeros being inequal in CmpTotal.
 				equal = d.Cmp(r) == 0 && d.Negative == r.Negative
 			} else {
@@ -740,6 +784,22 @@ func gdaTest(t *testing.T, path string, tcs []TestCase) {
 			}
 		}
 	}
+}
+
+// strictResultOps are the operations whose finite results must match the
+// expected value's exponent as well as its value. They select or adjust an
+// operand rather than compute a new value, so the exponent is part of what
+// they are specified to return.
+var strictResultOps = map[string]bool{
+	"copysign":   true,
+	"max":        true,
+	"maxmag":     true,
+	"min":        true,
+	"minmag":     true,
+	"nextminus":  true,
+	"nextplus":   true,
+	"nexttoward": true,
+	"scaleb":     true,
 }
 
 func (tc TestCase) PrintIgnore() {
@@ -779,6 +839,26 @@ var GDAignore = map[string]bool{
 	"cotx984": true,
 	"cotx987": true,
 	"cotx994": true,
+
+	// NaN payloads
+	"ctmx963": true,
+	"ctmx970": true,
+	"ctmx971": true,
+	"ctmx972": true,
+	"ctmx973": true,
+	"ctmx974": true,
+	"ctmx975": true,
+	"ctmx976": true,
+	"ctmx977": true,
+	"ctmx980": true,
+	"ctmx981": true,
+	"ctmx982": true,
+	"ctmx983": true,
+	"ctmx984": true,
+	"ctmx985": true,
+	"ctmx986": true,
+	"ctmx987": true,
+	"ctmx994": true,
 
 	// too large exponents, supposed to fail anyway
 	"quax525": true,

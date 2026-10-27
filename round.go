@@ -58,6 +58,22 @@ func (r Rounder) ShouldAddOne(result *BigInt, neg bool, half int) bool {
 	}
 }
 
+// overflowsToInfinity reports whether a result that overflows, with the given
+// sign, rounds to infinity. Otherwise it rounds to the largest finite
+// magnitude.
+func (r Rounder) overflowsToInfinity(neg bool) bool {
+	switch r {
+	case RoundDown, Round05Up:
+		return false
+	case RoundCeiling:
+		return !neg
+	case RoundFloor:
+		return neg
+	default:
+		return true
+	}
+}
+
 // Round sets d to rounded x.
 func (r Rounder) Round(c *Context, d, x *Decimal, disableIfPrecisionZero bool) Condition {
 	d.Set(x)

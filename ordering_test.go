@@ -16,6 +16,7 @@ package apd
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -378,13 +379,10 @@ func TestCopySign(t *testing.T) {
 		{"Infinity", "-1", "-Inf"},
 		{"NaN", "-1", "NaN"},
 	}
-	c := orderingCtx()
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s,%s", tc.x, tc.y), func(t *testing.T) {
 			d := new(Decimal)
-			if _, err := c.CopySign(d, newDecimal(t, c, tc.x), newDecimal(t, c, tc.y)); err != nil {
-				t.Fatal(err)
-			}
+			d.CopySign(newDecimal(t, testCtx, tc.x), newDecimal(t, testCtx, tc.y))
 			if got := canon(d); got != tc.expected {
 				t.Errorf("CopySign(%s, %s) = %s, want %s", tc.x, tc.y, got, tc.expected)
 			}
@@ -452,7 +450,6 @@ func TestCmpTotalMag(t *testing.T) {
 // TestOrderingConditions checks the conditions (flags) that the ordering and
 // adjacency operations raise, independent of their numeric result.
 func TestOrderingConditions(t *testing.T) {
-	const signals = InvalidOperation | DivisionByZero
 	tests := []struct {
 		op, x, y string
 		expected Condition
@@ -483,41 +480,194 @@ func TestOrderingConditions(t *testing.T) {
 		{"ScaleB", "sNaN", "1", InvalidOperation},
 		{"ScaleB", "1", "NaN", 0},
 		{"ScaleB", "1", "2", 0},
+		{"Max", "1.23456789012", "1", Inexact | Rounded},
+		{"NextToward", "9.99999999E+384", "Infinity", Overflow | Inexact | Rounded},
+		{"NextToward", "0", "1", Underflow | Subnormal | Inexact | Rounded},
+		{"NextToward", "1E-391", "0", Underflow | Subnormal | Inexact | Rounded | Clamped},
+		{"ScaleB", "1", "385", Overflow | Inexact | Rounded},
+		{"ScaleB", "1", "-391", Subnormal},
+		{"ScaleB", "1", "-392", Underflow | Subnormal | Inexact | Rounded | Clamped},
 	}
 	c := orderingCtx()
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s,%s,%s", tc.op, tc.x, tc.y), func(t *testing.T) {
 			d := new(Decimal)
-			x := newDecimal(t, c, tc.x)
+			x := newDecimal(t, testCtx, tc.x)
 			var res Condition
 			var err error
 			switch tc.op {
 			case "Max":
-				res, err = c.Max(d, x, newDecimal(t, c, tc.y))
+				res, err = c.Max(d, x, newDecimal(t, testCtx, tc.y))
 			case "Min":
-				res, err = c.Min(d, x, newDecimal(t, c, tc.y))
+				res, err = c.Min(d, x, newDecimal(t, testCtx, tc.y))
 			case "MaxAbs":
-				res, err = c.MaxAbs(d, x, newDecimal(t, c, tc.y))
+				res, err = c.MaxAbs(d, x, newDecimal(t, testCtx, tc.y))
 			case "MinAbs":
-				res, err = c.MinAbs(d, x, newDecimal(t, c, tc.y))
+				res, err = c.MinAbs(d, x, newDecimal(t, testCtx, tc.y))
 			case "NextPlus":
 				res, err = c.NextPlus(d, x)
 			case "NextMinus":
 				res, err = c.NextMinus(d, x)
 			case "NextToward":
-				res, err = c.NextToward(d, x, newDecimal(t, c, tc.y))
+				res, err = c.NextToward(d, x, newDecimal(t, testCtx, tc.y))
 			case "LogB":
 				res, err = c.LogB(d, x)
 			case "ScaleB":
-				res, err = c.ScaleB(d, x, newDecimal(t, c, tc.y))
+				res, err = c.ScaleB(d, x, newDecimal(t, testCtx, tc.y))
 			default:
 				t.Fatalf("unknown op %s", tc.op)
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := res & signals; got != tc.expected {
+			if got := res; got != tc.expected {
 				t.Errorf("%s(%s, %s) raised %v, want %v", tc.op, tc.x, tc.y, got, tc.expected)
+			}
+		})
+	}
+}
+
+// TestNextLargeContexts checks the next-* operations in contexts whose Etiny is
+// far below the operand, or below the system exponent limit, such as
+// BaseContext.WithPrecision. These must not depend on adding a tiny value.
+func TestNextLargeContexts(t *testing.T) {
+	wide := BaseContext.WithPrecision(9)
+	wide.MaxExponent = 60000
+	wide.MinExponent = -60000
+	tests := []struct {
+		c        *Context
+		op, x, y string
+		expected string
+		err      string
+	}{
+		{c: BaseContext.WithPrecision(9), op: "NextPlus", x: "1", expected: "100000001E-8"},
+		{c: BaseContext.WithPrecision(9), op: "NextMinus", x: "1", expected: "999999999E-9"},
+		{c: BaseContext.WithPrecision(9), op: "NextToward", x: "1", y: "2", expected: "100000001E-8"},
+		{c: BaseContext.WithPrecision(9), op: "NextPlus", x: "-1E+99999", expected: "-999999999E99990"},
+		// The smallest subnormal lies beyond the system limit.
+		{c: BaseContext.WithPrecision(9), op: "NextMinus", x: "0", err: "exponent out of range"},
+		{c: wide, op: "NextPlus", x: "1E+59000", expected: "100000001E58992"},
+		{c: wide, op: "NextMinus", x: "1E+59000", expected: "999999999E58991"},
+		{c: wide, op: "NextPlus", x: "1E-70000", expected: "1E-60008"},
+		{c: wide, op: "NextMinus", x: "1E-70000", expected: "0E-60008"},
+		{c: wide, op: "NextPlus", x: "9.99999999E+60000", expected: "Inf"},
+		{c: wide, op: "NextMinus", x: "1E+70000", expected: "999999999E59992"},
+		// Zero precision is rejected rather than producing a malformed Nmax.
+		{c: &BaseContext, op: "NextPlus", x: "1", err: errZeroPrecisionStr},
+		{c: &BaseContext, op: "NextMinus", x: "Infinity", err: errZeroPrecisionStr},
+		{c: &BaseContext, op: "NextToward", x: "1", y: "2", err: errZeroPrecisionStr},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s,%s,%s,%d", tc.op, tc.x, tc.y, tc.c.MaxExponent), func(t *testing.T) {
+			// Fill d with junk to make sure every field is set.
+			d := &Decimal{Form: Infinite, Negative: true, Exponent: 12345}
+			d.Coeff.SetInt64(9221)
+			x := newDecimal(t, testCtx, tc.x)
+			var err error
+			switch tc.op {
+			case "NextPlus":
+				_, err = tc.c.NextPlus(d, x)
+			case "NextMinus":
+				_, err = tc.c.NextMinus(d, x)
+			case "NextToward":
+				_, err = tc.c.NextToward(d, x, newDecimal(t, testCtx, tc.y))
+			default:
+				t.Fatalf("unknown op %s", tc.op)
+			}
+			if tc.err != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.err) {
+					t.Fatalf("%s(%s) = %s, %v; want error %q", tc.op, tc.x, canon(d), err, tc.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := canon(d); got != tc.expected {
+				t.Errorf("%s(%s) = %s, want %s", tc.op, tc.x, got, tc.expected)
+			}
+		})
+	}
+}
+
+// TestOrderingAliasing checks that the result may be either operand.
+func TestOrderingAliasing(t *testing.T) {
+	c := orderingCtx()
+	d := newDecimal(t, c, "-1")
+	d.CopySign(newDecimal(t, c, "5"), d)
+	if got := canon(d); got != "-5E0" {
+		t.Errorf("CopySign(5, d=-1) = %s, want -5E0", got)
+	}
+	d = newDecimal(t, c, "-7")
+	if _, err := c.NextToward(d, newDecimal(t, c, "-7"), d); err != nil {
+		t.Fatal(err)
+	}
+	if got := canon(d); got != "-7E0" {
+		t.Errorf("NextToward(-7, d=-7) = %s, want -7E0", got)
+	}
+	d = newDecimal(t, c, "1")
+	if _, err := c.NextPlus(d, d); err != nil {
+		t.Fatal(err)
+	}
+	if got := canon(d); got != "100000001E-8" {
+		t.Errorf("NextPlus(d=1) = %s, want 100000001E-8", got)
+	}
+	d = newDecimal(t, c, "-0")
+	if _, err := c.NextMinus(d, d); err != nil {
+		t.Fatal(err)
+	}
+	if got := canon(d); got != "-1E-391" {
+		t.Errorf("NextMinus(d=-0) = %s, want -1E-391", got)
+	}
+}
+
+// TestDirectedOverflow checks that a result overflowing under rounding toward
+// zero is clamped to Nmax, and that subnormal rounding respects the sign.
+func TestDirectedOverflow(t *testing.T) {
+	tests := []struct {
+		rounding Rounder
+		op, x, y string
+		expected string
+	}{
+		{RoundDown, "Max", "1E+400", "1", "999E382"},
+		{RoundDown, "Min", "-1E+400", "1", "-999E382"},
+		{RoundFloor, "Max", "1E+400", "1", "999E382"},
+		{RoundFloor, "Min", "-1E+400", "1", "-Inf"},
+		{RoundCeiling, "Max", "1E+400", "1", "Inf"},
+		{RoundCeiling, "Min", "-1E+400", "1", "-999E382"},
+		{Round05Up, "ScaleB", "1", "390", "999E382"},
+		{RoundHalfEven, "ScaleB", "1", "390", "Inf"},
+		{RoundFloor, "Min", "-1E-102", "NaN", "-1E-101"},
+		{RoundCeiling, "Min", "-1E-102", "NaN", "-0E-101"},
+		{RoundCeiling, "Max", "1E-102", "NaN", "1E-101"},
+		{RoundFloor, "Max", "1E-102", "NaN", "0E-101"},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s,%s,%s,%s", tc.rounding, tc.op, tc.x, tc.y), func(t *testing.T) {
+			c := BaseContext.WithPrecision(3)
+			c.MaxExponent = 384
+			c.MinExponent = -99
+			c.Rounding = tc.rounding
+			c.Traps = 0
+			d := new(Decimal)
+			x := newDecimal(t, testCtx, tc.x)
+			y := newDecimal(t, testCtx, tc.y)
+			var err error
+			switch tc.op {
+			case "Max":
+				_, err = c.Max(d, x, y)
+			case "Min":
+				_, err = c.Min(d, x, y)
+			case "ScaleB":
+				_, err = c.ScaleB(d, x, y)
+			default:
+				t.Fatalf("unknown op %s", tc.op)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := canon(d); got != tc.expected {
+				t.Errorf("%s(%s, %s) = %s, want %s", tc.op, tc.x, tc.y, got, tc.expected)
 			}
 		})
 	}
