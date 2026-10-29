@@ -716,7 +716,7 @@ func (d *Decimal) Reduce(x *Decimal) (*Decimal, int) {
 	neg := false
 	switch x.Sign() {
 	case 0:
-		nd = int(d.NumDigits())
+		nd = int(x.NumDigits())
 		d.SetInt64(0)
 		return d, nd - 1
 	case -1:
