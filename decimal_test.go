@@ -981,6 +981,23 @@ func TestReduce(t *testing.T) {
 			}
 		})
 	}
+
+	for _, s := range []string{"0", "0E+3", "000"} {
+		t.Run("reused "+s, func(t *testing.T) {
+			x, _, err := NewFromString(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d := New(10, 0)
+			_, got := d.Reduce(x)
+			if got != 0 {
+				t.Fatalf("got %v zeros removed, expected 0", got)
+			}
+			if gotValue := d.String(); gotValue != "0" {
+				t.Fatalf("got reduced value %s, expected 0", gotValue)
+			}
+		})
+	}
 }
 
 // TestRootZeroTraps checks that a root of zero whose exponent is clamped
