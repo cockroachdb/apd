@@ -79,6 +79,7 @@ func (c *Context) WithPrecision(p uint32) *Context {
 }
 
 // goError converts flags into an error based on c.Traps.
+//
 //gcassert:inline
 func (c *Context) goError(flags Condition) (Condition, error) {
 	if flags == 0 {
@@ -95,6 +96,7 @@ func (c *Context) etiny() int32 {
 // shouldSetAsNaN determines whether setAsNaN should be called, given
 // the provided values, where x is required and y is optional. It is
 // split from setAsNaN to permit inlining of this function.
+//
 //gcassert:inline
 func (c *Context) shouldSetAsNaN(x, y *Decimal) bool {
 	return x.Form == NaNSignaling || x.Form == NaN ||
@@ -649,24 +651,54 @@ func (c *Context) Cbrt(d, x *Decimal) (Condition, error) {
 		}
 	}
 
-	z0.Set(x)
+	exact := false
+	if c.Precision != 0 {
+		// Certify the guard digit: convergence alone cannot distinguish an
+		// exact root or rounding midpoint from an estimate just above it.
+		e := ax.NumDigits() + int64(ax.Exponent) - 1
+		if e < 0 && e%3 != 0 {
+			e -= 3
+		}
+		nc.Rounding = RoundDown
+		if _, err := nc.goError(nc.quantize(&z, &z, int32(e/3)-int32(c.Precision))); err != nil {
+			return 0, err
+		}
+		var cube Decimal
+		cmpCube := func() int {
+			cube.Coeff.Mul(&z.Coeff, &z.Coeff)
+			cube.Coeff.Mul(&cube.Coeff, &z.Coeff)
+			cube.Exponent = 3 * z.Exponent
+			return cube.Cmp(&ax)
+		}
+		for {
+			cmp := cmpCube()
+			if cmp == 0 {
+				exact = true
+				break
+			}
+			if cmp > 0 {
+				z.Coeff.Sub(&z.Coeff, bigOne)
+				continue
+			}
+			z.Coeff.Add(&z.Coeff, bigOne)
+			if cmpCube() > 0 {
+				z.Coeff.Sub(&z.Coeff, bigOne)
+				break
+			}
+		}
+		if !exact {
+			// Preserve a nonzero discarded tail without approximating its value.
+			z.Coeff.Mul(&z.Coeff, bigTen)
+			z.Coeff.Add(&z.Coeff, bigOne)
+			z.Exponent--
+		}
+	}
+	z.Negative = neg
 	res := c.round(d, &z)
-	res, err := c.goError(res)
-	d.Negative = neg
-
-	// Set z = d^3 to check for exactness.
-	ed.Mul(&z, d, d)
-	ed.Mul(&z, &z, d)
-
-	if err := ed.Err(); err != nil {
-		return 0, err
+	if exact && !res.Inexact() {
+		res &^= Rounded
 	}
-
-	// Result is exact
-	if z0.Cmp(&z) == 0 {
-		return 0, nil
-	}
-	return res, err
+	return c.goError(res)
 }
 
 func (c *Context) logSpecials(d, x *Decimal) (bool, Condition, error) {
