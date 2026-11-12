@@ -801,6 +801,36 @@ func TestQuantizeRounding(t *testing.T) {
 	}
 }
 
+func TestSubnormalDirectedRounding(t *testing.T) {
+	tests := []struct {
+		s      string
+		rnd    Rounder
+		expect string
+	}{
+		{s: "-3.06E-8", rnd: RoundCeiling, expect: "-0.000000"},
+		{s: "-3.06E-8", rnd: RoundFloor, expect: "-0.000001"},
+		{s: "3.06E-8", rnd: RoundCeiling, expect: "0.000001"},
+		{s: "3.06E-8", rnd: RoundFloor, expect: "0.000000"},
+	}
+	one := New(1, 0)
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s %s", tc.s, tc.rnd), func(t *testing.T) {
+			c := Context{Precision: 2, MaxExponent: 999, MinExponent: -5, Rounding: tc.rnd, Traps: DefaultTraps &^ Subnormal &^ Underflow}
+			x, _, err := NewFromString(tc.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got Decimal
+			if _, err := c.Mul(&got, x, one); err != nil {
+				t.Fatal(err)
+			}
+			if s := got.String(); s != tc.expect {
+				t.Fatalf("expected: %s, got: %s", tc.expect, s)
+			}
+		})
+	}
+}
+
 func TestRoundToIntegralRounding(t *testing.T) {
 	tests := []struct {
 		s      string
