@@ -712,6 +712,16 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 	nc := c.WithPrecision(p)
 	nc.Rounding = RoundHalfEven
+	// The terms of the power series are much smaller than the result, so
+	// they are computed with the package's exponent range: a term below the
+	// caller's Emin would be subnormal, and the trap would stop the series
+	// before it converged.
+	nc.MinExponent = MinExponent
+	nc.MaxExponent = MaxExponent
+	// The intermediate results of the series are inexact and can be
+	// subnormal, which must not stop the computation. The conditions of the
+	// caller's context are applied to the result.
+	nc.Traps &^= Inexact | Rounded | Subnormal | Underflow | Clamped
 	ed := MakeErrDecimal(nc)
 
 	var tmp1, tmp2, tmp3, tmp4, z, resAdjust Decimal
@@ -814,6 +824,12 @@ func (c *Context) Ln(d, x *Decimal) (Condition, error) {
 
 			if tmp4.Abs(&tmp4).Cmp(&eps) <= 0 {
 				break
+			}
+			// A trap makes the later steps no-ops, and tmp4 would then keep
+			// the value of 2n+1, which is never divided again, so the loop
+			// would never end.
+			if err := ed.Err(); err != nil {
+				return 0, err
 			}
 		}
 	} else {
