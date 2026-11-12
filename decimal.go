@@ -349,7 +349,7 @@ func (d *Decimal) setExponent(c *Context, nd int64, res Condition, xs ...int64) 
 			frac.Abs(&frac)
 			if !frac.IsZero() {
 				res |= Inexact
-				if c.Rounding.ShouldAddOne(&integ.Coeff, integ.Negative, frac.Cmp(decimalHalf)) {
+				if c.Rounding.ShouldAddOne(&integ.Coeff, d.Negative, frac.Cmp(decimalHalf)) {
 					integ.Coeff.Add(&integ.Coeff, bigOne)
 				}
 			}
