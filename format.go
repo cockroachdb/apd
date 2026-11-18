@@ -138,6 +138,9 @@ func fmtF(buf []byte, d *Decimal, digits []byte) []byte {
 		}
 	} else if d.Exponent >= 0 {
 		buf = append(buf, digits...)
+		if d.Exponent > 0 && d.Coeff.Sign() == 0 {
+			return buf
+		}
 		for i := int32(0); i < d.Exponent; i++ {
 			buf = append(buf, '0')
 		}
