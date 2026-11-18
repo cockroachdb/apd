@@ -17,6 +17,8 @@ package apd
 import (
 	"errors"
 	"fmt"
+	"math"
+	"math/bits"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -244,12 +246,33 @@ func (d *Decimal) setCoefficient(x int64) {
 	d.Form = Finite
 }
 
-// SetFloat64 sets d's Coefficient and Exponent to x and returns d. d will
-// hold the exact value of f.
+// SetFloat64 sets d to the exact value of f and returns d.
 func (d *Decimal) SetFloat64(f float64) (*Decimal, error) {
-	var buf [32]byte // Avoid most of the allocations in strconv.
-	_, _, err := d.SetString(string(strconv.AppendFloat(buf[:0], f, 'E', -1, 64)))
-	return d, err
+	if f == 0 || math.IsInf(f, 0) || math.IsNaN(f) {
+		_, _, err := d.SetString(strconv.FormatFloat(f, 'E', -1, 64))
+		return d, err
+	}
+
+	// Express |f| as an odd integer times a power of two.
+	frac, exp := math.Frexp(math.Abs(f))
+	mantissa := uint64(math.Ldexp(frac, 53))
+	zeros := bits.TrailingZeros64(mantissa)
+	exp += zeros - 53
+	d.Form = Finite
+	d.Negative = math.Signbit(f)
+	d.Coeff.SetUint64(mantissa >> uint(zeros))
+	if exp < 0 {
+		// For a denominator of 2^n, scale the coefficient by 10^n / 2^n.
+		var scale BigInt
+		scale.Rsh(tableExp10(int64(-exp), &scale), uint(-exp))
+		d.Coeff.Mul(&d.Coeff, &scale)
+		d.Exponent = int32(exp)
+	} else {
+		d.Coeff.Lsh(&d.Coeff, uint(exp))
+		d.Exponent = 0
+		d.Reduce(d)
+	}
+	return d, nil
 }
 
 // Int64 returns the int64 representation of x. If x cannot be represented in an

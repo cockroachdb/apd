@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"math/bits"
 	"strings"
 	"testing"
@@ -369,6 +370,38 @@ func TestFloat64(t *testing.T) {
 				t.Fatalf("expected %v, got %v", tc, f)
 			}
 		})
+	}
+}
+
+func TestSetFloat64Exact(t *testing.T) {
+	var d Decimal
+	for _, f := range []float64{
+		0.1, -0.1, math.Nextafter(1, 0), math.Nextafter(1, 2),
+		0x1.0000000000001p60, math.MaxFloat64, math.SmallestNonzeroFloat64,
+	} {
+		if _, err := d.SetFloat64(f); err != nil {
+			t.Fatal(err)
+		}
+		got, ok := new(big.Rat).SetString(d.String())
+		want := new(big.Rat).SetFloat64(f)
+		if !ok || got.Cmp(want) != 0 {
+			t.Errorf("SetFloat64(%g) = %s, want %s", f, &d, want)
+		}
+	}
+}
+
+func TestSetFloat64Special(t *testing.T) {
+	d := New(123, -2)
+	for _, tc := range []struct {
+		f    float64
+		want string
+	}{
+		{math.Inf(-1), "-Infinity"}, {math.Inf(1), "Infinity"},
+		{math.NaN(), "NaN"}, {math.Copysign(0, -1), "-0"}, {0, "0"}, {1000, "1E+3"},
+	} {
+		if _, err := d.SetFloat64(tc.f); err != nil || d.String() != tc.want {
+			t.Errorf("SetFloat64(%g) = %s, %v; want %s", tc.f, d, err, tc.want)
+		}
 	}
 }
 
