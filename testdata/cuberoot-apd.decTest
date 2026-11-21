@@ -37,6 +37,9 @@ cbtx022 cuberoot 0E+5 -> 0E+1
 cbtx023 cuberoot 8.0 -> 2.0
 cbtx024 cuberoot 8.00 -> 2.0
 
+cbtx025 cuberoot Infinity -> Infinity
+cbtx026 cuberoot -Infinity -> -Infinity
+
 cbtx030 cuberoot +0.1 -> 0.464158883 Inexact Rounded
 cbtx031 cuberoot -0.1 -> -0.464158883 Inexact Rounded
 cbtx032 cuberoot +0.01 -> 0.215443469 Inexact Rounded

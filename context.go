@@ -445,12 +445,14 @@ func (c *Context) rootSpecials(d, x *Decimal, factor int32) (bool, Condition, er
 		return true, res, err
 	}
 	if x.Form == Infinite {
-		if x.Negative {
+		negative := x.Negative
+		if negative && factor%2 == 0 {
 			d.Set(decimalNaN)
 			res, err := c.goError(InvalidOperation)
 			return true, res, err
 		}
 		d.Set(decimalInfinity)
+		d.Negative = negative
 		return true, 0, nil
 	}
 
